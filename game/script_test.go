@@ -1668,6 +1668,12 @@ end
 }
 
 func TestLuaBotCanSendMessages(t *testing.T) {
+	// Sit/stand use the legacy action packet, whose padding is derived from
+	// the clock; pin it so "want" matches what the bot sent.
+	fixed := time.UnixMilli(1_700_000_000_000)
+	restoreClock := network.LegacyPaddingClock
+	network.LegacyPaddingClock = func() time.Time { return fixed }
+	t.Cleanup(func() { network.LegacyPaddingClock = restoreClock })
 	path := filepath.Join(t.TempDir(), "bot.lua")
 	if err := os.WriteFile(path, []byte(`
 function tick()

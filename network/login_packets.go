@@ -316,11 +316,15 @@ func buildLegacyActionRequestPacket(targetGID uint32, action uint8) []byte {
 	return packet
 }
 
+// LegacyPaddingClock feeds the time-derived padding of legacy packets. Tests
+// that compare whole packets built at different moments pin it.
+var LegacyPaddingClock = time.Now
+
 func fillLegacyPacketPadding(pad []byte) {
 	if len(pad) == 0 {
 		return
 	}
-	now := uint32(time.Now().UnixMilli())
+	now := uint32(LegacyPaddingClock().UnixMilli())
 	text := fmt.Sprintf("%x", now^(now>>uint(len(pad))))
 	if text == "" {
 		text = "0"
