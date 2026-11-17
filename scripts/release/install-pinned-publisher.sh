@@ -16,6 +16,8 @@ SHA="${1:-}"
 REPO_URL="${REPO_URL:-https://github.com/Turor/goro.git}"
 PIN="${PIN:-$HOME/Work/goro-release-publisher/pinned}"
 export PATH="${GO_ROOT:-$HOME/Work/toolchains/go}/bin:$PATH" CGO_ENABLED=0
+# Use the installed toolchain only and never rewrite go.mod/go.sum.
+export GOTOOLCHAIN=local GOFLAGS=-mod=readonly
 
 tmp=$(mktemp -d)
 trap 'chmod -R u+w "$tmp" 2>/dev/null; rm -rf "$tmp"' EXIT
