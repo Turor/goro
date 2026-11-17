@@ -1,0 +1,12 @@
+[Unit]
+Description=Poll Turor/goro main for a new release every 2 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=2min
+AccuracySec=15s
+Persistent=true
+Unit=goro-release-publish.service
+
+[Install]
+WantedBy=timers.target

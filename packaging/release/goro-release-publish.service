@@ -1,0 +1,14 @@
+# Controller user unit (template). Install only after the publish path is
+# reviewed: pin the publisher with scripts/release/install-pinned-publisher.sh
+# <reviewed sha>, cp both units to ~/.config/systemd/user/ and
+# `systemctl --user enable --now goro-release-publish.timer`.
+# It runs the pinned copy only, never a checkout of main.
+[Unit]
+Description=Publish signed goro main-channel release to Garage
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/Work/goro-release-publisher
+ExecStart=%h/Work/goro-release-publisher/pinned/poll-and-publish.sh
+Nice=10
