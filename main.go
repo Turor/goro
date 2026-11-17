@@ -9,9 +9,13 @@ import (
 	"github.com/kivutar/goro/config"
 	"github.com/kivutar/goro/glog"
 	"github.com/kivutar/goro/render"
+	"github.com/kivutar/goro/updater"
 )
 
 func main() {
+	if updater.HandleFlags(os.Args[1:], os.Stdout) {
+		return
+	}
 	cfg, err := config.LoadConfig(os.Args[1:])
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -23,6 +27,21 @@ func main() {
 		os.Exit(1)
 	}
 	defer closeLog()
+
+	if updater.Enabled(os.Args[1:]) {
+		res, err := updater.CheckOnLaunch(os.Args[1:], glog.Infof)
+		switch {
+		case err != nil:
+			// A failed update never blocks play: the installed binary is unchanged.
+			glog.Warnf("update check failed: %v", err)
+		case res.Outcome == updater.Applied:
+			glog.Infof("updated to %s; restarting", res.Version)
+			closeLog()
+			os.Exit(0)
+		case res.Reason != "":
+			glog.Infof("update %s: %s", res.Outcome, res.Reason)
+		}
+	}
 
 	game, err := app.New(cfg)
 	if err != nil {

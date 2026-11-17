@@ -1,0 +1,12 @@
+# Controller user unit (template). Install only after the publish path is
+# reviewed: cp to ~/.config/systemd/user/ and `systemctl --user enable --now
+# goro-release-publish.timer`. Until then run DRY_RUN=1 by hand.
+[Unit]
+Description=Publish signed goro main-channel release to Garage
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/Work/goro-release-publisher
+ExecStart=%h/Work/goro-release-publisher/src/scripts/release/poll-and-publish.sh
+Nice=10
