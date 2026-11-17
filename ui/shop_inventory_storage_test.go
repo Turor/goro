@@ -477,7 +477,7 @@ func TestInventoryItemDisplayNameAddsSlotCountForIdentifiedItems(t *testing.T) {
 	if got := inventoryItemDisplayName(manager, session.InventoryItem{ItemID: 2608, Identified: true}); got != "Ring [1]" {
 		t.Fatalf("pre-suffixed slotted name = %q, want Ring [1]", got)
 	}
-	if got := inventoryItemDisplayName(manager, session.InventoryItem{ItemID: 2607, Type: db.ItemTypeArmor, Identified: true, Cards: [4]uint16{4001, 4001, 4002}}); got != "Double Poring Clip Fabre [1]" {
+	if got := inventoryItemDisplayName(manager, session.InventoryItem{ItemID: 2607, Type: db.ItemTypeArmor, Identified: true, Cards: [4]uint32{4001, 4001, 4002}}); got != "Double Poring Clip Fabre [1]" {
 		t.Fatalf("carded name = %q, want Double Poring Clip Fabre [1]", got)
 	}
 }
@@ -778,7 +778,7 @@ func TestMakingItemWindowOpensServerList(t *testing.T) {
 	window := MakingItemWindow{}
 	window.OpenList(Context{ScreenW: 800, ScreenH: 600}, network.MakingItemList{
 		Items: []network.MakingItemOption{
-			{ItemID: 501, Material: [3]uint16{1000, 990, 5}},
+			{ItemID: 501, Material: [3]uint32{1000, 990, 5}},
 			{ItemID: 713},
 		},
 	})
@@ -786,7 +786,7 @@ func TestMakingItemWindowOpensServerList(t *testing.T) {
 	if !window.IsOpen() {
 		t.Fatal("making item window did not open")
 	}
-	if len(window.items) != 2 || window.items[0].ItemID != 501 || window.items[0].Material != [3]uint16{1000, 990, 5} {
+	if len(window.items) != 2 || window.items[0].ItemID != 501 || window.items[0].Material != [3]uint32{1000, 990, 5} {
 		t.Fatalf("making item window items = %+v", window.items)
 	}
 

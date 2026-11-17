@@ -47,7 +47,7 @@ type EquipmentWindow struct {
 }
 
 type equipmentItemIconKey struct {
-	itemID     uint16
+	itemID     uint32
 	identified bool
 }
 

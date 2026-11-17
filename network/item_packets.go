@@ -118,6 +118,8 @@ var itemDropPacketLayouts = []itemDropPacketLayout{
 }
 
 var moveToStoragePacketLayouts = []storageMovePacketLayout{
+	// 20250716 (Hercules main): unshuffled 0x0364; 0x00F3 is global chat there.
+	{date: ClientDate20250716, opcode: PacketCZMoveToStorage2025, length: 8, indexOffset: 2, amountOffset: 4},
 	// 2008-09-10 keeps the 2007-02-12 shuffled Kafra packet offsets in
 	// rAthena's packet DB. The unshuffled 0x00F3 packet is not accepted by
 	// that server profile.
@@ -126,13 +128,14 @@ var moveToStoragePacketLayouts = []storageMovePacketLayout{
 }
 
 var moveFromStoragePacketLayouts = []storageMovePacketLayout{
+	{date: ClientDate20250716, opcode: PacketCZMoveFromStorage2025, length: 8, indexOffset: 2, amountOffset: 4},
 	{date: 20070212, opcode: PacketCZMoveFromStorage, length: 22, indexOffset: 14, amountOffset: 18},
 	{date: 20050509, opcode: PacketCZMoveFromStorage, length: 22, indexOffset: 14, amountOffset: 18},
 }
 
 type FloorItemEntry struct {
 	ID         uint32
-	ItemID     uint16
+	ItemID     uint32
 	Identified bool
 	X          int
 	Y          int
@@ -143,12 +146,12 @@ type FloorItemEntry struct {
 }
 
 type MakingArrowList struct {
-	ItemIDs []uint16
+	ItemIDs []uint32
 }
 
 type MakingItemOption struct {
-	ItemID   uint16
-	Material [3]uint16
+	ItemID   uint32
+	Material [3]uint32
 }
 
 type MakingItemList struct {
@@ -158,7 +161,7 @@ type MakingItemList struct {
 
 type MakingItemAck struct {
 	Result uint16
-	ItemID uint16
+	ItemID uint32
 }
 
 func (a MakingItemAck) Success() bool {
@@ -171,9 +174,9 @@ func (a MakingItemAck) Alchemist() bool {
 
 type RepairItem struct {
 	Index  uint16
-	ItemID uint16
+	ItemID uint32
 	Refine uint8
-	Cards  [4]uint16
+	Cards  [4]uint32
 }
 
 type RepairItemList struct {
@@ -191,9 +194,9 @@ func (a RepairItemAck) Success() bool {
 
 type WeaponRefineItem struct {
 	Index  uint16
-	ItemID uint16
+	ItemID uint32
 	Refine uint8
-	Cards  [4]uint16
+	Cards  [4]uint32
 }
 
 type WeaponRefineList struct {
@@ -202,7 +205,7 @@ type WeaponRefineList struct {
 
 type WeaponRefineAck struct {
 	Result uint32
-	ItemID uint16
+	ItemID uint32
 }
 
 func (a WeaponRefineAck) Success() bool {
@@ -216,26 +219,27 @@ type FloorItemDisappear struct {
 type ItemPickupAck struct {
 	Index      uint16
 	Amount     uint16
-	ItemID     uint16
+	ItemID     uint32
 	Location   uint16
 	Identified bool
 	Type       uint8
 	Damaged    bool
 	Refine     uint8
 	Result     uint8
+	Cards      [4]uint32
 }
 
 type UseItemAck struct {
 	Index  uint16
 	Amount uint16
-	ItemID uint16
+	ItemID uint32
 	AID    uint32
 	Result uint8
 }
 
 type InventoryItem struct {
 	Index        uint16
-	ItemID       uint16
+	ItemID       uint32
 	Type         uint8
 	Location     uint16 // Allowed equipment slots.
 	WearLocation uint16 // Occupied equipment slots, or zero when unequipped.
@@ -245,7 +249,7 @@ type InventoryItem struct {
 	Equipped     bool
 	Damaged      bool
 	Refine       uint8
-	Cards        [4]uint16
+	Cards        [4]uint32
 }
 
 type InventoryItemDelete struct {
@@ -315,7 +319,7 @@ type ShopDealSelection struct {
 }
 
 type ShopBuyItem struct {
-	ItemID        uint16
+	ItemID        uint32
 	Type          uint8
 	Price         uint32
 	DiscountPrice uint32
@@ -338,19 +342,24 @@ type SellRequestItem struct {
 }
 
 type BuyRequestItem struct {
-	ItemID uint16
+	ItemID uint32
 	Amount uint16
 }
 
 func ParseFloorItemEntry(packet Packet) (FloorItemEntry, bool, error) {
 	switch packet.ID {
+	case PacketZCItemFallEntry2025:
+		return parseItemFallEntry2025(packet)
 	case 0x009D:
+		if len(packet.Data) >= 19 {
+			return parseItemEntry2025(packet)
+		}
 		if len(packet.Data) < 17 {
 			return FloorItemEntry{}, false, fmt.Errorf("ZC_ITEM_ENTRY too short: %d", len(packet.Data))
 		}
 		return FloorItemEntry{
 			ID:         binary.LittleEndian.Uint32(packet.Data[2:6]),
-			ItemID:     binary.LittleEndian.Uint16(packet.Data[6:8]),
+			ItemID:     uint32(binary.LittleEndian.Uint16(packet.Data[6:8])),
 			Identified: packet.Data[8] != 0,
 			X:          int(binary.LittleEndian.Uint16(packet.Data[9:11])),
 			Y:          int(binary.LittleEndian.Uint16(packet.Data[11:13])),
@@ -364,7 +373,7 @@ func ParseFloorItemEntry(packet Packet) (FloorItemEntry, bool, error) {
 		}
 		return FloorItemEntry{
 			ID:         binary.LittleEndian.Uint32(packet.Data[2:6]),
-			ItemID:     binary.LittleEndian.Uint16(packet.Data[6:8]),
+			ItemID:     uint32(binary.LittleEndian.Uint16(packet.Data[6:8])),
 			Identified: packet.Data[8] != 0,
 			X:          int(binary.LittleEndian.Uint16(packet.Data[9:11])),
 			Y:          int(binary.LittleEndian.Uint16(packet.Data[11:13])),
@@ -394,6 +403,8 @@ func ParseItemPickupAck(packet Packet) (ItemPickupAck, bool, error) {
 		return parseItemPickupAckLocation16(packet)
 	case 0x0990, 0x0A0C, 0x0A37:
 		return parseItemPickupAckLocation32(packet)
+	case PacketZCItemPickupAck2025:
+		return parseItemPickupAck2025(packet)
 	default:
 		return ItemPickupAck{}, false, nil
 	}
@@ -415,7 +426,7 @@ func ParseUseItemAck(packet Packet) (UseItemAck, bool, error) {
 		case len(packet.Data) >= 15:
 			return UseItemAck{
 				Index:  binary.LittleEndian.Uint16(packet.Data[2:4]),
-				ItemID: uint16(binary.LittleEndian.Uint32(packet.Data[4:8])),
+				ItemID: binary.LittleEndian.Uint32(packet.Data[4:8]),
 				AID:    binary.LittleEndian.Uint32(packet.Data[8:12]),
 				Amount: binary.LittleEndian.Uint16(packet.Data[12:14]),
 				Result: packet.Data[14],
@@ -423,7 +434,7 @@ func ParseUseItemAck(packet Packet) (UseItemAck, bool, error) {
 		case len(packet.Data) >= 13:
 			return UseItemAck{
 				Index:  binary.LittleEndian.Uint16(packet.Data[2:4]),
-				ItemID: binary.LittleEndian.Uint16(packet.Data[4:6]),
+				ItemID: uint32(binary.LittleEndian.Uint16(packet.Data[4:6])),
 				AID:    binary.LittleEndian.Uint32(packet.Data[6:10]),
 				Amount: binary.LittleEndian.Uint16(packet.Data[10:12]),
 				Result: packet.Data[12],
@@ -443,7 +454,7 @@ func parseItemPickupAckLocation16(packet Packet) (ItemPickupAck, bool, error) {
 	return ItemPickupAck{
 		Index:      binary.LittleEndian.Uint16(packet.Data[2:4]),
 		Amount:     binary.LittleEndian.Uint16(packet.Data[4:6]),
-		ItemID:     binary.LittleEndian.Uint16(packet.Data[6:8]),
+		ItemID:     uint32(binary.LittleEndian.Uint16(packet.Data[6:8])),
 		Identified: packet.Data[8] != 0,
 		Damaged:    packet.Data[9] != 0,
 		Refine:     packet.Data[10],
@@ -460,7 +471,7 @@ func parseItemPickupAckLocation32(packet Packet) (ItemPickupAck, bool, error) {
 	return ItemPickupAck{
 		Index:      binary.LittleEndian.Uint16(packet.Data[2:4]),
 		Amount:     binary.LittleEndian.Uint16(packet.Data[4:6]),
-		ItemID:     binary.LittleEndian.Uint16(packet.Data[6:8]),
+		ItemID:     uint32(binary.LittleEndian.Uint16(packet.Data[6:8])),
 		Identified: packet.Data[8] != 0,
 		Damaged:    packet.Data[9] != 0,
 		Refine:     packet.Data[10],
@@ -490,6 +501,8 @@ func ParseInventoryItemList(packet Packet) ([]InventoryItem, bool, error) {
 		return parseEquipInventoryItems4(packet, 31)
 	case 0x0A0D:
 		return parseEquipInventoryItems4(packet, 57)
+	case PacketZCInventoryItemList2025, PacketZCInventoryEquipList2025:
+		return parseItemList2025(packet, InventoryTypeInventory)
 	default:
 		return nil, false, nil
 	}
@@ -505,6 +518,8 @@ func ParseStorageItemList(packet Packet) ([]InventoryItem, bool, error) {
 		return parseEquipInventoryItems(packet, 20)
 	case 0x02D1:
 		return parseEquipInventoryItems(packet, 26)
+	case PacketZCInventoryItemList2025, PacketZCInventoryEquipList2025:
+		return parseItemList2025(packet, InventoryTypeStorage)
 	default:
 		return nil, false, nil
 	}
@@ -524,6 +539,8 @@ func ParseCartItemList(packet Packet) ([]InventoryItem, bool, error) {
 		return parseEquipInventoryItems(packet, 26)
 	case 0x0994:
 		return parseEquipInventoryItems4(packet, 31)
+	case PacketZCInventoryItemList2025, PacketZCInventoryEquipList2025:
+		return parseItemList2025(packet, InventoryTypeCart)
 	default:
 		return nil, false, nil
 	}
@@ -538,13 +555,13 @@ func parseNormalInventoryItems(packet Packet, entrySize int) ([]InventoryItem, b
 	}
 	items := make([]InventoryItem, 0, (len(packet.Data)-4)/entrySize)
 	for offset := 4; offset+entrySize <= len(packet.Data); offset += entrySize {
-		var cards [4]uint16
+		var cards [4]uint32
 		if entrySize >= 18 {
 			cards = readItemCards(packet.Data, offset+10)
 		}
 		items = append(items, InventoryItem{
 			Index:      binary.LittleEndian.Uint16(packet.Data[offset : offset+2]),
-			ItemID:     binary.LittleEndian.Uint16(packet.Data[offset+2 : offset+4]),
+			ItemID:     uint32(binary.LittleEndian.Uint16(packet.Data[offset+2 : offset+4])),
 			Type:       packet.Data[offset+4],
 			Identified: packet.Data[offset+5] != 0,
 			Amount:     binary.LittleEndian.Uint16(packet.Data[offset+6 : offset+8]),
@@ -568,7 +585,7 @@ func parseNormalInventoryItems4(packet Packet) ([]InventoryItem, bool, error) {
 		flag := packet.Data[offset+23]
 		items = append(items, InventoryItem{
 			Index:      binary.LittleEndian.Uint16(packet.Data[offset : offset+2]),
-			ItemID:     binary.LittleEndian.Uint16(packet.Data[offset+2 : offset+4]),
+			ItemID:     uint32(binary.LittleEndian.Uint16(packet.Data[offset+2 : offset+4])),
 			Type:       packet.Data[offset+4],
 			Identified: flag&1 != 0,
 			Amount:     binary.LittleEndian.Uint16(packet.Data[offset+5 : offset+7]),
@@ -591,7 +608,7 @@ func parseEquipInventoryItems(packet Packet, entrySize int) ([]InventoryItem, bo
 		wearState := binary.LittleEndian.Uint16(packet.Data[offset+8 : offset+10])
 		items = append(items, InventoryItem{
 			Index:        binary.LittleEndian.Uint16(packet.Data[offset : offset+2]),
-			ItemID:       binary.LittleEndian.Uint16(packet.Data[offset+2 : offset+4]),
+			ItemID:       uint32(binary.LittleEndian.Uint16(packet.Data[offset+2 : offset+4])),
 			Type:         packet.Data[offset+4],
 			Identified:   packet.Data[offset+5] != 0,
 			Location:     binary.LittleEndian.Uint16(packet.Data[offset+6 : offset+8]),
@@ -620,7 +637,7 @@ func parseEquipInventoryItems4(packet Packet, entrySize int) ([]InventoryItem, b
 		wearState := binary.LittleEndian.Uint32(packet.Data[offset+9 : offset+13])
 		items = append(items, InventoryItem{
 			Index:        binary.LittleEndian.Uint16(packet.Data[offset : offset+2]),
-			ItemID:       binary.LittleEndian.Uint16(packet.Data[offset+2 : offset+4]),
+			ItemID:       uint32(binary.LittleEndian.Uint16(packet.Data[offset+2 : offset+4])),
 			Type:         packet.Data[offset+4],
 			Identified:   flag&1 != 0,
 			Location:     uint16(binary.LittleEndian.Uint32(packet.Data[offset+5 : offset+9])),
@@ -636,14 +653,27 @@ func parseEquipInventoryItems4(packet Packet, entrySize int) ([]InventoryItem, b
 	return items, true, nil
 }
 
-func readItemCards(data []byte, offset int) [4]uint16 {
-	var cards [4]uint16
+func readItemCards(data []byte, offset int) [4]uint32 {
+	var cards [4]uint32
 	for i := range cards {
 		start := offset + i*2
 		if start+2 > len(data) {
 			break
 		}
-		cards[i] = binary.LittleEndian.Uint16(data[start : start+2])
+		cards[i] = uint32(binary.LittleEndian.Uint16(data[start : start+2]))
+	}
+	return cards
+}
+
+// readItemCards32 reads four 32-bit card item IDs (PACKETVER >= 20181121).
+func readItemCards32(data []byte, offset int) [4]uint32 {
+	var cards [4]uint32
+	for i := range cards {
+		start := offset + i*4
+		if start+4 > len(data) {
+			break
+		}
+		cards[i] = binary.LittleEndian.Uint32(data[start : start+4])
 	}
 	return cards
 }
@@ -726,9 +756,9 @@ func ParseMakingArrowList(packet Packet) (MakingArrowList, bool, error) {
 	if (size-4)%2 != 0 {
 		return MakingArrowList{}, false, fmt.Errorf("ZC_MAKINGARROW_LIST odd item payload: %d", size)
 	}
-	itemIDs := make([]uint16, 0, (size-4)/2)
+	itemIDs := make([]uint32, 0, (size-4)/2)
 	for offset := 4; offset+2 <= size; offset += 2 {
-		itemIDs = append(itemIDs, binary.LittleEndian.Uint16(packet.Data[offset:offset+2]))
+		itemIDs = append(itemIDs, uint32(binary.LittleEndian.Uint16(packet.Data[offset:offset+2])))
 	}
 	return MakingArrowList{ItemIDs: itemIDs}, true, nil
 }
@@ -754,11 +784,11 @@ func ParseMakableItemList(packet Packet) (MakingItemList, bool, error) {
 	items := make([]MakingItemOption, 0, (size-4)/entrySize)
 	for offset := 4; offset+entrySize <= size; offset += entrySize {
 		items = append(items, MakingItemOption{
-			ItemID: binary.LittleEndian.Uint16(packet.Data[offset : offset+2]),
-			Material: [3]uint16{
-				binary.LittleEndian.Uint16(packet.Data[offset+2 : offset+4]),
-				binary.LittleEndian.Uint16(packet.Data[offset+4 : offset+6]),
-				binary.LittleEndian.Uint16(packet.Data[offset+6 : offset+8]),
+			ItemID: uint32(binary.LittleEndian.Uint16(packet.Data[offset : offset+2])),
+			Material: [3]uint32{
+				uint32(binary.LittleEndian.Uint16(packet.Data[offset+2 : offset+4])),
+				uint32(binary.LittleEndian.Uint16(packet.Data[offset+4 : offset+6])),
+				uint32(binary.LittleEndian.Uint16(packet.Data[offset+6 : offset+8])),
 			},
 		})
 	}
@@ -784,7 +814,7 @@ func ParseMakingItemList(packet Packet) (MakingItemList, bool, error) {
 	}
 	items := make([]MakingItemOption, 0, (size-6)/2)
 	for offset := 6; offset+2 <= size; offset += 2 {
-		items = append(items, MakingItemOption{ItemID: binary.LittleEndian.Uint16(packet.Data[offset : offset+2])})
+		items = append(items, MakingItemOption{ItemID: uint32(binary.LittleEndian.Uint16(packet.Data[offset : offset+2]))})
 	}
 	return MakingItemList{
 		Type:  binary.LittleEndian.Uint16(packet.Data[4:6]),
@@ -801,7 +831,7 @@ func ParseMakingItemAck(packet Packet) (MakingItemAck, bool, error) {
 	}
 	return MakingItemAck{
 		Result: binary.LittleEndian.Uint16(packet.Data[2:4]),
-		ItemID: binary.LittleEndian.Uint16(packet.Data[4:6]),
+		ItemID: uint32(binary.LittleEndian.Uint16(packet.Data[4:6])),
 	}, true, nil
 }
 
@@ -869,15 +899,15 @@ func ParseWeaponRefineAck(packet Packet) (WeaponRefineAck, bool, error) {
 	}
 	return WeaponRefineAck{
 		Result: binary.LittleEndian.Uint32(packet.Data[2:6]),
-		ItemID: binary.LittleEndian.Uint16(packet.Data[6:8]),
+		ItemID: uint32(binary.LittleEndian.Uint16(packet.Data[6:8])),
 	}, true, nil
 }
 
 type equipmentChoiceItem struct {
 	Index  uint16
-	ItemID uint16
+	ItemID uint32
 	Refine uint8
-	Cards  [4]uint16
+	Cards  [4]uint32
 }
 
 func parseEquipmentChoiceItems(data []byte, packetName string) ([]equipmentChoiceItem, error) {
@@ -889,13 +919,13 @@ func parseEquipmentChoiceItems(data []byte, packetName string) ([]equipmentChoic
 	for offset := 0; offset+entrySize <= len(data); offset += entrySize {
 		items = append(items, equipmentChoiceItem{
 			Index:  binary.LittleEndian.Uint16(data[offset : offset+2]),
-			ItemID: binary.LittleEndian.Uint16(data[offset+2 : offset+4]),
+			ItemID: uint32(binary.LittleEndian.Uint16(data[offset+2 : offset+4])),
 			Refine: data[offset+4],
-			Cards: [4]uint16{
-				binary.LittleEndian.Uint16(data[offset+5 : offset+7]),
-				binary.LittleEndian.Uint16(data[offset+7 : offset+9]),
-				binary.LittleEndian.Uint16(data[offset+9 : offset+11]),
-				binary.LittleEndian.Uint16(data[offset+11 : offset+13]),
+			Cards: [4]uint32{
+				uint32(binary.LittleEndian.Uint16(data[offset+5 : offset+7])),
+				uint32(binary.LittleEndian.Uint16(data[offset+7 : offset+9])),
+				uint32(binary.LittleEndian.Uint16(data[offset+9 : offset+11])),
+				uint32(binary.LittleEndian.Uint16(data[offset+11 : offset+13])),
 			},
 		})
 	}
@@ -986,7 +1016,7 @@ func ParseStorageItemAdded(packet Packet) (InventoryItem, bool, error) {
 		return InventoryItem{
 			Index:      binary.LittleEndian.Uint16(packet.Data[2:4]),
 			Amount:     uint16(minIntNetwork(int(binary.LittleEndian.Uint32(packet.Data[4:8])), int(^uint16(0)))),
-			ItemID:     binary.LittleEndian.Uint16(packet.Data[8:10]),
+			ItemID:     uint32(binary.LittleEndian.Uint16(packet.Data[8:10])),
 			Identified: packet.Data[10] != 0,
 			Damaged:    packet.Data[11] != 0,
 			Refine:     packet.Data[12],
@@ -998,7 +1028,7 @@ func ParseStorageItemAdded(packet Packet) (InventoryItem, bool, error) {
 		return InventoryItem{
 			Index:      binary.LittleEndian.Uint16(packet.Data[2:4]),
 			Amount:     uint16(minIntNetwork(int(binary.LittleEndian.Uint32(packet.Data[4:8])), int(^uint16(0)))),
-			ItemID:     binary.LittleEndian.Uint16(packet.Data[8:10]),
+			ItemID:     uint32(binary.LittleEndian.Uint16(packet.Data[8:10])),
 			Type:       packet.Data[10],
 			Identified: packet.Data[11] != 0,
 			Damaged:    packet.Data[12] != 0,
@@ -1018,7 +1048,7 @@ func ParseCartItemAdded(packet Packet) (InventoryItem, bool, error) {
 		return InventoryItem{
 			Index:      binary.LittleEndian.Uint16(packet.Data[2:4]),
 			Amount:     uint16(minIntNetwork(int(binary.LittleEndian.Uint32(packet.Data[4:8])), int(^uint16(0)))),
-			ItemID:     binary.LittleEndian.Uint16(packet.Data[8:10]),
+			ItemID:     uint32(binary.LittleEndian.Uint16(packet.Data[8:10])),
 			Identified: packet.Data[10] != 0,
 			Damaged:    packet.Data[11] != 0,
 			Refine:     packet.Data[12],
@@ -1030,7 +1060,7 @@ func ParseCartItemAdded(packet Packet) (InventoryItem, bool, error) {
 		return InventoryItem{
 			Index:      binary.LittleEndian.Uint16(packet.Data[2:4]),
 			Amount:     uint16(minIntNetwork(int(binary.LittleEndian.Uint32(packet.Data[4:8])), int(^uint16(0)))),
-			ItemID:     binary.LittleEndian.Uint16(packet.Data[8:10]),
+			ItemID:     uint32(binary.LittleEndian.Uint16(packet.Data[8:10])),
 			Type:       packet.Data[10],
 			Identified: packet.Data[11] != 0,
 			Damaged:    packet.Data[12] != 0,
@@ -1094,6 +1124,8 @@ func minIntNetwork(a, b int) int {
 
 func ParseInventoryEquipAck(packet Packet) (InventoryEquipAck, bool, error) {
 	switch packet.ID {
+	case PacketZCReqWearEquipAck2, PacketZCReqTakeoffEquipAck2:
+		return parseEquipAck2025(packet)
 	case 0x00AA:
 		if len(packet.Data) < 7 {
 			return InventoryEquipAck{}, false, fmt.Errorf("ZC_REQ_WEAR_EQUIP_ACK too short: %d", len(packet.Data))
@@ -1156,7 +1188,7 @@ func ParseShopBuyList(packet Packet) ([]ShopBuyItem, bool, error) {
 			Price:         binary.LittleEndian.Uint32(packet.Data[offset : offset+4]),
 			DiscountPrice: binary.LittleEndian.Uint32(packet.Data[offset+4 : offset+8]),
 			Type:          packet.Data[offset+8],
-			ItemID:        binary.LittleEndian.Uint16(packet.Data[offset+9 : offset+11]),
+			ItemID:        uint32(binary.LittleEndian.Uint16(packet.Data[offset+9 : offset+11])),
 		})
 	}
 	return items, true, nil
@@ -1298,28 +1330,28 @@ func BuildItemCompositionPacket(cardIndex, equipIndex uint16) []byte {
 	return packet
 }
 
-func BuildMakingArrowPacket(itemID uint16) []byte {
+func BuildMakingArrowPacket(itemID uint32) []byte {
 	packet := make([]byte, 4)
 	binary.LittleEndian.PutUint16(packet[0:2], PacketCZReqMakingArrow)
-	binary.LittleEndian.PutUint16(packet[2:4], itemID)
+	binary.LittleEndian.PutUint16(packet[2:4], uint16(itemID))
 	return packet
 }
 
-func BuildMakingItemPacket(itemID uint16, material [3]uint16) []byte {
+func BuildMakingItemPacket(itemID uint32, material [3]uint32) []byte {
 	packet := make([]byte, 10)
 	binary.LittleEndian.PutUint16(packet[0:2], PacketCZReqMakingItem)
-	binary.LittleEndian.PutUint16(packet[2:4], itemID)
-	binary.LittleEndian.PutUint16(packet[4:6], material[0])
-	binary.LittleEndian.PutUint16(packet[6:8], material[1])
-	binary.LittleEndian.PutUint16(packet[8:10], material[2])
+	binary.LittleEndian.PutUint16(packet[2:4], uint16(itemID))
+	binary.LittleEndian.PutUint16(packet[4:6], uint16(material[0]))
+	binary.LittleEndian.PutUint16(packet[6:8], uint16(material[1]))
+	binary.LittleEndian.PutUint16(packet[8:10], uint16(material[2]))
 	return packet
 }
 
-func BuildCookingPacket(makeType, itemID uint16) []byte {
+func BuildCookingPacket(makeType uint16, itemID uint32) []byte {
 	packet := make([]byte, 6)
 	binary.LittleEndian.PutUint16(packet[0:2], PacketCZReqCooking)
-	binary.LittleEndian.PutUint16(packet[2:4], makeType)
-	binary.LittleEndian.PutUint16(packet[4:6], itemID)
+	binary.LittleEndian.PutUint16(packet[2:4], uint16(makeType))
+	binary.LittleEndian.PutUint16(packet[4:6], uint16(itemID))
 	return packet
 }
 
@@ -1339,12 +1371,12 @@ func BuildWeaponRefinePacket(index uint32) []byte {
 
 func writeEquipmentChoiceItem(dst []byte, item equipmentChoiceItem) {
 	binary.LittleEndian.PutUint16(dst[0:2], item.Index)
-	binary.LittleEndian.PutUint16(dst[2:4], item.ItemID)
+	binary.LittleEndian.PutUint16(dst[2:4], uint16(item.ItemID))
 	dst[4] = item.Refine
-	binary.LittleEndian.PutUint16(dst[5:7], item.Cards[0])
-	binary.LittleEndian.PutUint16(dst[7:9], item.Cards[1])
-	binary.LittleEndian.PutUint16(dst[9:11], item.Cards[2])
-	binary.LittleEndian.PutUint16(dst[11:13], item.Cards[3])
+	binary.LittleEndian.PutUint16(dst[5:7], uint16(item.Cards[0]))
+	binary.LittleEndian.PutUint16(dst[7:9], uint16(item.Cards[1]))
+	binary.LittleEndian.PutUint16(dst[9:11], uint16(item.Cards[2]))
+	binary.LittleEndian.PutUint16(dst[11:13], uint16(item.Cards[3]))
 }
 
 func BuildWearEquipPacket(index, location uint16) []byte {
@@ -1464,7 +1496,7 @@ func BuildBuyItemListPacket(items []BuyRequestItem) []byte {
 	offset := 4
 	for _, item := range items {
 		binary.LittleEndian.PutUint16(packet[offset:offset+2], item.Amount)
-		binary.LittleEndian.PutUint16(packet[offset+2:offset+4], item.ItemID)
+		binary.LittleEndian.PutUint16(packet[offset+2:offset+4], uint16(item.ItemID))
 		offset += 4
 	}
 	return packet
@@ -1536,7 +1568,7 @@ func (c *Client) SendItemComposition(cardIndex, equipIndex uint16) error {
 	return err
 }
 
-func (c *Client) SendMakingArrow(itemID uint16) error {
+func (c *Client) SendMakingArrow(itemID uint32) error {
 	packet := BuildMakingArrowPacket(itemID)
 	err := c.Send(packet)
 	if err == nil {
@@ -1547,7 +1579,7 @@ func (c *Client) SendMakingArrow(itemID uint16) error {
 	return err
 }
 
-func (c *Client) SendMakingItem(itemID uint16, material [3]uint16) error {
+func (c *Client) SendMakingItem(itemID uint32, material [3]uint32) error {
 	packet := BuildMakingItemPacket(itemID, material)
 	err := c.Send(packet)
 	if err == nil {
@@ -1558,7 +1590,7 @@ func (c *Client) SendMakingItem(itemID uint16, material [3]uint16) error {
 	return err
 }
 
-func (c *Client) SendCooking(makeType, itemID uint16) error {
+func (c *Client) SendCooking(makeType uint16, itemID uint32) error {
 	packet := BuildCookingPacket(makeType, itemID)
 	err := c.Send(packet)
 	if err == nil {
@@ -1592,7 +1624,7 @@ func (c *Client) SendWeaponRefine(index uint32) error {
 }
 
 func (c *Client) SendWearEquip(index, location uint16) error {
-	packet := BuildWearEquipPacket(index, location)
+	packet := BuildWearEquipPacketForClientDate(index, location, c.clientDate)
 	err := c.Send(packet)
 	if err == nil {
 		glog.Debugf("sent CZ_REQ_WEAR_EQUIP opcode=0x%04X index=%d location=0x%04X client_date=%d", ID(packet), index, location, c.clientDate)

@@ -103,11 +103,11 @@ type PartyChat struct {
 
 type PartyItemPickup struct {
 	AccountID  uint32
-	ItemID     uint16
+	ItemID     uint32
 	Identified bool
 	Type       uint8
 	Refine     uint8
-	Cards      [4]uint16
+	Cards      [4]uint32
 }
 
 func ParsePartyItemPickup(packet Packet) (PartyItemPickup, bool, error) {
@@ -119,7 +119,7 @@ func ParsePartyItemPickup(packet Packet) (PartyItemPickup, bool, error) {
 	}
 	return PartyItemPickup{
 		AccountID:  binary.LittleEndian.Uint32(packet.Data[2:6]),
-		ItemID:     binary.LittleEndian.Uint16(packet.Data[6:8]),
+		ItemID:     uint32(binary.LittleEndian.Uint16(packet.Data[6:8])),
 		Identified: packet.Data[8] != 0,
 		Type:       packet.Data[21],
 		Refine:     packet.Data[10],

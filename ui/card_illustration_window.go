@@ -21,7 +21,7 @@ type CardIllustrationWindow struct {
 	image image.Image
 }
 
-func (w *CardIllustrationWindow) Open(ctx Context, itemID uint16, title string) error {
+func (w *CardIllustrationWindow) Open(ctx Context, itemID uint32, title string) error {
 	if ctx.Resources == nil {
 		return fmt.Errorf("card illustration resources unavailable")
 	}

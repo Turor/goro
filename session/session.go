@@ -368,7 +368,7 @@ type Cart struct {
 
 type InventoryItem struct {
 	Index        uint16
-	ItemID       uint16
+	ItemID       uint32
 	Type         uint8
 	Location     uint16 // Allowed equipment slots.
 	WearLocation uint16 // Occupied equipment slots, or zero when unequipped.
@@ -378,7 +378,7 @@ type InventoryItem struct {
 	Equipped     bool
 	Damaged      bool
 	Refine       uint8
-	Cards        [4]uint16
+	Cards        [4]uint32
 }
 
 type Stats struct {
