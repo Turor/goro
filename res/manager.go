@@ -42,6 +42,11 @@ type Manager struct {
 	skillResourceNamesLoaded bool
 	skillMaxLevels           map[int]int
 	skillMaxLevelsLoaded     bool
+	skillInfoListLoaded      bool
+	jobIDLoaded              bool
+	jobIDs                   luaValue
+	skillInfoNames           map[int]string
+	skillInfoMaxLevels       map[int]int
 	skillDisplayNames        map[int]string
 	skillDescriptions        map[int][]string
 	skillMetadataLoaded      bool
