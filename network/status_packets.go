@@ -3,6 +3,7 @@ package network
 import (
 	"encoding/binary"
 	"fmt"
+	"math"
 	"time"
 )
 
@@ -149,6 +150,15 @@ func ParseParameterChange(packet Packet) (ParameterChange, bool, error) {
 			Value: int64(packet.Data[4]),
 		}, true, nil
 	}
+	if packet.ID == PacketZCLongLongParChange {
+		if len(packet.Data) < 12 {
+			return ParameterChange{}, false, fmt.Errorf("ZC_LONGLONGPAR_CHANGE too short: %d", len(packet.Data))
+		}
+		return ParameterChange{
+			VarID: binary.LittleEndian.Uint16(packet.Data[2:4]),
+			Value: int64(binary.LittleEndian.Uint64(packet.Data[4:12])),
+		}, true, nil
+	}
 	if packet.ID != 0x00B0 && packet.ID != 0x00B1 {
 		return ParameterChange{}, false, nil
 	}
@@ -175,7 +185,31 @@ func ParseCoupleStatus(packet Packet) (CoupleStatus, bool, error) {
 	}, true, nil
 }
 
+// PacketZCLongLongParChange is ZC_LONGLONGPAR_CHANGE (64-bit EXP, HP and SP
+// values; PACKETVER >= 20170830).
+const PacketZCLongLongParChange uint16 = 0x0ACB
+
+// PacketZCNotifyExp2 is ZC_NOTIFY_EXP2 with a 64-bit amount.
+const PacketZCNotifyExp2 uint16 = 0x0ACC
+
 func ParseExpNotify(packet Packet) (ExpNotify, bool, error) {
+	if packet.ID == PacketZCNotifyExp2 {
+		if len(packet.Data) < 18 {
+			return ExpNotify{}, false, fmt.Errorf("ZC_NOTIFY_EXP2 too short: %d", len(packet.Data))
+		}
+		amount := int64(binary.LittleEndian.Uint64(packet.Data[6:14]))
+		if amount > math.MaxInt32 {
+			amount = math.MaxInt32
+		} else if amount < math.MinInt32 {
+			amount = math.MinInt32
+		}
+		return ExpNotify{
+			AID:     binary.LittleEndian.Uint32(packet.Data[2:6]),
+			Amount:  int32(amount),
+			VarID:   binary.LittleEndian.Uint16(packet.Data[14:16]),
+			ExpType: binary.LittleEndian.Uint16(packet.Data[16:18]),
+		}, true, nil
+	}
 	if packet.ID != PacketZCNotifyExp {
 		return ExpNotify{}, false, nil
 	}
