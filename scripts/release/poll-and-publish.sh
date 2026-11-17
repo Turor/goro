@@ -33,9 +33,13 @@ ALLOW_NON_MAIN="${ALLOW_NON_MAIN:-0}"
 MAX_BYTES=$((512 * 1024 * 1024))
 
 mkdir -p "$WORK/staging" "$WORK/failures"
-chmod 700 "$WORK" "$WORK/staging"
+chmod 700 "$WORK" "$WORK/staging" "$WORK/failures"
+touch "$LOG"
+chmod 600 "$LOG"
 exec 9>"$WORK/publish.lock"
 flock -n 9 || { echo "another publish is running" >>"$LOG"; exit 0; }
+# Remote build output is untrusted: drop control characters (escape sequences).
+sanitize() { tr -d '\000-\010\013-\037\177'; }
 log() { printf '%s %s\n' "$(date -Iseconds)" "$*" | tee -a "$LOG"; }
 die() { log "refused: $*"; exit 1; }
 
@@ -68,8 +72,19 @@ fi
 
 fails=$(cat "$WORK/failures/$sha" 2>/dev/null || echo 0)
 if [[ "$DRY_RUN" != 1 ]] && (( fails >= 3 )); then exit 0; fi
+stage=""
+remote_base=""
 on_exit() {
   local rc=$?
+  # Never leave a build user process or run directory behind on CT119.
+  if [[ -n "$remote_base" ]]; then
+    remote_root "pkill -KILL -u $BUILD_USER || true; rm -rf -- '$remote_base'" || true
+  fi
+  # A dry run never keeps signed output.
+  if [[ "$DRY_RUN" == 1 && -n "$stage" && -d "$stage" ]]; then
+    chmod -R u+w "$stage" 2>/dev/null || true
+    rm -rf -- "$stage"
+  fi
   if (( rc != 0 )); then
     [[ "$DRY_RUN" == 1 ]] || echo $((fails + 1)) >"$WORK/failures/$sha"
     log "publish failed sha=$sha rc=$rc dry_run=$DRY_RUN"
@@ -77,40 +92,52 @@ on_exit() {
 }
 trap on_exit EXIT
 
-# 3. Gate and build on CT119 as the unprivileged build user. The build number
-#    is chosen here and linked in; the client self-check enforces it.
+# 3. Gate and build on CT119 as the unprivileged build user, in a fresh
+#    directory with a fresh HOME, Go cache and module cache every run. Before
+#    the run the build user's home, temp files, crontab and processes are wiped,
+#    so nothing an earlier commit planted (git hooks or config, cache entries,
+#    daemons) can touch this build. The build number is chosen here and linked
+#    in; the client self-check enforces it.
+remote_root() { ssh -o BatchMode=yes "$BUILD_HOST" -- "$1"; }
 build=$(date +%s)
 version="main-${sha:0:12}"
 linux="goro-linux-amd64-${sha}"
 windows="goro-windows-amd64-${sha}.exe"
-log "remote gate+build sha=$sha build=$build on $BUILD_HOST as $BUILD_USER"
+remote_root "set -e; pkill -KILL -u $BUILD_USER || true; crontab -r -u $BUILD_USER 2>/dev/null || true
+  find /home/$BUILD_USER -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+  find /tmp /var/tmp /dev/shm -xdev -user $BUILD_USER -delete 2>/dev/null || true"
+remote_base=$(remote_root "runuser -u $BUILD_USER -- mktemp -d /home/$BUILD_USER/run.XXXXXXXX")
+[[ "$remote_base" =~ ^/home/$BUILD_USER/run\.[A-Za-z0-9]{8}$ ]] || die "bad remote run dir"
+log "remote gate+build sha=$sha build=$build on $BUILD_HOST as $BUILD_USER in $remote_base"
 # shellcheck disable=SC2087
 ssh -o BatchMode=yes "$BUILD_HOST" -- runuser -u "$BUILD_USER" -- env -i \
-  HOME="/home/$BUILD_USER" PATH=/usr/local/go/bin:/usr/bin:/bin LANG=C.UTF-8 \
-  bash -s -- "$REPO_URL" "$sha" "$build" >>"$LOG" 2>&1 <<'REMOTE'
+  HOME="$remote_base/home" GOCACHE="$remote_base/gocache" GOMODCACHE="$remote_base/gomod" \
+  GOPATH="$remote_base/gopath" GOTOOLCHAIN=local GOFLAGS=-mod=readonly \
+  GIT_CONFIG_NOSYSTEM=1 PATH=/usr/local/go/bin:/usr/bin:/bin LANG=C.UTF-8 \
+  bash -s -- "$REPO_URL" "$sha" "$build" "$remote_base" 2>&1 <<'REMOTE' | sanitize >>"$LOG"
 set -euo pipefail
-repo="$1" sha="$2" build="$3"
-base="$HOME/goro-release"
-mkdir -p "$base"
-chmod 700 "$base"
-[[ -d "$base/src/.git" ]] || git clone -q "$repo" "$base/src"
+repo="$1" sha="$2" build="$3" base="$4"
+mkdir -p "$HOME"
+git clone -q --no-checkout "$repo" "$base/src"
 cd "$base/src"
 git fetch -q origin "$sha"
-git -c advice.detachedHead=false checkout -q --force "$sha"
-git clean -qfdx
+git -c advice.detachedHead=false checkout -q "$sha"
 scripts/release/local-gate.sh
-out="$base/out/$sha"
-rm -rf "$out"
-scripts/release/build-release.sh --build "$build" --out "$out"
+scripts/release/build-release.sh --build "$build" --out "$base/out"
 REMOTE
+[[ "${PIPESTATUS[0]}" == 0 ]] || die "remote gate or build failed"
 
-# 4. Copy back only the two artifacts and sanity-check them without running them.
+# 4. Copy back only the two artifacts, read as the build user (so a symlink
+#    can never expose a root-only file), refusing anything that is not a
+#    regular file; sanity-check them without running them.
 stage="$WORK/staging/$sha"
 rm -rf "$stage"
 mkdir -p "$stage"
 chmod 700 "$stage"
-scp -q -o BatchMode=yes "$BUILD_HOST:/home/$BUILD_USER/goro-release/out/$sha/$linux" \
-  "$BUILD_HOST:/home/$BUILD_USER/goro-release/out/$sha/$windows" "$stage/"
+for f in "$linux" "$windows"; do
+  remote_root "runuser -u $BUILD_USER -- sh -c 'test -f \"\$1\" && test ! -L \"\$1\" && cat -- \"\$1\"' sh '$remote_base/out/$f'" >"$stage/$f" \
+    || die "artifact $f missing, not a regular file, or a symlink"
+done
 for f in "$linux" "$windows"; do
   [[ -f "$stage/$f" && ! -L "$stage/$f" ]] || die "missing artifact $f"
   size=$(stat -c %s "$stage/$f")
@@ -120,16 +147,32 @@ for f in "$linux" "$windows"; do
 done
 [[ "$(head -c 4 "$stage/$linux" | od -An -tx1 | tr -d ' ')" == "7f454c46" ]] || die "linux artifact is not ELF"
 [[ "$(head -c 2 "$stage/$windows")" == "MZ" ]] || die "windows artifact is not PE"
+remote_root "pkill -KILL -u $BUILD_USER || true; rm -rf -- '$remote_base'"
+remote_base=""
 
 # 5. Sign with the pinned signer; verify with the client's embedded key only.
-"$SIGNER" sign --private-key "$SEED" --version "$version" --build "$build" \
-  --out "$stage/manifest.goroup" --file "$linux=$stage/$linux" --file "$windows=$stage/$windows" >>"$LOG"
-"$SIGNER" verify --manifest "$stage/manifest.goroup" >>"$LOG"
+#    A commit that is not on main (ALLOW_NON_MAIN, dry runs only) is signed
+#    with a throwaway key, so it never gets a real signature; every other dry
+#    run signs with the real seed to prove it, and the trap deletes the output.
+if [[ "$ALLOW_NON_MAIN" == 1 ]]; then
+  throwaway="$stage/throwaway.seed"
+  (umask 077 && head -c 32 /dev/urandom >"$throwaway")
+  pub=$("$SIGNER" public-key --private-key "$throwaway" | head -n1)
+  "$SIGNER" sign --private-key "$throwaway" --version "$version" --build "$build" \
+    --out "$stage/manifest.goroup" --file "$linux=$stage/$linux" --file "$windows=$stage/$windows" >>"$LOG"
+  rm -f "$throwaway"
+  "$SIGNER" verify --manifest "$stage/manifest.goroup" --public-key "$pub" >>"$LOG"
+  log "non-main dry run: signed with a throwaway key, not the release seed"
+else
+  "$SIGNER" sign --private-key "$SEED" --version "$version" --build "$build" \
+    --out "$stage/manifest.goroup" --file "$linux=$stage/$linux" --file "$windows=$stage/$windows" >>"$LOG"
+  "$SIGNER" verify --manifest "$stage/manifest.goroup" >>"$LOG"
+fi
 
 publish=("$PUBLISH" --sha "$sha" --manifest "$stage/manifest.goroup" --linux "$stage/$linux" --windows "$stage/$windows")
 if [[ "$DRY_RUN" == 1 ]]; then
   "${publish[@]}" --dry-run | tee -a "$LOG"
-  log "dry run ok sha=$sha version=$version build=$build stage=$stage"
+  log "dry run ok sha=$sha version=$version build=$build (signed output deleted)"
   exit 0
 fi
 "${publish[@]}" >>"$LOG"

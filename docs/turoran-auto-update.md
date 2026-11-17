@@ -75,9 +75,13 @@ merge to main (local gate + independent review PASS)
   → controller timer runs the PINNED poller (~/Work/goro-release-publisher/pinned/)
       → verify pinned files against PINNED.sha256
       → bare mirror: commit must be on main and descend from the last published commit
-      → CT119, user gorobuild (no seed, no sudo, no keys):
-            scripts/release/local-gate.sh + build-release.sh of that commit
-      → copy back only the two binaries; check names, size, ELF/PE magic,
+      → CT119, user gorobuild (no seed, no sudo, no keys): wipe its home,
+        temp files, crontab and processes; fresh run dir, HOME, GOCACHE and
+        GOMODCACHE (GOTOOLCHAIN=local, -mod=readonly); then
+        scripts/release/local-gate.sh + build-release.sh of that commit;
+        kill its processes and delete the run dir afterwards
+      → copy back only the two binaries, read as gorobuild (symlinks and
+        non-regular files refused); check names, size, ELF/PE magic,
         embedded version string (never executed on the controller)
       → pinned goro-sign-release sign   (host-local seed)
       → pinned goro-sign-release verify (embedded public key only)
@@ -97,7 +101,9 @@ Re-pin only after an independent review of a change to `cmd/goro-sign-release`,
 `updater/manifest.go` or `scripts/release/`. The build user on CT119 is created
 once with `scripts/release/setup-build-user.sh` (as root there).
 
-`DRY_RUN=1` does everything except the upload. `SHA=<commit> ALLOW_NON_MAIN=1`
+`DRY_RUN=1` does everything except the upload and then deletes the signed
+output. A non-main commit (`ALLOW_NON_MAIN=1`) is signed with a throwaway key,
+never the release seed. `SHA=<commit> ALLOW_NON_MAIN=1`
 is accepted only together with `DRY_RUN=1`. The systemd user units in
 `packaging/release/` are templates and are not enabled by this change.
 
