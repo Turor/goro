@@ -206,7 +206,8 @@ func SHA256Hex(data []byte) string {
 }
 
 func validateVersion(v string) error {
-	if len(v) < 1 || len(v) > 64 {
+	// Must look like a name: no separators, and not only dots ("." / "..").
+	if len(v) < 1 || len(v) > 64 || strings.Trim(v, ".") == "" || strings.HasPrefix(v, ".") {
 		return fmt.Errorf("unsafe version %q", v)
 	}
 	for _, c := range v {

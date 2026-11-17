@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 const testSHA = "0123456789abcdef0123456789abcdef01234567"
@@ -169,13 +170,15 @@ func TestHandleFlags(t *testing.T) {
 
 func TestEnabled(t *testing.T) {
 	t.Setenv(EnvSkip, "")
-	t.Setenv(EnvForce, "")
+	t.Setenv("GORO_UPDATE_FORCE", "1") // removed override: must have no effect
 	if Enabled(nil) {
 		t.Fatal("dev build (no Channel) must not update")
 	}
-	t.Setenv(EnvForce, "1")
+	saved := Channel
+	Channel = "main"
+	t.Cleanup(func() { Channel = saved })
 	if !Enabled(nil) {
-		t.Fatal("forced check disabled")
+		t.Fatal("release build check disabled")
 	}
 	if Enabled([]string{"--headless"}) {
 		t.Fatal("headless must not update")
@@ -270,7 +273,7 @@ func TestApplyFromFileURL(t *testing.T) {
 			if len(f.selfChecks) != 2 {
 				t.Fatalf("want staged and installed self-checks, got %v", f.selfChecks)
 			}
-			if _, err := os.Stat(filepath.Join(f.root, "updates", "staging", "main-0123456789ab")); !os.IsNotExist(err) {
+			if _, err := os.Stat(filepath.Join(f.root, "updates", "staging", "20")); !os.IsNotExist(err) {
 				t.Fatal("staging not cleaned")
 			}
 			// Second launch: same build is up to date, and .old is removed.
@@ -406,8 +409,19 @@ func TestConcurrentApplyIsLocked(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(f.root, "updates", ".lock"), []byte("1\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Run(context.Background(), f.opts(f.manifestURL(), "linux")); err == nil || !strings.Contains(err.Error(), "another goro") {
-		t.Fatalf("err=%v", err)
+	if err := os.WriteFile(f.exe+".old", []byte("restore source"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	res, err := Run(context.Background(), f.opts(f.manifestURL(), "linux"))
+	if err != nil || res.Outcome != Skipped || !strings.Contains(res.Reason, "another goro") {
+		t.Fatalf("res=%+v err=%v", res, err)
+	}
+	// Without the lock, .old (another instance's restore source) is untouched.
+	if _, err := os.Stat(f.exe + ".old"); err != nil {
+		t.Fatal(".old removed without holding the lock")
+	}
+	if b, _ := os.ReadFile(filepath.Join(f.root, "updates", ".lock")); string(b) != "1\n" {
+		t.Fatalf("foreign lock touched: %q", b)
 	}
 	assertUnchanged(t, f)
 }
@@ -432,4 +446,138 @@ func TestSizeMismatchLeavesInstallUnchanged(t *testing.T) {
 		t.Fatalf("err=%v", err)
 	}
 	assertUnchanged(t, f)
+}
+
+// B1: a server that accepts and never answers must not hold up launch.
+func TestHangingCatalogIsBoundedByMetaTimeout(t *testing.T) {
+	release := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case <-release:
+		case <-r.Context().Done():
+		}
+	}))
+	defer srv.Close()
+	defer close(release)
+	f := newFixture(t, 20, "linux")
+	o := f.opts(srv.URL+"/latest", "linux")
+	o.MetaTimeout = 300 * time.Millisecond
+	start := time.Now()
+	res, err := Run(context.Background(), o)
+	if took := time.Since(start); took > 3*time.Second {
+		t.Fatalf("hanging catalog took %v", took)
+	}
+	if err != nil || res.Outcome != Skipped {
+		t.Fatalf("res=%+v err=%v", res, err)
+	}
+	assertUnchanged(t, f)
+}
+
+// B1: headers arrive but the body stalls; still bounded and skipped.
+func TestStalledCatalogBodyIsBoundedByMetaTimeout(t *testing.T) {
+	release := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"manifest_url":`))
+		w.(http.Flusher).Flush()
+		select {
+		case <-release:
+		case <-r.Context().Done():
+		}
+	}))
+	defer srv.Close()
+	defer close(release)
+	f := newFixture(t, 20, "linux")
+	o := f.opts(srv.URL+"/latest", "linux")
+	o.MetaTimeout = 300 * time.Millisecond
+	start := time.Now()
+	res, err := Run(context.Background(), o)
+	if took := time.Since(start); took > 3*time.Second {
+		t.Fatalf("stalled body took %v", took)
+	}
+	if err != nil || res.Outcome != Skipped {
+		t.Fatalf("res=%+v err=%v", res, err)
+	}
+}
+
+// B1: the short deadline covers metadata only, not the binary download.
+func TestMetaTimeoutDoesNotLimitDownload(t *testing.T) {
+	f := newFixture(t, 20, "linux")
+	mux := http.NewServeMux()
+	mux.HandleFunc("/m", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, filepath.Join(f.rel, "manifest.goroup"))
+	})
+	mux.HandleFunc("/"+f.artifactName("linux"), func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(600 * time.Millisecond) // longer than MetaTimeout below
+		http.ServeFile(w, r, filepath.Join(f.rel, f.artifactName("linux")))
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	o := f.opts(srv.URL+"/m", "linux")
+	o.MetaTimeout = 300 * time.Millisecond
+	res, err := Run(context.Background(), o)
+	if err != nil || res.Outcome != Applied {
+		t.Fatalf("res=%+v err=%v", res, err)
+	}
+}
+
+// Note 3: dot-only and separator versions are refused everywhere.
+func TestUnsafeVersionsRejected(t *testing.T) {
+	for _, v := range []string{".", "..", "...", ".hidden", "a/b", `a\b`, "", strings.Repeat("a", 65)} {
+		if err := validateVersion(v); err == nil {
+			t.Errorf("version %q accepted", v)
+		}
+	}
+	for _, v := range []string{"main-0123456789ab", "1.2.3", "v1.0+build_7"} {
+		if err := validateVersion(v); err != nil {
+			t.Errorf("version %q rejected: %v", v, err)
+		}
+	}
+	if _, err := CanonicalPayload(Manifest{Version: "..", Build: 1, Files: []File{{Path: "x", SHA256: strings.Repeat("a", 64), Size: 1, URL: "x"}}}); err == nil {
+		t.Fatal("signer would sign version ..")
+	}
+}
+
+// Note 2: unlock only removes our own lock; a stale lock is taken over once.
+func TestLockOwnershipAndStaleTakeover(t *testing.T) {
+	dir := t.TempDir()
+	unlock, err := lock(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := lock(dir); err == nil {
+		t.Fatal("second lock taken while held")
+	}
+	// Someone replaces our lock (e.g. after a stale takeover): unlock must not remove theirs.
+	path := filepath.Join(dir, ".lock")
+	if err := os.WriteFile(path, []byte("other\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	unlock()
+	if b, _ := os.ReadFile(path); string(b) != "other\n" {
+		t.Fatalf("unlock removed a lock it does not own: %q", b)
+	}
+	// Make it stale: exactly one taker wins and the old file is gone.
+	old := time.Now().Add(-2 * lockStale)
+	if err := os.Chtimes(path, old, old); err != nil {
+		t.Fatal(err)
+	}
+	unlock2, err := lock(dir)
+	if err != nil {
+		t.Fatalf("stale lock not taken over: %v", err)
+	}
+	if b, _ := os.ReadFile(path); strings.TrimSpace(string(b)) == "other" {
+		t.Fatal("stale lock content survived takeover")
+	}
+	if _, err := lock(dir); err == nil {
+		t.Fatal("lock taken twice after takeover")
+	}
+	unlock2()
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatal("own lock not released")
+	}
+	matches, _ := filepath.Glob(filepath.Join(dir, ".lock.stale.*"))
+	if len(matches) != 0 {
+		t.Fatalf("stale leftovers: %v", matches)
+	}
 }

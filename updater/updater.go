@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/ed25519"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -46,14 +47,18 @@ const (
 	EnvSkip = "GORO_SKIP_UPDATE"
 	// EnvURL overrides the catalog or manifest URL (still allowlisted).
 	EnvURL = "GORO_UPDATE_MANIFEST_URL"
-	// EnvForce runs the check even in a development build (Channel unset).
-	EnvForce = "GORO_UPDATE_FORCE"
 
 	// SelfCheckFlag makes the binary print SelfCheckToken and exit.
 	SelfCheckFlag  = "--update-self-check"
 	SelfCheckToken = "goro-update-self-check-ok"
 	// BuildInfoFlag prints the link-time release identity and exits.
 	BuildInfoFlag = "--build-info"
+
+	// MetaTimeout bounds the catalog and manifest fetches together, so a
+	// stalled server can delay the game window by at most this long.
+	MetaTimeout = 12 * time.Second
+	// DownloadTimeout bounds the binary download only.
+	DownloadTimeout = 10 * time.Minute
 
 	catalogLimit  = 64 * 1024
 	manifestLimit = 256 * 1024
@@ -99,6 +104,8 @@ type Options struct {
 	GOOS        string
 	GOARCH      string
 	HTTPClient  *http.Client
+	// MetaTimeout overrides the catalog+manifest deadline (tests).
+	MetaTimeout time.Duration
 	// SelfCheck runs the staged binary; nil runs it with SelfCheckFlag.
 	SelfCheck func(exe string, want uint64) error
 	Logf      func(format string, args ...any)
@@ -135,7 +142,9 @@ func Enabled(args []string) bool {
 			return false
 		}
 	}
-	return Channel != "" || os.Getenv(EnvForce) == "1"
+	// Development builds (no Channel linked in) never update. There is no
+	// override: tests call Run directly.
+	return Channel != ""
 }
 
 // CheckOnLaunch runs the production launch check for the current process.
@@ -192,9 +201,24 @@ func Run(ctx context.Context, o Options) (Result, error) {
 	if rel, err := filepath.Rel(o.InstallRoot, o.Executable); err != nil || strings.HasPrefix(rel, "..") {
 		return Result{}, errors.New("executable is outside the install root")
 	}
+	updates := filepath.Join(o.InstallRoot, "updates")
+	if err := os.MkdirAll(updates, 0o755); err != nil {
+		return Result{Reason: "install directory is not writable: " + err.Error()}, nil
+	}
+	unlock, err := lock(updates)
+	if err != nil {
+		return Result{Reason: err.Error()}, nil
+	}
+	defer unlock()
+	// Only the lock holder may delete <exe>.old: another instance may be
+	// mid-swap and need it to restore.
 	cleanupOld(o.Executable, o.logf)
 
-	fetched, err := o.fetch(ctx, o.URL, catalogLimit+manifestLimit)
+	// Catalog and manifest share one short deadline; only the binary
+	// download below gets the long one.
+	metaCtx, cancelMeta := context.WithTimeout(ctx, o.MetaTimeout)
+	defer cancelMeta()
+	fetched, err := o.fetch(metaCtx, o.URL, catalogLimit+manifestLimit)
 	if err != nil {
 		if isUnreachable(err) {
 			return Result{Reason: "channel unreachable: " + err.Error()}, nil
@@ -218,7 +242,7 @@ func Run(ctx context.Context, o Options) (Result, error) {
 			}
 		}
 		manifestURL = cat.ManifestURL
-		envelope, err = o.fetch(ctx, manifestURL, manifestLimit)
+		envelope, err = o.fetch(metaCtx, manifestURL, manifestLimit)
 		if err != nil {
 			if isUnreachable(err) {
 				return Result{Reason: "manifest unreachable: " + err.Error()}, nil
@@ -257,7 +281,8 @@ func Run(ctx context.Context, o Options) (Result, error) {
 	if err != nil {
 		return res, err
 	}
-	if err := o.apply(ctx, m, file, src); err != nil {
+	cancelMeta()
+	if err := o.apply(ctx, m, file, src, updates); err != nil {
 		return res, err
 	}
 	res.Outcome = Applied
@@ -274,9 +299,19 @@ func (o *Options) defaults() {
 	if o.GOARCH == "" {
 		o.GOARCH = runtime.GOARCH
 	}
+	if o.MetaTimeout <= 0 {
+		o.MetaTimeout = MetaTimeout
+	}
 	if o.HTTPClient == nil {
 		o.HTTPClient = &http.Client{
-			Timeout: 10 * time.Minute,
+			Timeout: DownloadTimeout,
+			Transport: &http.Transport{
+				Proxy:                 http.ProxyFromEnvironment,
+				DialContext:           (&net.Dialer{Timeout: 5 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
+				TLSHandshakeTimeout:   5 * time.Second,
+				ResponseHeaderTimeout: 10 * time.Second,
+				ForceAttemptHTTP2:     true,
+			},
 			// Every hop must itself be allowlisted, so redirects are refused.
 			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 		}
@@ -292,18 +327,10 @@ func (o *Options) logf(format string, args ...any) {
 	}
 }
 
-func (o *Options) apply(ctx context.Context, m Manifest, f File, src string) error {
-	updates := filepath.Join(o.InstallRoot, "updates")
-	if err := os.MkdirAll(updates, 0o755); err != nil {
-		return fmt.Errorf("install directory is not writable: %w", err)
-	}
-	unlock, err := lock(updates)
-	if err != nil {
-		return err
-	}
-	defer unlock()
-
-	staging := filepath.Join(updates, "staging", m.Version)
+// apply runs with the update lock held by Run.
+func (o *Options) apply(ctx context.Context, m Manifest, f File, src, updates string) error {
+	// Staging is named by the numeric build, never by the version string.
+	staging := filepath.Join(updates, "staging", strconv.FormatUint(m.Build, 10))
 	_ = os.RemoveAll(staging)
 	if err := os.MkdirAll(staging, 0o755); err != nil {
 		return err
@@ -392,7 +419,8 @@ func (o *Options) fetch(ctx context.Context, rawURL string, limit int64) ([]byte
 	defer body.Close()
 	data, err := io.ReadAll(io.LimitReader(body, limit+1))
 	if err != nil {
-		return nil, err
+		// A body that stalls past the deadline is the same as no answer.
+		return nil, unreachable{err}
 	}
 	if int64(len(data)) > limit {
 		return nil, errors.New("response exceeds limit")
@@ -409,7 +437,7 @@ func (o *Options) open(ctx context.Context, rawURL string, limit int64) (io.Read
 	if u.Scheme == "file" {
 		return os.Open(filepath.FromSlash(fileURLPath(u)))
 	}
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, DownloadTimeout)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
 		cancel()
@@ -463,7 +491,7 @@ func isUnreachable(err error) bool {
 	if errors.As(err, &ne) {
 		return true
 	}
-	return errors.Is(err, os.ErrNotExist)
+	return errors.Is(err, context.DeadlineExceeded) || errors.Is(err, os.ErrNotExist)
 }
 
 // redact drops presigned query strings from log lines.
@@ -627,22 +655,58 @@ func cleanupOld(exe string, logf func(string, ...any)) {
 	}
 }
 
+// lock takes updates/.lock with O_EXCL. The file holds a random token; unlock
+// removes the file only while it still holds our token. A lock older than
+// lockStale is taken over by atomically renaming it aside first, so two
+// instances cannot both steal it, and a lock that turns out to be fresh is put
+// back.
 func lock(dir string) (func(), error) {
 	path := filepath.Join(dir, ".lock")
-	for attempt := 0; attempt < 2; attempt++ {
+	token := fmt.Sprintf("%d-%s", os.Getpid(), randomHex(8))
+	for attempt := 0; attempt < 3; attempt++ {
 		f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
 		if err == nil {
-			fmt.Fprintf(f, "%d\n", os.Getpid())
-			f.Close()
-			return func() { _ = os.Remove(path) }, nil
+			_, werr := f.WriteString(token + "\n")
+			cerr := f.Close()
+			if werr != nil || cerr != nil {
+				_ = os.Remove(path)
+				return nil, errors.New("could not write update lock")
+			}
+			return func() {
+				if b, err := os.ReadFile(path); err == nil && strings.TrimSpace(string(b)) == token {
+					_ = os.Remove(path)
+				}
+			}, nil
 		}
-		if st, serr := os.Stat(path); serr == nil && time.Since(st.ModTime()) > lockStale {
-			_ = os.Remove(path)
-			continue
+		st, serr := os.Stat(path)
+		if serr != nil {
+			continue // released meanwhile; retry the create
 		}
-		return nil, errors.New("another goro is applying an update")
+		if time.Since(st.ModTime()) <= lockStale {
+			return nil, errors.New("another goro is applying an update")
+		}
+		aside := path + ".stale." + randomHex(8)
+		if err := os.Rename(path, aside); err != nil {
+			continue // someone else moved it first
+		}
+		if st2, err := os.Stat(aside); err == nil && time.Since(st2.ModTime()) <= lockStale {
+			// We raced a fresh lock in; give it back if the slot is still free.
+			if os.Link(aside, path) == nil {
+				_ = os.Remove(aside)
+			}
+			return nil, errors.New("another goro is applying an update")
+		}
+		_ = os.Remove(aside)
 	}
 	return nil, errors.New("could not take update lock")
+}
+
+func randomHex(n int) string {
+	b := make([]byte, n)
+	if _, err := rand.Read(b); err != nil {
+		return strconv.FormatInt(time.Now().UnixNano(), 16)
+	}
+	return hex.EncodeToString(b)
 }
 
 func writeAtomic(path string, data []byte) error {
