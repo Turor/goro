@@ -2,11 +2,13 @@ package res
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
+	"hash/crc32"
 	"image"
 	"image/draw"
 	_ "image/jpeg"
-	_ "image/png"
+	"image/png"
 	"strings"
 
 	_ "golang.org/x/image/bmp"
@@ -35,12 +37,75 @@ func loadImageCandidates(manager *Manager, candidates []string, exact bool) (ima
 func DecodeImageData(data []byte) (image.Image, error) {
 	img, _, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
-		img, err = decodeTGA(data)
+		img, err = decodeImageFallback(data, err)
 		if err != nil {
 			return nil, fmt.Errorf("decode image: %w", err)
 		}
 	}
 	return applyROTransparency(img), nil
+}
+
+// decodeImageFallback handles files the standard decoders reject but the RO
+// client still draws: BMP variants, PNGs with bad chunk CRCs (the client does
+// not verify them) and every TGA (which has no magic number).
+func decodeImageFallback(data []byte, decodeErr error) (image.Image, error) {
+	switch {
+	case bytes.HasPrefix(data, []byte("BM")):
+		return decodeBMPFallback(data)
+	case bytes.HasPrefix(data, []byte(pngSignature)):
+		fixed, ok := repairPNGChecksums(data)
+		if !ok {
+			return nil, decodeErr
+		}
+		img, err := png.Decode(bytes.NewReader(fixed))
+		if err != nil {
+			return nil, err
+		}
+		return img, nil
+	default:
+		return decodeTGA(data)
+	}
+}
+
+const pngSignature = "\x89PNG\r\n\x1a\n"
+
+// repairPNGChecksums returns a copy of data with every chunk CRC recomputed
+// and a clean IEND. Some shipped PNGs end in a mangled IEND ("I\0\0\0"); the
+// walk stops at the first chunk whose type is not four ASCII letters.
+func repairPNGChecksums(data []byte) ([]byte, bool) {
+	out := append([]byte(nil), data...)
+	offset := len(pngSignature)
+	sawData := false
+	for offset+12 <= len(out) {
+		length := int(binary.BigEndian.Uint32(out[offset:]))
+		end := offset + 8 + length
+		chunkType := out[offset+4 : offset+8]
+		if !isPNGChunkType(chunkType) || length < 0 || end+4 > len(out) {
+			break
+		}
+		if string(chunkType) == "IEND" {
+			break
+		}
+		if string(chunkType) == "IDAT" {
+			sawData = true
+		}
+		binary.BigEndian.PutUint32(out[end:], crc32.ChecksumIEEE(out[offset+4:end]))
+		offset = end + 4
+	}
+	if !sawData {
+		return nil, false
+	}
+	out = append(out[:offset], 0, 0, 0, 0, 'I', 'E', 'N', 'D', 0xae, 0x42, 0x60, 0x82)
+	return out, true
+}
+
+func isPNGChunkType(t []byte) bool {
+	for _, c := range t {
+		if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z') {
+			return false
+		}
+	}
+	return len(t) == 4
 }
 
 func applyROTransparency(img image.Image) *image.NRGBA {
