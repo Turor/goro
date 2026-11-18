@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/gogpu/ui/core/checkbox"
+	"github.com/gogpu/ui/core/dropdown"
 	"github.com/gogpu/ui/core/slider"
 	"github.com/gogpu/ui/primitives"
 	"github.com/gogpu/ui/widget"
@@ -225,6 +226,59 @@ func (w *SettingsWindow) displayTree(ctx client.Context) widget.Widget {
 	).Padding(float32(settingsPad)).Gap(float32(settingsGap))
 }
 
+// themeRow is the Theme dropdown at the top of the Gameplay tab: the built-in themes, then the player's
+// files in the themes folder next to goro.ini. A choice applies at once (the
+// theme sits under ui-layout.ini, so its overrides still win) and is saved in
+// goro.ini.
+func (w *SettingsWindow) themeRow(ctx client.Context) widget.Widget {
+	themes := rotheme.ListThemes()
+	items := make([]dropdown.ItemDef, 0, len(themes))
+	selected := -1
+	active := rotheme.ActiveTheme()
+	for i, theme := range themes {
+		if theme.ID == active {
+			selected = i
+		}
+		items = append(items, dropdown.ItemDef{Value: theme.ID, Label: theme.Name})
+	}
+	return primitives.HBox(
+		primitives.Expanded(rotheme.Text("Theme")),
+		primitives.Box(
+			dropdown.New(
+				dropdown.ItemDefs(items),
+				dropdown.Selected(selected),
+				dropdown.MaxVisibleItems(settingsThemeMenuRows),
+				dropdown.ItemHeight(float32(settingsThemeItemH)),
+				dropdown.PainterOpt(rotheme.DropdownPainter{}),
+				dropdown.OnChange(func(_ int, id string) {
+					w.selectTheme(ctx, id)
+				}),
+			),
+		).Width(float32(settingsThemeDropdownW)).CrossAlign(primitives.CrossAxisStretch),
+	).Gap(float32(settingsGap)).Height(rotheme.Default.Typography.TextSize + rotheme.ButtonPaddingY*2)
+}
+
+// selectTheme applies and saves a theme. A theme that fails to load (a user
+// file with an error) leaves the current one in place.
+func (w *SettingsWindow) selectTheme(ctx client.Context, id string) {
+	if id == rotheme.ActiveTheme() {
+		return
+	}
+	warnings, err := rotheme.SetTheme(id)
+	for _, warning := range warnings {
+		glog.Warnf("ui theme: %s", warning)
+	}
+	if err != nil {
+		glog.Warnf("ui theme %q not applied: %v", id, err)
+		w.refresh(ctx)
+		return
+	}
+	if _, err := ctx.Config.SaveUITheme(id); err != nil {
+		glog.Warnf("settings save failed: %v", err)
+	}
+	w.refresh(ctx)
+}
+
 func (w *SettingsWindow) soundTree(ctx client.Context) widget.Widget {
 	return primitives.Box(
 		primitives.HBox(
@@ -267,6 +321,8 @@ func (w *SettingsWindow) soundTree(ctx client.Context) widget.Widget {
 
 func (w *SettingsWindow) gameplayTree(ctx client.Context) widget.Widget {
 	return primitives.Box(
+		w.themeRow(ctx),
+
 		rotheme.Checkbox(
 			checkbox.Checked(settingsNoShift(ctx)),
 			checkbox.LabelOpt("No Shift"),
