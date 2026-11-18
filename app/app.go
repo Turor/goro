@@ -16,6 +16,7 @@ import (
 	"github.com/kivutar/goro/res"
 	"github.com/kivutar/goro/session"
 	gameui "github.com/kivutar/goro/ui"
+	"github.com/kivutar/goro/ui/rotheme"
 	"github.com/kivutar/goro/world"
 )
 
@@ -38,6 +39,8 @@ type Game struct {
 	quitting          bool
 	pendingScreenshot string
 	uiLayout          *uiLayoutWatcher
+	uiTuner           *gameui.LayoutTuner
+	uiGen             uint64
 }
 
 func New(cfg config.Config) (*Game, error) {
@@ -72,6 +75,10 @@ func NewWithResources(cfg config.Config, resource *res.Manager) *Game {
 		screenH:  cfg.Window.Height,
 	}
 	g.uiLayout = newUILayoutWatcher(cfg, time.Now())
+	if g.uiLayout != nil {
+		g.uiTuner = gameui.NewLayoutTuner(g.uiLayout.path)
+	}
+	g.uiGen = rotheme.Generation()
 	g.session.KeepLoginID = cfg.Login.KeepID
 	g.session.SavedUsername = cfg.Login.SavedUsername
 	g.session.NoShift = cfg.Gameplay.NoShift
@@ -101,7 +108,11 @@ func NewWithResources(cfg config.Config, resource *res.Manager) *Game {
 func (g *Game) Update() error {
 	defer g.input.EndFrame()
 	g.network.Pump()
-	if g.uiLayout.Update(g.input, time.Now()) {
+	g.uiLayout.Update(g.input, time.Now())
+	g.updateUITuner()
+	// The file watcher and the tuner both change layout values.
+	if gen := rotheme.Generation(); gen != g.uiGen {
+		g.uiGen = gen
 		g.ui.RefreshLayout()
 	}
 	g.modes.UpdateContext(g.modeContext())

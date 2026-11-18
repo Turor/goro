@@ -35,6 +35,17 @@ What updates live:
 - **Not yet:** the login, server and character select screens, and transient
   pop-ups (shops, trades, prompts) keep their values until they are reopened.
 
+## In-game tuner (--ui-dev, F11)
+
+With `--ui-dev`, F11 opens the UI Tuner. It lists every key, 12 per page
+(`<` and `>` turn pages). Numbers change with `-` and `+` (by 1, or 0.05 for
+0 to 1 values such as alpha) and apply at once; colors and names are typed,
+then **Apply**. A changed key is shown in the title color. **Save** writes the
+changed values (only those) to ui-layout.ini through a temporary file and a
+rename; this replaces the file, so comments in it are not kept. **Revert**
+reloads the file. Players never see the tuner: without `--ui-dev` F11 does
+nothing.
+
 ## What the file covers
 
 | Section | Keys |
