@@ -13,6 +13,10 @@ import (
 // Keep it explicit so direct and asynchronous rendering use identical metrics.
 const uiFontFamily = "Inter"
 
+// FontFile is the optional ui-layout.ini font file ([text] font_file). The
+// app loads it under Typography.FontFamily; empty keeps the built-in font.
+var FontFile string
+
 type Colors struct {
 	WindowBody     widget.Color
 	WindowTitleTop widget.Color

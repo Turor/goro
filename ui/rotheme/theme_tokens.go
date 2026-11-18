@@ -24,6 +24,8 @@ func init() {
 	RegisterColor("theme", "context_menu_hover", &contextMenuItemHover, "hovered context menu row")
 
 	RegisterFloat("text", "size", &Default.Typography.TextSize, 6, 32, "UI text size in pixels")
+	RegisterString("text", "font_family", &Default.Typography.FontFamily, 64, false, "UI font family: the built-in Inter, or the name to give font_file")
+	RegisterString("text", "font_file", &FontFile, 256, true, "TTF or OTF file for font_family, relative to this file; empty uses the built-in font")
 
 	RegisterFloat("button", "radius", &ButtonRadius, 0, 16, "button corner radius")
 	RegisterFloat("button", "padding_x", &ButtonPaddingX, 0, 32, "button horizontal padding")
