@@ -26,20 +26,14 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
+// theme:ok notice subject and body length limits
 const (
-	guildWindowWidth     = 400
-	guildWindowHeight    = 325
-	guildWindowTabHeight = 23
-	guildWindowTabWidth  = 68
-	guildEmblemSize      = 24
-	guildTableViewportW  = guildWindowWidth
-	guildTableRowH       = 32
-	guildTableHeaderH    = 24
-	guildTableControlH   = 22
-	guildNoticeFieldH    = 24
-	guildNoticeSubjectN  = 59
-	guildNoticeBodyN     = 119
+	guildNoticeSubjectN = 59
+	guildNoticeBodyN    = 119
+)
 
+// theme:ok guild menu access bit flags
+const (
 	guildMenuAccessMembers   uint32 = 0x01
 	guildMenuAccessPositions uint32 = 0x02
 	guildMenuAccessSkills    uint32 = 0x04
@@ -178,7 +172,17 @@ func (w *GuildWindow) OpenWindow(ctx Context) {
 	w.ensureAuthorizedTab(ctx)
 	w.snapshot = guildWindowSnapshot(ctx.Session)
 	w.Open(ctx, w.widgetTree(ctx))
+	w.bindLayoutReload()
 	w.Publish(ctx)
+}
+
+func (w *GuildWindow) bindLayoutReload() {
+	w.claimLayoutReload(func() {
+		w.SetSize(guildWindowWidth, guildWindowHeight)
+		if w.IsOpen() {
+			w.SetContent(w.widgetTree(w.ctx))
+		}
+	})
 }
 
 func (w *GuildWindow) Close() {
@@ -298,9 +302,11 @@ func (w *GuildWindow) Rebind(ctx Context) {
 		return
 	}
 	w.ctx = ctx
+	w.SetSize(guildWindowWidth, guildWindowHeight)
 	w.ensureAuthorizedTab(ctx)
 	w.snapshot = guildWindowSnapshot(ctx.Session)
 	w.SetContent(w.widgetTree(ctx))
+	w.bindLayoutReload()
 	w.Publish(ctx)
 }
 
@@ -309,7 +315,7 @@ func (w *GuildWindow) widgetTree(ctx Context) widget.Widget {
 		Title("Guild"),
 		CloseButton(true),
 		OnClose(w.Close),
-		Size(guildWindowWidth, guildWindowHeight),
+		Size(float32(guildWindowWidth), float32(guildWindowHeight)),
 		Content(w.tabFrame(ctx)),
 	}
 	if footer := w.tabFooter(ctx); footer != nil {
@@ -327,8 +333,8 @@ func (w *GuildWindow) tabFrame(ctx Context) widget.Widget {
 				CrossAlign(primitives.CrossAxisStretch),
 		),
 	).
-		Gap(2).
-		Background(widget.RGBA8(255, 255, 255, 255)).
+		Gap(float32(guildContentGap)).
+		Background(guildTabFrameBg).
 		CrossAlign(primitives.CrossAxisStretch)
 }
 
@@ -362,7 +368,7 @@ func (w *GuildWindow) tabStrip(ctx Context) widget.Widget {
 	}
 	tabs = append(tabs, primitives.Expanded(primitives.Box()))
 	return primitives.HBox(tabs...).
-		Gap(-1).
+		Gap(float32(guildTabStripGap)).
 		CrossAlign(primitives.CrossAxisStretch).
 		Background(rotheme.Default.Colors.FooterLine)
 }
@@ -513,10 +519,10 @@ func (w *GuildWindow) membersTab(ctx Context) widget.Widget {
 	totalExp := guildMembersTotalExp(members)
 	return primitives.Box(
 		rotheme.TableView(
-			rotheme.TableViewColumns(guildMemberTableColumns),
+			rotheme.TableViewColumns(guildMemberTableColumns()),
 			rotheme.TableViewRowCount(len(members)),
-			rotheme.TableViewRowHeight(guildTableRowH),
-			rotheme.TableViewHeaderHeight(guildTableHeaderH),
+			rotheme.TableViewRowHeight(float32(guildTableRowH)),
+			rotheme.TableViewHeaderHeight(float32(guildTableHeaderH)),
 			rotheme.TableViewEmptyText("No guild members loaded."),
 			rotheme.TableViewScrollYSignal(w.ensureGuildMemberScrollSignal()),
 			rotheme.TableViewBuildCell(func(cell rotheme.TableViewCellContext) widget.Widget {
@@ -571,16 +577,18 @@ func (w *GuildWindow) drainMemberContextAction() bool {
 	return true
 }
 
-var guildMemberTableColumns = []rotheme.TableViewColumn{
-	{Key: "portrait", Width: 28},
-	{Key: "name", Title: "Name", Width: 78},
-	{Key: "position", Title: "Position", Width: 62},
-	{Key: "job", Title: "Job", Width: 52},
-	{Key: "level", Title: "Lv", Width: 26},
-	{Key: "note", Title: "Note", Width: 62},
-	{Key: "devotion", Title: "Dev.", Width: 38},
-	{Key: "tax", Title: "Tax", Width: 42},
-	{Key: "fill", Flex: 1},
+func guildMemberTableColumns() []rotheme.TableViewColumn {
+	return []rotheme.TableViewColumn{
+		{Key: "portrait", Width: float32(guildMemberPortraitW)},
+		{Key: "name", Title: "Name", Width: float32(guildMemberNameW)},
+		{Key: "position", Title: "Position", Width: float32(guildMemberPosW)},
+		{Key: "job", Title: "Job", Width: float32(guildMemberJobW)},
+		{Key: "level", Title: "Lv", Width: float32(guildMemberLevelW)},
+		{Key: "note", Title: "Note", Width: float32(guildMemberNoteW)},
+		{Key: "devotion", Title: "Dev.", Width: float32(guildMemberDevotionW)},
+		{Key: "tax", Title: "Tax", Width: float32(guildMemberTaxW)},
+		{Key: "fill", Flex: 1},
+	}
 }
 
 func (w *GuildWindow) guildMemberTableCell(ctx Context, member session.GuildMember, positions []session.GuildPosition, isMaster bool, totalExp uint64, cell rotheme.TableViewCellContext) widget.Widget {
@@ -590,21 +598,21 @@ func (w *GuildWindow) guildMemberTableCell(ctx Context, member session.GuildMemb
 		if w.MemberPortrait != nil {
 			img = w.MemberPortrait(ctx, member)
 		}
-		return primitives.HBox(newStaticImageWidget(img, 24, 24)).Width(cell.Width).Height(guildTableRowH).PaddingLeft(2).CrossAlign(primitives.CrossAxisCenter)
+		return primitives.HBox(newStaticImageWidget(img, guildPortraitSize, guildPortraitSize)).Width(cell.Width).Height(float32(guildTableRowH)).PaddingLeft(float32(guildPortraitPadLeft)).CrossAlign(primitives.CrossAxisCenter)
 	case "name":
 		return w.guildMemberNameCell(member, cell.Width)
 	case "position":
 		return w.guildMemberPositionCell(ctx, member, positions, isMaster, cell.Width)
 	case "job":
-		return guildTableViewTextCell(db.JobDisplayName(int(member.Job)), cell.Width, guildTableRowH)
+		return guildTableViewTextCell(db.JobDisplayName(int(member.Job)), cell.Width, float32(guildTableRowH))
 	case "level":
-		return guildTableViewTextCell(fmt.Sprintf("%d", member.Level), cell.Width, guildTableRowH)
+		return guildTableViewTextCell(fmt.Sprintf("%d", member.Level), cell.Width, float32(guildTableRowH))
 	case "note":
-		return guildTableViewTextCell(member.Memo, cell.Width, guildTableRowH)
+		return guildTableViewTextCell(member.Memo, cell.Width, float32(guildTableRowH))
 	case "devotion":
-		return guildTableViewTextCell(guildMemberDevotion(member.MemberExp, totalExp), cell.Width, guildTableRowH)
+		return guildTableViewTextCell(guildMemberDevotion(member.MemberExp, totalExp), cell.Width, float32(guildTableRowH))
 	case "tax":
-		return guildTableViewTextCell(fmt.Sprintf("%d", member.MemberExp), cell.Width, guildTableRowH)
+		return guildTableViewTextCell(fmt.Sprintf("%d", member.MemberExp), cell.Width, float32(guildTableRowH))
 	default:
 		return primitives.Box()
 	}
@@ -619,14 +627,14 @@ func (w *GuildWindow) guildMemberNameCell(member session.GuildMember, width floa
 		rotheme.Text(trimRunes(guildText(member.CharName), int(width/7))).Color(nameColor),
 	).
 		Width(width).
-		Height(guildTableRowH).
-		PaddingLeft(6).
+		Height(float32(guildTableRowH)).
+		PaddingLeft(float32(guildCellPadLeft)).
 		CrossAlign(primitives.CrossAxisCenter)
 }
 
 func (w *GuildWindow) guildMemberPositionCell(ctx Context, member session.GuildMember, positions []session.GuildPosition, isMaster bool, width float32) widget.Widget {
 	if !isMaster || member.PositionID == 0 {
-		return guildTableViewTextCell(guildPositionName(positions, member.PositionID), width, guildTableRowH)
+		return guildTableViewTextCell(guildPositionName(positions, member.PositionID), width, float32(guildTableRowH))
 	}
 	positionID := member.PositionID
 	if w.memberDraft != nil {
@@ -647,14 +655,14 @@ func (w *GuildWindow) guildMemberPositionCell(ctx Context, member session.GuildM
 		})
 	}
 	if len(items) == 0 {
-		return guildTableViewTextCell(guildPositionName(positions, member.PositionID), width, guildTableRowH)
+		return guildTableViewTextCell(guildPositionName(positions, member.PositionID), width, float32(guildTableRowH))
 	}
 	return guildTableViewControlCell(
 		dropdown.New(
 			dropdown.ItemDefs(items),
 			dropdown.Selected(selected),
-			dropdown.MaxVisibleItems(8),
-			dropdown.ItemHeight(22),
+			dropdown.MaxVisibleItems(guildMemberDropRows),
+			dropdown.ItemHeight(float32(guildMemberDropItemH)),
 			dropdown.PainterOpt(rotheme.DropdownPainter{}),
 			dropdown.OnChange(func(_ int, value string) {
 				positionID, err := strconv.ParseUint(value, 10, 32)
@@ -768,10 +776,10 @@ func (w *GuildWindow) positionsTab(ctx Context) widget.Widget {
 	positions := guildSortedPositions(guild.Positions)
 	return primitives.Box(
 		rotheme.TableView(
-			rotheme.TableViewColumns(guildPositionTableColumns),
+			rotheme.TableViewColumns(guildPositionTableColumns()),
 			rotheme.TableViewRowCount(len(positions)),
-			rotheme.TableViewRowHeight(guildTableRowH),
-			rotheme.TableViewHeaderHeight(guildTableHeaderH),
+			rotheme.TableViewRowHeight(float32(guildTableRowH)),
+			rotheme.TableViewHeaderHeight(float32(guildTableHeaderH)),
 			rotheme.TableViewEmptyText("No guild positions loaded."),
 			rotheme.TableViewScrollYSignal(w.ensureGuildPositionScrollSignal()),
 			rotheme.TableViewBuildCell(func(cell rotheme.TableViewCellContext) widget.Widget {
@@ -792,19 +800,21 @@ func (w *GuildWindow) positionsTab(ctx Context) widget.Widget {
 		CrossAlign(primitives.CrossAxisStretch)
 }
 
-var guildPositionTableColumns = []rotheme.TableViewColumn{
-	{Key: "rank", Title: "Rank", Width: 44},
-	{Key: "title", Title: "Position Title", Width: 164},
-	{Key: "invite", Title: "Invitation", Width: 58},
-	{Key: "punish", Title: "Punish", Width: 48},
-	{Key: "tax", Title: "Tax", Width: 46},
-	{Key: "fill", Flex: 1},
+func guildPositionTableColumns() []rotheme.TableViewColumn {
+	return []rotheme.TableViewColumn{
+		{Key: "rank", Title: "Rank", Width: float32(guildPosRankW)},
+		{Key: "title", Title: "Position Title", Width: float32(guildPosTitleW)},
+		{Key: "invite", Title: "Invitation", Width: float32(guildPosInviteW)},
+		{Key: "punish", Title: "Punish", Width: float32(guildPosPunishW)},
+		{Key: "tax", Title: "Tax", Width: float32(guildPosTaxW)},
+		{Key: "fill", Flex: 1},
+	}
 }
 
 func (w *GuildWindow) guildPositionCell(ctx Context, position session.GuildPosition, isMaster bool, cell rotheme.TableViewCellContext) widget.Widget {
 	switch cell.Column.Key {
 	case "rank":
-		return guildTableViewTextCell(fmt.Sprintf("%d", position.PositionID), cell.Width, guildTableRowH)
+		return guildTableViewTextCell(fmt.Sprintf("%d", position.PositionID), cell.Width, float32(guildTableRowH))
 	case "title":
 		return w.guildPositionTitleCell(position, isMaster, cell.Width)
 	case "invite":
@@ -820,7 +830,7 @@ func (w *GuildWindow) guildPositionCell(ctx Context, position session.GuildPosit
 
 func (w *GuildWindow) guildPositionTitleCell(position session.GuildPosition, isMaster bool, width float32) widget.Widget {
 	if !isMaster {
-		return guildTableViewTextCell(guildPositionTitle(position), width, guildTableRowH)
+		return guildTableViewTextCell(guildPositionTitle(position), width, float32(guildTableRowH))
 	}
 	return guildTableViewControlCell(
 		rotheme.TextField(
@@ -841,7 +851,7 @@ func (w *GuildWindow) guildPositionTitleCell(position session.GuildPosition, isM
 func (w *GuildWindow) guildPositionRightCell(ctx Context, positionID, flag uint32, isMaster bool, width float32) widget.Widget {
 	enabled := w.positionDraft[positionID].right&flag != 0
 	if !isMaster {
-		return guildTableViewTextCell(guildRightLabel(enabled), width, guildTableRowH)
+		return guildTableViewTextCell(guildRightLabel(enabled), width, float32(guildTableRowH))
 	}
 	return primitives.HBox(
 		primitives.Expanded(primitives.Box()),
@@ -864,7 +874,7 @@ func (w *GuildWindow) guildPositionRightCell(ctx Context, positionID, flag uint3
 
 func (w *GuildWindow) guildPositionTaxCell(position session.GuildPosition, isMaster bool, width float32) widget.Widget {
 	if !isMaster {
-		return guildTableViewTextCell(fmt.Sprintf("%d %%", position.PayRate), width, guildTableRowH)
+		return guildTableViewTextCell(fmt.Sprintf("%d %%", position.PayRate), width, float32(guildTableRowH))
 	}
 	return guildTableViewControlCell(
 		rotheme.TextField(
@@ -889,14 +899,14 @@ func guildTableViewTextCell(text string, width, height float32) widget.Widget {
 	).
 		Width(width).
 		Height(height).
-		PaddingLeft(6).
+		PaddingLeft(float32(guildCellPadLeft)).
 		CrossAlign(primitives.CrossAxisCenter)
 }
 
 func guildTableViewControlCell(child widget.Widget, width float32) widget.Widget {
 	return primitives.Box(child).
 		Width(width).
-		Height(guildTableControlH).
+		Height(float32(guildTableControlH)).
 		CrossAlign(primitives.CrossAxisStretch)
 }
 
@@ -1007,10 +1017,10 @@ func (w *GuildWindow) skillsTab(ctx Context) widget.Widget {
 	guild := guildSessionInfo(ctx.Session)
 	return primitives.Box(
 		rotheme.TableView(
-			rotheme.TableViewColumns(guildSkillTableColumns),
+			rotheme.TableViewColumns(guildSkillTableColumns()),
 			rotheme.TableViewRowCount(len(guild.Skills)),
-			rotheme.TableViewRowHeight(guildTableRowH),
-			rotheme.TableViewHeaderHeight(guildTableHeaderH),
+			rotheme.TableViewRowHeight(float32(guildTableRowH)),
+			rotheme.TableViewHeaderHeight(float32(guildTableHeaderH)),
 			rotheme.TableViewEmptyText("No guild skills loaded."),
 			rotheme.TableViewScrollYSignal(w.ensureGuildSkillScrollSignal()),
 			rotheme.TableViewDispatchHoverToCells(false),
@@ -1029,13 +1039,15 @@ func (w *GuildWindow) skillsTab(ctx Context) widget.Widget {
 		CrossAlign(primitives.CrossAxisStretch)
 }
 
-var guildSkillTableColumns = []rotheme.TableViewColumn{
-	{Key: "icon", Width: 34},
-	{Key: "type", Width: 16},
-	{Key: "name", Title: "Name", Width: 234},
-	{Key: "level", Title: "Lv", Width: 40},
-	{Key: "levelup", Width: 22},
-	{Key: "fill", Flex: 1},
+func guildSkillTableColumns() []rotheme.TableViewColumn {
+	return []rotheme.TableViewColumn{
+		{Key: "icon", Width: float32(guildSkillIconW)},
+		{Key: "type", Width: float32(guildSkillTypeW)},
+		{Key: "name", Title: "Name", Width: float32(guildSkillNameW)},
+		{Key: "level", Title: "Lv", Width: float32(guildSkillLevelW)},
+		{Key: "levelup", Width: float32(guildSkillLevelUpW)},
+		{Key: "fill", Flex: 1},
+	}
 }
 
 func (w *GuildWindow) guildSkillCell(ctx Context, skill session.Skill, guild session.Guild, cell rotheme.TableViewCellContext) rotheme.TableViewSimpleCell {
@@ -1179,11 +1191,12 @@ func (w *GuildWindow) pressGuildSkill(ctx Context, skill session.Skill) {
 
 func guildSkillLevelUpButtonBounds(row int) geometry.Rect {
 	x := float32(0)
-	for _, col := range guildSkillTableColumns {
+	for _, col := range guildSkillTableColumns() {
 		if col.Key == "levelup" {
+			rowH := float32(guildTableRowH)
 			return geometry.NewRect(
 				x+(col.Width-rotheme.IconButtonSize)/2,
-				float32(row)*guildTableRowH+(guildTableRowH-rotheme.IconButtonSize)/2,
+				float32(row)*rowH+(rowH-rotheme.IconButtonSize)/2,
 				rotheme.IconButtonSize,
 				rotheme.IconButtonSize,
 			)
@@ -1246,8 +1259,7 @@ func (w *GuildWindow) showSkillTooltip(ctx Context, skill session.Skill, mx, my 
 		w.hideTooltip()
 		return
 	}
-	const tooltipW = 292
-	w.tooltip.ShowColoredBox(ctx, skillTooltipText(ctx, skill), mx+16+tooltipW/2, my+18, tooltipW, 0)
+	w.tooltip.ShowColoredBox(ctx, skillTooltipText(ctx, skill), mx+guildTooltipOffX+guildTooltipW/2, my+guildTooltipOffY, float64(guildTooltipW), 0)
 }
 
 func (w *GuildWindow) hideTooltip() {
@@ -1273,7 +1285,7 @@ func (w *GuildWindow) handleRowTooltip(ctx Context, text string, row int, e even
 		if scroll := w.tableScrollSignal(); scroll != nil {
 			w.tooltipScroll = scroll.Get()
 		}
-		w.tooltip.ShowBox(ctx, text, mx+150, my+18, my-6, 300, 0)
+		w.tooltip.ShowBox(ctx, text, mx+guildRowTipOffX, my+guildRowTipOffY, my-guildRowTipAbove, float64(guildRowTipW), 0)
 	case event.MouseLeave, event.MousePress:
 		w.hideTooltip()
 	}
@@ -1306,7 +1318,7 @@ func (w *GuildWindow) updateTooltipHover(ctx Context) {
 	}
 	if w.tab != guildWindowTabSkills {
 		scroll := w.tableScrollSignal()
-		if scroll == nil || scroll.Get() != w.tooltipScroll || int((float32(ctx.Input.MouseY-y)+scroll.Get())/guildTableRowH) != w.tooltipRow {
+		if scroll == nil || scroll.Get() != w.tooltipScroll || int((float32(ctx.Input.MouseY-y)+scroll.Get())/float32(guildTableRowH)) != w.tooltipRow {
 			w.hideTooltip()
 		}
 	}
@@ -1314,7 +1326,7 @@ func (w *GuildWindow) updateTooltipHover(ctx Context) {
 
 func (w *GuildWindow) guildTableBounds(ctx Context) (int, int, int, int) {
 	x := w.x
-	y := w.y + ROWindowTitleHeight + guildWindowTabHeight + 2
+	y := w.y + ROWindowTitleHeight + guildWindowTabHeight + guildContentGap
 	height := w.height - (y - w.y)
 	if w.tab == guildWindowTabSkills || guildSessionInfo(ctx.Session).IsMaster && (w.tab == guildWindowTabMembers || w.tab == guildWindowTabPositions) {
 		height -= ROWindowFooterHeight
@@ -1322,7 +1334,7 @@ func (w *GuildWindow) guildTableBounds(ctx Context) (int, int, int, int) {
 	if height < 0 {
 		height = 0
 	}
-	return x, y, guildTableViewportW, height
+	return x, y, guildWindowWidth, height
 }
 
 func (w *GuildWindow) ensureGuildSkillScrollSignal() state.Signal[float32] {
@@ -1336,10 +1348,10 @@ func (w *GuildWindow) historyTab(ctx Context) widget.Widget {
 	history := guildSessionInfo(ctx.Session).ExpelHistory
 	return primitives.Box(
 		rotheme.TableView(
-			rotheme.TableViewColumns(guildHistoryTableColumns),
+			rotheme.TableViewColumns(guildHistoryTableColumns()),
 			rotheme.TableViewRowCount(len(history)),
-			rotheme.TableViewRowHeight(guildTableRowH),
-			rotheme.TableViewHeaderHeight(guildTableHeaderH),
+			rotheme.TableViewRowHeight(float32(guildTableRowH)),
+			rotheme.TableViewHeaderHeight(float32(guildTableHeaderH)),
 			rotheme.TableViewEmptyText("No expel history loaded."),
 			rotheme.TableViewScrollYSignal(w.ensureGuildHistoryScrollSignal()),
 			rotheme.TableViewBuildSimpleCell(func(cell rotheme.TableViewCellContext) rotheme.TableViewSimpleCell {
@@ -1361,9 +1373,11 @@ func (w *GuildWindow) historyTab(ctx Context) widget.Widget {
 		CrossAlign(primitives.CrossAxisStretch)
 }
 
-var guildHistoryTableColumns = []rotheme.TableViewColumn{
-	{Key: "name", Title: "Name", Width: 116},
-	{Key: "reason", Title: "The Reason of Expulsion", Flex: 1},
+func guildHistoryTableColumns() []rotheme.TableViewColumn {
+	return []rotheme.TableViewColumn{
+		{Key: "name", Title: "Name", Width: float32(guildHistoryNameW)},
+		{Key: "reason", Title: "The Reason of Expulsion", Flex: 1},
+	}
 }
 
 func guildHistoryCell(entry session.GuildExpelHistory, cell rotheme.TableViewCellContext) rotheme.TableViewSimpleCell {
@@ -1411,7 +1425,7 @@ func (w *GuildWindow) noticeTab(ctx Context) widget.Widget {
 			},
 		)
 	} else {
-		title = guildNoticeBox(guildText(guild.NoticeSubject), 28, 1)
+		title = guildNoticeBox(guildText(guild.NoticeSubject), float32(guildNoticeTitleH), 1)
 	}
 	return primitives.Box(
 		rotheme.Text("Title"),
@@ -1419,8 +1433,8 @@ func (w *GuildWindow) noticeTab(ctx Context) widget.Widget {
 		rotheme.Text("Contents"),
 		primitives.Expanded(w.noticeBody),
 	).
-		PaddingXY(9, 10).
-		Gap(5).
+		PaddingXY(float32(guildNoticePadX), float32(guildNoticePadY)).
+		Gap(float32(guildNoticeGap)).
 		CrossAlign(primitives.CrossAxisStretch).
 		Background(rotheme.Default.Colors.WindowBody)
 }
@@ -1435,7 +1449,7 @@ func guildNoticeInput(value string, maxLength int, onChange func(string)) widget
 			textfield.MaxLength(maxLength),
 		),
 	).
-		Height(guildNoticeFieldH).
+		Height(float32(guildNoticeFieldH)).
 		CrossAlign(primitives.CrossAxisStretch)
 }
 
@@ -1444,10 +1458,10 @@ func guildNoticeBox(text string, height float32, maxLines int) widget.Widget {
 		rotheme.Text(text).
 			Align(widget.TextAlignLeft).
 			MaxLines(maxLines).
-			LineHeight(16/rotheme.Default.Typography.TextSize),
+			LineHeight(float32(guildNoticeLineH)/rotheme.Default.Typography.TextSize),
 	).
 		Height(height).
-		PaddingXY(5, 4).
+		PaddingXY(float32(guildNoticeBoxPadX), float32(guildNoticeBoxPadY)).
 		CrossAlign(primitives.CrossAxisStretch).
 		Background(rotheme.Default.Colors.WindowFooter).
 		BorderStyle(1, rotheme.Default.Colors.FooterLine)
@@ -1536,14 +1550,14 @@ func (w *GuildWindow) infoTab(ctx Context) widget.Widget {
 	}
 	return primitives.HBox(
 		primitives.Box(leftRows...).
-			Gap(3).
-			Width(188),
+			Gap(float32(guildInfoRowGap)).
+			Width(float32(guildInfoLeftW)),
 		primitives.Box(rightRows...).
-			Gap(3).
-			Width(174),
+			Gap(float32(guildInfoRowGap)).
+			Width(float32(guildInfoRightW)),
 	).
-		PaddingXY(9, 10).
-		Gap(10).
+		PaddingXY(float32(guildInfoPadX), float32(guildInfoPadY)).
+		Gap(float32(guildInfoColGap)).
 		CrossAlign(primitives.CrossAxisStart)
 }
 
@@ -1558,11 +1572,11 @@ func (w *GuildWindow) guildEmblemEditor(ctx Context, version uint32) widget.Widg
 	return primitives.HBox(
 		w.guildEmblemBox(ctx, version),
 		primitives.Box(w.guildEmblemDropdown()).
-			Width(132).
-			Height(22).
+			Width(float32(guildEmblemEditorW)).
+			Height(float32(guildEmblemEditorH)).
 			CrossAlign(primitives.CrossAxisStretch),
 	).
-		Gap(6).
+		Gap(float32(guildEmblemEditorGap)).
 		CrossAlign(primitives.CrossAxisCenter)
 }
 
@@ -1572,7 +1586,7 @@ func (w *GuildWindow) guildEmblemDropdown() widget.Widget {
 			dropdown.ItemDefs([]dropdown.ItemDef{{Value: "", Label: "No emblems found", Disabled: true}}),
 			dropdown.Selected(0),
 			dropdown.Disabled(true),
-			dropdown.MaxVisibleItems(5),
+			dropdown.MaxVisibleItems(guildEmblemDropRows),
 			dropdown.PainterOpt(rotheme.DropdownPainter{}),
 		)
 	}
@@ -1590,7 +1604,7 @@ func (w *GuildWindow) guildEmblemDropdown() widget.Widget {
 	return dropdown.New(
 		dropdown.ItemDefs(items),
 		dropdown.Placeholder("Edit"),
-		dropdown.MaxVisibleItems(5),
+		dropdown.MaxVisibleItems(guildEmblemDropRows),
 		dropdown.PainterOpt(rotheme.DropdownPainter{}),
 		dropdown.OnChange(func(_ int, value string) {
 			w.action.SelectedEmblemPath = value
@@ -1602,12 +1616,12 @@ func guildInfoRow(label, value string) widget.Widget {
 	return primitives.Box(
 		rotheme.Text(label + " : " + value),
 	).
-		Height(16)
+		Height(float32(guildInfoRowH))
 }
 
 func guildInfoSection(label string) widget.Widget {
 	return primitives.Box(rotheme.Text(label + ":")).
-		Height(16)
+		Height(float32(guildInfoRowH))
 }
 
 func guildTendencyBox(honor, virtue uint32) widget.Widget {
@@ -1616,36 +1630,36 @@ func guildTendencyBox(honor, virtue uint32) widget.Widget {
 		value = fmt.Sprintf("H %d  V %d", honor, virtue)
 	}
 	return primitives.Box(
-		primitives.Box(rotheme.Text("R")).Width(16),
+		primitives.Box(rotheme.Text("R")).Width(float32(guildTendencyLabelW)),
 		primitives.HBox(
 			primitives.Box(
 				primitives.Expanded(primitives.Box()),
 				rotheme.Text("V"),
 				primitives.Expanded(primitives.Box()),
 			).
-				PaddingLeft(3).
-				Width(16).
-				Height(90).
+				PaddingLeft(float32(guildTendencyPadL)).
+				Width(float32(guildTendencyLabelW)).
+				Height(float32(guildTendencyTrackH)).
 				CrossAlign(primitives.CrossAxisCenter),
-			guildFramedBox(90, 90, value),
+			guildFramedBox(float32(guildTendencyTrackH), float32(guildTendencyTrackH), value),
 			primitives.Box(
 				primitives.Expanded(primitives.Box()),
 				rotheme.Text("F"),
 				primitives.Expanded(primitives.Box()),
 			).
-				Width(16).
-				Height(90).
+				Width(float32(guildTendencyLabelW)).
+				Height(float32(guildTendencyTrackH)).
 				CrossAlign(primitives.CrossAxisCenter),
 		).
-			Gap(4).
+			Gap(float32(guildTendencyGap)).
 			CrossAlign(primitives.CrossAxisCenter),
 		primitives.Box(rotheme.Text("W")).
-			PaddingTop(3).
-			Width(16).
-			Height(19),
+			PaddingTop(float32(guildTendencyPadT)).
+			Width(float32(guildTendencyLabelW)).
+			Height(float32(guildTendencyCaption)),
 	).
 		CrossAlign(primitives.CrossAxisCenter).
-		Gap(2)
+		Gap(float32(guildTendencyBoxGap))
 }
 
 func (w *GuildWindow) guildEmblemBox(ctx Context, version uint32) widget.Widget {
@@ -1656,19 +1670,19 @@ func (w *GuildWindow) guildEmblemBox(ctx Context, version uint32) widget.Widget 
 		}
 	}
 	if content != nil {
-		return guildFramedWidget(guildEmblemSize, guildEmblemSize, 0, content)
+		return guildFramedWidget(float32(guildEmblemSize), float32(guildEmblemSize), 0, content)
 	}
 	text := "-"
 	if version != 0 {
 		text = fmt.Sprintf("v%d", version)
 	}
-	return guildFramedBox(guildEmblemSize, guildEmblemSize, text)
+	return guildFramedBox(float32(guildEmblemSize), float32(guildEmblemSize), text)
 }
 
 func (w *GuildWindow) guildRelationList(guild session.Guild, kind uint32) widget.Widget {
-	rows := make([]widget.Widget, 0, 3)
+	rows := make([]widget.Widget, 0, guildRelationRows)
 	for _, relation := range guild.Relations {
-		if relation.Relation != kind || relation.GuildID == 0 || len(rows) == 3 {
+		if relation.Relation != kind || relation.GuildID == 0 || len(rows) == guildRelationRows {
 			continue
 		}
 		relation := relation
@@ -1681,9 +1695,9 @@ func (w *GuildWindow) guildRelationList(guild session.Guild, kind uint32) widget
 		})
 	}
 	return primitives.Box(rows...).
-		Width(168).
-		Height(42).
-		PaddingXY(3, 1).
+		Width(float32(guildRelationW)).
+		Height(float32(guildRelationH)).
+		PaddingXY(float32(guildRelationPadX), float32(guildRelationPadY)).
 		CrossAlign(primitives.CrossAxisStretch).
 		Background(rotheme.Default.Colors.WindowFooter).
 		BorderStyle(1, rotheme.Default.Colors.FooterLine)
@@ -1698,7 +1712,7 @@ type guildRelationRowWidget struct {
 }
 
 func (w *guildRelationRowWidget) Layout(_ widget.Context, constraints geometry.Constraints) geometry.Size {
-	size := constraints.Constrain(geometry.Sz(160, 13))
+	size := constraints.Constrain(geometry.Sz(float32(guildRelationRowW), float32(guildRelationRowH)))
 	w.SetBounds(geometry.FromPointSize(w.Position(), size))
 	return size
 }
@@ -1709,7 +1723,7 @@ func (w *guildRelationRowWidget) Draw(_ widget.Context, canvas widget.Canvas) {
 		canvas.DrawRect(bounds, rotheme.Default.Colors.ButtonHover)
 	}
 	name := guildText(w.relation.Name)
-	rotheme.DrawText(canvas, trimRunes(name, 24), geometry.NewRect(bounds.Min.X+2, bounds.Min.Y, bounds.Width()-4, bounds.Height()), rotheme.Default.Typography.TextSize, rotheme.Default.Colors.Text, false, widget.TextAlignLeft)
+	rotheme.DrawText(canvas, trimRunes(name, 24), geometry.NewRect(bounds.Min.X+float32(guildRelationTextX), bounds.Min.Y, bounds.Width()-float32(guildRelationTextW), bounds.Height()), rotheme.Default.Typography.TextSize, rotheme.Default.Colors.Text, false, widget.TextAlignLeft)
 }
 
 func (w *guildRelationRowWidget) Event(ctx widget.Context, e event.Event) bool {
@@ -1744,7 +1758,7 @@ func guildFramedBox(width, height float32, text string) widget.Widget {
 	if strings.TrimSpace(text) == "" {
 		content = primitives.Box()
 	}
-	return guildFramedWidget(width, height, 4, content)
+	return guildFramedWidget(width, height, float32(guildFramePad), content)
 }
 
 func guildFramedWidget(width, height, padding float32, content widget.Widget) widget.Widget {
@@ -1763,7 +1777,7 @@ func guildWindowPlaceholder(text string) widget.Widget {
 	return primitives.Box(
 		rotheme.Text(text),
 	).
-		Padding(10).
+		Padding(float32(guildPlaceholderPad)).
 		Background(rotheme.Default.Colors.WindowBody)
 }
 

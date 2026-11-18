@@ -18,10 +18,10 @@ func TestContextMenuUsesCompactInsetRows(t *testing.T) {
 	if size != geometry.Sz(100, float32(wantHeight)) {
 		t.Fatalf("context menu size = %v, want 100x%d", size, wantHeight)
 	}
-	if got := first.(interface{ Bounds() geometry.Rect }).Bounds(); got != geometry.NewRect(contextMenuPadding, contextMenuPadding, 100-2*contextMenuPadding, contextMenuRowH) {
+	if got := first.(interface{ Bounds() geometry.Rect }).Bounds(); got != geometry.NewRect(float32(contextMenuPadding), float32(contextMenuPadding), float32(100-2*contextMenuPadding), float32(contextMenuRowH())) {
 		t.Fatalf("first context menu row bounds = %v, want inset compact row", got)
 	}
-	if got := second.(interface{ Bounds() geometry.Rect }).Bounds(); got != geometry.NewRect(contextMenuPadding, contextMenuPadding+contextMenuRowH, 100-2*contextMenuPadding, contextMenuRowH) {
+	if got := second.(interface{ Bounds() geometry.Rect }).Bounds(); got != geometry.NewRect(float32(contextMenuPadding), float32(contextMenuPadding+contextMenuRowH()), float32(100-2*contextMenuPadding), float32(contextMenuRowH())) {
 		t.Fatalf("second context menu row bounds = %v, want adjacent inset compact row", got)
 	}
 	frame, ok := root.(*windowFrame)
@@ -32,7 +32,7 @@ func TestContextMenuUsesCompactInsetRows(t *testing.T) {
 	if !ok {
 		t.Fatalf("context menu root = %T, want box", root)
 	}
-	if box.Style().Radius != contextMenuRadius {
+	if box.Style().Radius != float32(contextMenuRadius) {
 		t.Fatalf("context menu radius = %.1f, want %.1f", box.Style().Radius, float32(contextMenuRadius))
 	}
 }
