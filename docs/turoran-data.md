@@ -45,9 +45,14 @@ lacks is fetched on first use and kept in
 - **Freshness.** Archive files are reused from the cache and revalidated
   (`If-None-Match`) when the server's archive list changes. Cached text
   tables are served at once and refreshed in the background. If the refresh
-  brings a changed skill table, the skill tree reloads live; other overlay
-  changes show on the next run. The planned version-based invalidation is
-  in `docs/data-version-invalidation.md`.
+  brings a changed skill table, the skill tree reloads live. When the
+  server stamps `X-Data-Version`, the client keeps the newest version it
+  has seen, asks `changes?since=` once for the delta (or a full recheck
+  when the log says the client is too old), and polls `GET version` every
+  60–120 seconds with jitter while idle. A signed GDAT1 manifest for that
+  version, when published, is verified against the trusted public-key list
+  before any streamed file is cached or used; a digest mismatch is
+  discarded. Details: `docs/data-version-invalidation.md`.
 - **Failures.** A 404 is remembered for the run and the lookup falls through
   to the next candidate. A bad file (over 128 MB, cut short) only fails that
   file. If the server cannot be reached (dial, TLS, no response), cached

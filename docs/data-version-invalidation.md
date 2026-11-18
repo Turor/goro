@@ -1,8 +1,11 @@
 # Live data invalidation (design)
 
-Status: design only. Nothing here is built yet in remoteclient2 or goro,
-except the client entry point described under "Client hook", which the Lua
-skill tree work ships so this flow can call it.
+Status: implemented in goro (`res` streaming layer) and remoteclient2
+(`DATA_VERSION=1`: header, `/version`, `/changes`, `/data-manifest`). Enable
+the remoteclient2 flag separately; old clients ignore the header. Signed GDAT1
+manifests are produced offline with `goro-sign-release sign-data` (same
+Ed25519 key as client updates) and copied onto the data host. The signing
+seed never lives on the data server.
 
 ## Goal
 
