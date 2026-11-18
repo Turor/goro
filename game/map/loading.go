@@ -6,10 +6,12 @@ import (
 	"image"
 	"image/color"
 	"math/rand/v2"
+	"strings"
 	"time"
 
 	"github.com/kivutar/goro/client"
 	"github.com/kivutar/goro/render"
+	"github.com/kivutar/goro/res"
 )
 
 const (
@@ -23,13 +25,16 @@ const (
 // Loading prepares one map on the game thread, yielding between assets so the
 // loading screen can redraw. GPU uploads and scene warmup follow preparation.
 type Loading struct {
-	RSWSource  string
-	Presented  bool
-	stage      int
-	tasks      []func()
-	completed  int
-	uploads    int
-	images     render.ImageGroup
+	RSWSource string
+	Presented bool
+	stage     int
+	tasks     []func()
+	completed int
+	uploads   int
+	images    render.ImageGroup
+	// prefetch downloads the next stage's streamed files in parallel; the
+	// loading screen keeps drawing until it is done.
+	prefetch   *res.RemoteBatch
 	background *render.Image
 	unblockUI  func()
 }
@@ -62,6 +67,7 @@ func NewLoading(ctx client.Context) *Loading {
 			}
 		}
 	}
+	l.prefetch = ctx.Resources.PrefetchRemote(mapFileCandidates(ctx.World.MapName))
 	l.tasks = []func(){
 		func() { ctx.World.GND, _, _ = LoadGND(ctx.Resources, ctx.World.MapName) },
 		func() {
@@ -84,6 +90,9 @@ func (l *Loading) Advance(ctx client.Context, scene *System) bool {
 	if !l.Presented || l.Prepared() {
 		return false
 	}
+	if !l.prefetch.Done() {
+		return false
+	}
 	l.Presented = false
 	deadline := time.Now().Add(8 * time.Millisecond)
 	for l.completed < len(l.tasks) {
@@ -102,8 +111,10 @@ func (l *Loading) Advance(ctx client.Context, scene *System) bool {
 	switch l.stage {
 	case loadingModels:
 		l.tasks = ModelLoadTasks(ctx)
+		l.prefetch = ctx.Resources.PrefetchRemote(modelFileCandidates(ctx))
 	case loadingTextures:
 		l.tasks = scene.TextureLoadTasks(ctx)
+		l.prefetch = ctx.Resources.PrefetchRemote(textureFileCandidates(ctx))
 	case loadingSounds:
 		l.tasks = SoundLoadTasks(ctx)
 	case loadingPrepared:
@@ -169,4 +180,47 @@ func (l *Loading) blockUI(ctx client.Context) {
 	if app, ok := ctx.UIApp.(interface{ BlockInput() func() }); ok && l.unblockUI == nil {
 		l.unblockUI = app.BlockInput()
 	}
+}
+
+func mapFileCandidates(mapName string) [][]string {
+	base := strings.TrimSuffix(strings.TrimSuffix(mapName, ".gat"), ".rsw")
+	var lists [][]string
+	for _, ext := range []string{"gnd", "rsw", "gat"} {
+		lists = append(lists, []string{"data\\" + base + "." + ext})
+	}
+	return lists
+}
+
+func modelFileCandidates(ctx client.Context) [][]string {
+	if ctx.World == nil || ctx.World.RSW == nil {
+		return nil
+	}
+	var lists [][]string
+	for _, placement := range ctx.World.RSW.Models {
+		if placement.Filename != "" {
+			lists = append(lists, res.RSMModelCandidates(placement.Filename))
+		}
+	}
+	return lists
+}
+
+func textureFileCandidates(ctx client.Context) [][]string {
+	if ctx.Config.Headless || ctx.World == nil {
+		return nil
+	}
+	var lists [][]string
+	if ctx.World.GND != nil {
+		for _, name := range ctx.World.GND.Textures {
+			lists = append(lists, res.GroundTextureCandidates(name))
+		}
+	}
+	for _, model := range ctx.World.RSM {
+		if model == nil {
+			continue
+		}
+		for _, name := range model.Textures {
+			lists = append(lists, res.GroundTextureCandidates(name))
+		}
+	}
+	return lists
 }

@@ -10,6 +10,7 @@ import (
 	_ "image/jpeg"
 	"image/png"
 	"strings"
+	"time"
 
 	_ "golang.org/x/image/bmp"
 )
@@ -29,6 +30,20 @@ func checkImageDims(kind string, width, height int) error {
 
 func LoadImage(manager *Manager, candidates []string) (image.Image, string, error) {
 	return loadImageCandidates(manager, candidates, false)
+}
+
+// LoadImageWithin is LoadImage for per-frame callers; see
+// Manager.ReadFileCandidatesWithin. On ErrRemotePending, try again later.
+func LoadImageWithin(manager *Manager, candidates []string, budget time.Duration) (image.Image, string, error) {
+	data, source, err := manager.ReadFileCandidatesWithin(candidates, budget)
+	if err != nil {
+		return nil, source, fmt.Errorf("load image: %w", err)
+	}
+	img, err := DecodeImageData(data)
+	if err != nil {
+		return nil, source, fmt.Errorf("decode image: %w", err)
+	}
+	return img, source, nil
 }
 
 func LoadImageExact(manager *Manager, candidates []string) (image.Image, string, error) {

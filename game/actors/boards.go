@@ -1,6 +1,7 @@
 package actors
 
 import (
+	"errors"
 	"fmt"
 	"image/color"
 	"math"
@@ -341,9 +342,11 @@ func (m *System) roomBoardIcon(manager *res.Manager, key, resource string) *rend
 	if _, ok := m.bindings.Map.TextureMiss[key]; ok {
 		return nil
 	}
-	img, _, err := res.LoadImage(manager, res.InterfaceTextureCandidates(resource))
+	img, _, err := res.LoadImageWithin(manager, res.InterfaceTextureCandidates(resource), scene.FrameRemoteBudget)
 	if err != nil {
-		m.bindings.Map.TextureMiss[key] = struct{}{}
+		if !errors.Is(err, res.ErrRemotePending) {
+			m.bindings.Map.TextureMiss[key] = struct{}{}
+		}
 		return nil
 	}
 	texture := render.NewImageFromImage(img)

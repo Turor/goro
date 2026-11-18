@@ -48,7 +48,38 @@ func New(cfg config.Config) (*Game, error) {
 	if err != nil {
 		return nil, fmt.Errorf("resource manager: %w", err)
 	}
+	if err := enableRemoteData(cfg.Data, resource); err != nil {
+		glog.Warnf("remote data disabled: %v", err)
+	}
 	return NewWithResources(cfg, resource), nil
+}
+
+// enableRemoteData streams client data from the asset server, so a player
+// needs no GRF set: "auto" does so when the data directory has no archives.
+func enableRemoteData(data config.DataConfig, resource *res.Manager) error {
+	if !data.Streaming() {
+		if data.Remote != config.DataRemoteOff && len(resource.Archives) == 0 {
+			glog.Infof("remote data: off, no asset server configured (set [data] remote_url in %s)", config.DataServerFile)
+		}
+		return nil
+	}
+	switch data.Remote {
+	case config.DataRemoteOff:
+		return nil
+	case config.DataRemoteAuto:
+		if len(resource.Archives) > 0 {
+			return nil
+		}
+	}
+	cacheDir, err := data.RemoteCacheDir()
+	if err != nil {
+		return err
+	}
+	return resource.EnableRemote(res.RemoteOptions{
+		BaseURL:  data.RemoteURL,
+		CacheDir: cacheDir,
+		Aliases:  res.TuroranRemoteAliases,
+	})
 }
 
 // NewWithResources allows platform launchers to supply a granted asset folder.
