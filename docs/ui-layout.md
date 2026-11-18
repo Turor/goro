@@ -15,7 +15,26 @@ built-in layout is used, exactly as before, and nothing else is read.
   with `file:line: reason` in the log, and the previous values stay. Unknown
   keys are only warnings, so a file from an older or newer build still loads.
 
-## What the file covers
+## Live editing (--ui-dev)
+
+Start goro with `--ui-dev` (or `[ui_layout] watch = true` in goro.ini). The
+client then checks the file's size and modification time every 0.5 s, so a
+saved edit shows within about a second; F10 reloads at once. A banner at the
+top of the screen says `UI layout reloaded`, or `UI layout NOT applied:
+file:line: reason` for a bad edit, which keeps the last good values. Deleting
+the file restores the built-in layout. Without `--ui-dev` nothing is polled and
+F10 does nothing.
+
+What updates live, and what needs the window reopened:
+
+- **Live:** window body, border, radius and title text; title bar, footer and
+  button colors; button text and other text drawn at paint time; the hotbar
+  (slot size, gaps, padding); inventory cell size, columns and rows.
+- **On reopen:** colors and sizes that a window copies when it is built, such
+  as table rows, labels inside window bodies, title and footer padding, and
+  button heights. Reopen the window (or restart) to see those.
+
+
 
 | Section | Keys |
 |---|---|

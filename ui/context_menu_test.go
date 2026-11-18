@@ -24,7 +24,11 @@ func TestContextMenuUsesCompactInsetRows(t *testing.T) {
 	if got := second.(interface{ Bounds() geometry.Rect }).Bounds(); got != geometry.NewRect(contextMenuPadding, contextMenuPadding+contextMenuRowH, 100-2*contextMenuPadding, contextMenuRowH) {
 		t.Fatalf("second context menu row bounds = %v, want adjacent inset compact row", got)
 	}
-	box, ok := root.(*primitives.BoxWidget)
+	frame, ok := root.(*windowFrame)
+	box := (*primitives.BoxWidget)(nil)
+	if ok {
+		box = frame.BoxWidget
+	}
 	if !ok {
 		t.Fatalf("context menu root = %T, want box", root)
 	}

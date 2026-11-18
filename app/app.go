@@ -37,6 +37,7 @@ type Game struct {
 	quit              func()
 	quitting          bool
 	pendingScreenshot string
+	uiLayout          *uiLayoutWatcher
 }
 
 func New(cfg config.Config) (*Game, error) {
@@ -70,6 +71,7 @@ func NewWithResources(cfg config.Config, resource *res.Manager) *Game {
 		screenW:  cfg.Window.Width,
 		screenH:  cfg.Window.Height,
 	}
+	g.uiLayout = newUILayoutWatcher(cfg, time.Now())
 	g.session.KeepLoginID = cfg.Login.KeepID
 	g.session.SavedUsername = cfg.Login.SavedUsername
 	g.session.NoShift = cfg.Gameplay.NoShift
@@ -99,6 +101,9 @@ func NewWithResources(cfg config.Config, resource *res.Manager) *Game {
 func (g *Game) Update() error {
 	defer g.input.EndFrame()
 	g.network.Pump()
+	if g.uiLayout.Update(g.input, time.Now()) {
+		g.ui.RefreshLayout()
+	}
 	g.modes.UpdateContext(g.modeContext())
 	return g.modes.Update()
 }
@@ -127,6 +132,7 @@ func (g *Game) DrawUIOverlay(screen *render.Frame) {
 		return
 	}
 	g.modes.DrawUIOverlay(screen)
+	g.uiLayout.Draw(screen, time.Now())
 }
 
 func (g *Game) FrameSubmitted() {

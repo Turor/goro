@@ -77,6 +77,7 @@ var inventoryBagTabs = []struct {
 
 type InventoryBagWindow struct {
 	Window
+	layoutGen     uint64
 	tab           int
 	scrollY       state.Signal[float32]
 	snapshot      string
@@ -112,6 +113,8 @@ func (w *InventoryBagWindow) Toggle(ctx Context) {
 	w.snapshot = w.inventorySnapshot(ctx.Session)
 	x, y := inventoryBagDefaultPosition(ctx)
 	w.SetAutoPosition(x, y)
+	w.layoutGen = rotheme.Generation()
+	w.SetSize(inventoryBagWidth, inventoryBagHeight)
 	w.Open(ctx, w.widgetTree(ctx, nil))
 	w.Publish(ctx)
 }
@@ -145,6 +148,12 @@ func (w *InventoryBagWindow) UpdatePresentation(ctx Context, itemInfo *ItemWindo
 	}
 	w.ClampScroll(ctx.Session)
 	snapshot := w.inventorySnapshot(ctx.Session)
+	if gen := rotheme.Generation(); gen != w.layoutGen {
+		// A reloaded ui-layout.ini may change the cell size or rows.
+		w.layoutGen = gen
+		w.SetSize(inventoryBagWidth, inventoryBagHeight)
+		w.snapshot = ""
+	}
 	if snapshot != w.snapshot || itemInfo != w.itemInfo {
 		w.hideTooltip()
 		w.snapshot = snapshot

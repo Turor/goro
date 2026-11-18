@@ -89,6 +89,38 @@ func (m *Manager) Clear() {
 	m.apply()
 }
 
+// RefreshLayout redraws and re-lays out every overlay after the UI layout
+// tokens change, so paint-time colors and token-driven sizes show at once.
+func (m *Manager) RefreshLayout() {
+	if m == nil {
+		return
+	}
+	for _, root := range m.overlays {
+		if overlay, ok := root.(*positionedOverlay); ok {
+			markTreeNeedsRedraw(overlay.child)
+			overlay.markFrameDirty()
+			continue
+		}
+		markTreeNeedsRedraw(root)
+	}
+	if m.app != nil {
+		if app, ok := m.app.(layoutInvalidatingUIApp); ok {
+			app.InvalidateLayout()
+		}
+		m.app.Invalidate()
+	}
+}
+
+func markTreeNeedsRedraw(root widget.Widget) {
+	if root == nil {
+		return
+	}
+	markNeedsRedraw(root)
+	for _, child := range root.Children() {
+		markTreeNeedsRedraw(child)
+	}
+}
+
 func (m *Manager) PointerBlocked(x, y int) bool {
 	return m != nil && m.root != nil && m.root.PointerBlocked(geometry.Pt(float32(x), float32(y)))
 }
