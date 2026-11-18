@@ -150,7 +150,7 @@ func formatWarpraZeny(n uint32) string {
 	buf = append(buf, s[:lead]...)
 	for i := lead; i < len(s); i += 3 {
 		buf = append(buf, ',')
-		buf = append(buf, s[i:i+3]...)
+		buf = append(buf, s[i:i+3]...) // theme:ok thousands separator stride
 	}
 	return string(buf)
 }

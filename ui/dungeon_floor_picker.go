@@ -10,14 +10,6 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	dungeonPickerW    = 360
-	dungeonPickerMinH = 220
-	dungeonPickerRowH = 22
-	dungeonPickerPad  = 12
-	dungeonPickerMax  = 8
-)
-
 // DungeonFloorPicker is the world-map overlay for a dungeon tile click.
 type DungeonFloorPicker struct {
 	Window
@@ -70,7 +62,7 @@ func (p *DungeonFloorPicker) Update(ctx Context) bool {
 
 func (p *DungeonFloorPicker) windowHeight() int {
 	rows := minInt(len(p.info.Floors), dungeonPickerMax)
-	return ROWindowTitleHeight + dungeonPickerPad*2 + 36 + rows*dungeonPickerRowH + ROWindowFooterHeight
+	return ROWindowTitleHeight + dungeonPickerPad*2 + dungeonPickerIntroH + rows*dungeonPickerRowH + ROWindowFooterHeight
 }
 
 func (p *DungeonFloorPicker) widgetTree(ctx Context) widget.Widget {
@@ -81,17 +73,17 @@ func (p *DungeonFloorPicker) widgetTree(ctx Context) widget.Widget {
 	floors := append([]network.WarpraLoc(nil), p.info.Floors...)
 	lv := listview.New(
 		listview.ItemCount(len(floors)),
-		listview.FixedItemHeight(dungeonPickerRowH),
+		listview.FixedItemHeight(float32(dungeonPickerRowH)),
 		listview.ScrollYSignal(p.scrollY),
 		listview.SelectionModeOpt(listview.SelectionNone),
 		listview.PainterOpt(rotheme.SelectListPainter{EmptyText: "No floors listed."}),
 		listview.BuildItem(func(item listview.ItemContext) widget.Widget {
 			if item.Index < 0 || item.Index >= len(floors) {
-				return rotheme.SelectListRow("", false, dungeonPickerRowH)
+				return rotheme.SelectListRow("", false, float32(dungeonPickerRowH))
 			}
 			floor := floors[item.Index]
 			label := warpraFloorLabel(floor, p.price)
-			return rotheme.SelectListRow(trimRunes(label, 48), true, dungeonPickerRowH)
+			return rotheme.SelectListRow(trimRunes(label, 48), true, float32(dungeonPickerRowH))
 		}),
 		listview.OnItemClick(func(index int) {
 			if index < 0 || index >= len(floors) || p.onSelect == nil {
@@ -108,12 +100,12 @@ func (p *DungeonFloorPicker) widgetTree(ctx Context) widget.Widget {
 		title = "Dungeon Floors"
 	}
 	return Win(Title(title), CloseButton(true), OnClose(p.Close),
-		Size(dungeonPickerW, float32(p.windowHeight())),
+		Size(float32(dungeonPickerW), float32(p.windowHeight())),
 		Content(
 			primitives.Box(
 				rotheme.Text(intro).MaxLines(3),
 				primitives.Box(lv).Height(float32(minInt(len(floors), dungeonPickerMax)*dungeonPickerRowH)).CrossAlign(primitives.CrossAxisStretch),
-			).Padding(dungeonPickerPad).Gap(8),
+			).Padding(float32(dungeonPickerPad)).Gap(float32(dungeonPickerGap)),
 		),
 		Footer(primitives.Expanded(primitives.Box()), rotheme.Button("Close", p.Close)),
 	)

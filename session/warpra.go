@@ -9,12 +9,16 @@ import (
 
 // WarpraCatalog is the account's Warpra destination list, keyed by map. The
 // server splits the catalog across 0x0EFE chunks; ApplyList concatenates them
-// until the more flag clears.
+// until the more flag clears. BeginList retires an in-flight chain so a second
+// request cannot prepend that partial onto the next catalog.
 type WarpraCatalog struct {
 	Zeny     uint32
 	Price    uint32
 	Locs     []network.WarpraLoc
 	assemble []network.WarpraLoc
+	asmTotal uint16
+	listGen  uint32
+	asmGen   uint32
 }
 
 type WarpraDungeon struct {
@@ -26,26 +30,76 @@ type WarpraDungeon struct {
 
 var warpraLevelGateRe = regexp.MustCompile(`\(Lv (\d+)\+\)`)
 
+// BeginList starts a catalog fetch. Chunks assembled under the previous
+// generation are dropped, including a MORE chain that has not finished.
+func (c *WarpraCatalog) BeginList() {
+	if c == nil {
+		return
+	}
+	c.listGen++
+	c.assemble = nil
+	c.asmTotal = 0
+}
+
 func (c *WarpraCatalog) ApplyList(list network.WarpraList) bool {
 	if c == nil {
 		return false
 	}
+	c.noteListPrice(list)
+	incoming := append([]network.WarpraLoc(nil), list.Locs...)
+	if c.listContinues(list, len(incoming)) {
+		if list.More() {
+			c.assemble = append(c.assemble, incoming...)
+			return false
+		}
+		c.Locs = append(append([]network.WarpraLoc(nil), c.assemble...), incoming...)
+		c.finishList()
+		return true
+	}
+	// A new 0x0EFE sequence (another request, or a full list while a partial
+	// is still buffered) replaces the open chain. It must not prepend it.
+	if list.More() {
+		c.assemble = incoming
+		c.asmGen = c.listGen
+		c.asmTotal = list.Total
+		return false
+	}
+	c.Locs = incoming
+	c.asmGen = c.listGen
+	c.finishList()
+	return true
+}
+
+func (c *WarpraCatalog) noteListPrice(list network.WarpraList) {
 	c.Zeny = list.Zeny
 	if list.Price != 0 {
 		c.Price = list.Price
 	} else if c.Price == 0 {
 		c.Price = network.WarpraDefaultPrice
 	}
-	incoming := append([]network.WarpraLoc(nil), list.Locs...)
-	if list.More() {
-		c.assemble = append(c.assemble, incoming...)
+}
+
+func (c *WarpraCatalog) finishList() {
+	c.assemble = nil
+	c.asmTotal = 0
+}
+
+// listContinues reports whether list is the next chunk of the open generation.
+// A total that does not match, or a count that would pass the declared total,
+// is a different list.
+func (c *WarpraCatalog) listContinues(list network.WarpraList, incoming int) bool {
+	if len(c.assemble) == 0 || c.asmGen != c.listGen {
 		return false
 	}
-	if len(c.assemble) > 0 {
-		c.Locs = append(c.assemble, incoming...)
-		c.assemble = nil
-	} else {
-		c.Locs = incoming
+	if list.Total != 0 && c.asmTotal != 0 && list.Total != c.asmTotal {
+		return false
+	}
+	combined := len(c.assemble) + incoming
+	if list.Total != 0 && combined > int(list.Total) {
+		return false
+	}
+	if !list.More() && list.Total != 0 && combined != int(list.Total) {
+		return false
 	}
 	return true
 }

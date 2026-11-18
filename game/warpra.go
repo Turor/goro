@@ -145,6 +145,9 @@ func (m *WorldMode) maybeWarpAfterBuy(ctx client.Context) {
 }
 
 func (m *WorldMode) requestWarpraList(ctx client.Context, announce bool) {
+	if ctx.Session != nil {
+		ctx.Session.Warpra.BeginList()
+	}
 	if announce && (ctx.Session == nil || !ctx.Session.Warpra.Ready()) {
 		m.ui.console.AddSystemMessage("Loading Warpra destinations…")
 	}
@@ -164,6 +167,12 @@ func (m *WorldMode) sendWarpraWarp(ctx client.Context, loc network.WarpraLoc) {
 }
 
 func (m *WorldMode) sendWarpraBuy(ctx client.Context, loc network.WarpraLoc) {
+	if session.WarpraLevelGate(loc) > 0 {
+		if msg := session.WarpraLevelGateMessage(loc); msg != "" {
+			m.ui.console.AddErrorMessage("%s", msg)
+		}
+		return
+	}
 	m.sendWarpraRequest(ctx, network.WarpraActBuy, uint16(loc.Kind), loc.ID)
 }
 

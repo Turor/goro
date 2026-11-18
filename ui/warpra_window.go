@@ -11,14 +11,11 @@ import (
 )
 
 const (
-	warpraWindowW    = 420
-	warpraWindowH    = 340
-	warpraTabH       = 24
-	warpraRowH       = 22
-	warpraListRows   = 10
-	warpraTabTown    = 0
-	warpraTabField   = 1
+	warpraTabTown  = 0
+	warpraTabField = 1
+	// theme:ok tab index, not a size
 	warpraTabDungeon = 2
+	// theme:ok tab index, not a size
 	warpraTabSpecial = 3
 )
 
@@ -155,15 +152,15 @@ func (w *WarpraWindow) widgetTree(ctx Context) widget.Widget {
 	crumb := w.crumbBar(ctx)
 	lv := listview.New(
 		listview.ItemCount(len(w.rows)),
-		listview.FixedItemHeight(warpraRowH),
+		listview.FixedItemHeight(float32(warpraRowH)),
 		listview.ScrollYSignal(w.scrollY),
 		listview.SelectionModeOpt(listview.SelectionNone),
 		listview.PainterOpt(rotheme.SelectListPainter{EmptyText: w.emptyText()}),
 		listview.BuildItem(func(item listview.ItemContext) widget.Widget {
 			if item.Index < 0 || item.Index >= len(w.rows) {
-				return rotheme.SelectListRow("", false, warpraRowH)
+				return rotheme.SelectListRow("", false, float32(warpraRowH))
 			}
-			return rotheme.SelectListRow(trimRunes(w.rows[item.Index].label, 52), true, warpraRowH)
+			return rotheme.SelectListRow(trimRunes(w.rows[item.Index].label, 52), true, float32(warpraRowH))
 		}),
 		listview.OnItemClick(func(index int) {
 			w.clickRow(ctx, index)
@@ -171,13 +168,13 @@ func (w *WarpraWindow) widgetTree(ctx Context) widget.Widget {
 	)
 	zeny := "Zeny " + formatWarpraZeny(w.catalog.Zeny)
 	return Win(Title("Warpra"), CloseButton(true), OnClose(w.Close),
-		Size(warpraWindowW, warpraWindowH),
+		Size(float32(warpraWindowW), float32(warpraWindowH)),
 		Content(
 			primitives.Box(
-				primitives.HBox(tabRow...).Gap(2),
+				primitives.HBox(tabRow...).Gap(float32(warpraTabGap)),
 				crumb,
 				primitives.Box(lv).Height(float32(warpraListRows*warpraRowH)).CrossAlign(primitives.CrossAxisStretch),
-			).Padding(10).Gap(6),
+			).Padding(float32(warpraPad)).Gap(float32(warpraGap)),
 		),
 		Footer(footerLabel(zeny), primitives.Expanded(primitives.Box()), rotheme.Button("Close", w.Close)),
 	)
@@ -208,9 +205,9 @@ func (w *WarpraWindow) crumbBar(ctx Context) widget.Widget {
 			w.refreshRows()
 			w.SetContent(w.widgetTree(ctx))
 			w.Publish(ctx)
-		}).Width(64).Height(warpraTabH),
+		}).Width(float32(warpraBackW)).Height(float32(warpraTabH)),
 		rotheme.Label(label).MaxLines(1),
-	).Gap(8).CrossAlign(primitives.CrossAxisCenter)
+	).Gap(float32(warpraBackGap)).CrossAlign(primitives.CrossAxisCenter)
 }
 
 func (w *WarpraWindow) groupName(kind uint8, id uint8) string {

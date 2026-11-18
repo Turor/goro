@@ -108,6 +108,45 @@ func TestWarpraLevelGateRefusesBuy(t *testing.T) {
 	}
 }
 
+func TestWarpraLevelGateRefusesDirectBuy(t *testing.T) {
+	netClient, server := testutil.NewConnection(t, 20080910)
+	ctx := client.Context{Network: netClient, Session: &session.Session{}, Input: input.NewState(), UIManager: &worldModeTestUIManager{}, ScreenW: 1024, ScreenH: 768}
+	m := &WorldMode{}
+	m.bindWarpra(ctx)
+	loc := network.WarpraLoc{Kind: network.WarpraKindSpecial, ID: 1, Map: "jor_back1", Name: "Jormungandr Dungeon (Lv 180+)"}
+	m.sendWarpraBuy(ctx, loc)
+	if err := server.SetReadDeadline(time.Now().Add(150 * time.Millisecond)); err != nil {
+		t.Fatal(err)
+	}
+	buf := make([]byte, 8)
+	n, err := server.Read(buf)
+	if err == nil {
+		t.Fatalf("direct buy sent %x", buf[:n])
+	}
+	if messages := m.ui.console.Messages(); len(messages) == 0 || !strings.Contains(messages[len(messages)-1].Text, "base level 180") {
+		t.Fatalf("level banner = %+v", m.ui.console.Messages())
+	}
+}
+
+func TestWarpraSecondListRequestDoesNotConcatenate(t *testing.T) {
+	ctx := client.Context{Session: &session.Session{}, Input: input.NewState(), UIManager: &worldModeTestUIManager{}, ScreenW: 1024, ScreenH: 768}
+	m := &WorldMode{}
+	m.bindWarpra(ctx)
+	m.handleNetworkPacket(ctx, warpraListPacket(t, network.WarpraList{
+		Zeny: 10, Price: network.WarpraDefaultPrice, Flags: network.WarpraListFlagMore, Total: 2,
+		Locs: []network.WarpraLoc{{Kind: network.WarpraKindTown, ID: 0, Map: "prontera", Name: "Prontera"}},
+	}), time.Now())
+	m.requestWarpraList(ctx, false)
+	m.handleNetworkPacket(ctx, warpraListPacket(t, network.WarpraList{
+		Zeny: 20, Price: network.WarpraDefaultPrice, Total: 2,
+		Locs: []network.WarpraLoc{{Kind: network.WarpraKindTown, ID: 3, Map: "alberta", Name: "Alberta"}},
+	}), time.Now())
+	locs := ctx.Session.Warpra.Locs
+	if !ctx.Session.Warpra.Ready() || len(locs) != 1 || locs[0].Map != "alberta" {
+		t.Fatalf("second 0x0EFE sequence kept the stale partial: %+v", locs)
+	}
+}
+
 func TestWarpraWindowSurvivesMapTransitionAndMenuOpens(t *testing.T) {
 	ctx := client.Context{Session: &session.Session{}, Input: input.NewState(), UIManager: &worldModeTestUIManager{}, ScreenW: 1024, ScreenH: 768}
 	m := &WorldMode{}
