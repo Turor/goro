@@ -7,21 +7,6 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	basicMenuX         = windowScreenMargin
-	basicMenuY         = characterWindowY + characterWindowHeight + basicMenuFollowGap
-	basicMenuFollowGap = 2
-	basicMenuToggleH   = 10
-	basicMenuToggleGap = 2
-	basicMenuCols      = 4
-	basicMenuRows      = 2
-	basicMenuButtonW   = 72
-	basicMenuButtonH   = 24
-	basicMenuGapX      = 6
-	basicMenuGapY      = 5
-	basicMenuPad       = 8
-)
-
 type BasicMenu struct {
 	Window
 	content   widget.Widget
@@ -63,11 +48,16 @@ func (m *BasicMenu) Update(ctx client.Context, callbacks BasicMenuCallbacks) boo
 		m.titleHeight = 0
 		m.CloseOnEsc = false
 	}
+	if m.width != width || m.baseHeight() != height {
+		m.SetSize(width, height)
+		m.content = nil
+	}
 	if !m.IsOpen() {
 		m.OpenAt(basicMenuX, basicMenuY, m.widgetTree())
 	} else if m.content == nil {
 		m.SetContent(m.widgetTree())
 	}
+	m.bindLayoutReload()
 	consumed := m.Window.Update(ctx)
 	m.Publish(ctx)
 	return consumed
@@ -80,12 +70,31 @@ func (m *BasicMenu) Rebind(ctx client.Context, callbacks BasicMenuCallbacks) {
 		m.titleHeight = 0
 		m.CloseOnEsc = false
 	}
+	m.SetSize(width, height)
 	m.content = nil
 	if !m.IsOpen() {
 		return
 	}
 	m.SetContent(m.widgetTree())
 	m.Publish(ctx)
+	m.OnLayoutReload(func() { m.rebuildFromLayout() })
+}
+
+func (m *BasicMenu) bindLayoutReload() {
+	if m.layoutRebuild != nil {
+		return
+	}
+	m.OnLayoutReload(func() { m.rebuildFromLayout() })
+}
+
+func (m *BasicMenu) rebuildFromLayout() {
+	width, height := basicMenuSize(m.collapsed)
+	m.SetSize(width, height)
+	m.content = nil
+	if !m.IsOpen() {
+		return
+	}
+	m.SetContent(m.widgetTree())
 }
 
 // FollowCharacterWindow keeps the menu attached below the character window
@@ -200,7 +209,7 @@ func (m *BasicMenu) widgetTree() widget.Widget {
 		kind = rotheme.IconButtonExpand
 	}
 	toggle := rotheme.IconButton(kind, m.toggleCollapsed).
-		Width(float32(width)).Height(basicMenuToggleH).
+		Width(float32(width)).Height(float32(basicMenuToggleH)).
 		CrossAlign(primitives.CrossAxisStretch)
 	if m.collapsed {
 		m.content = toggle
@@ -210,20 +219,27 @@ func (m *BasicMenu) widgetTree() widget.Widget {
 	for row := 0; row < basicMenuRows; row++ {
 		buttons := make([]widget.Widget, 0, basicMenuCols)
 		for col := 0; col < basicMenuCols; col++ {
-			button := basicMenuButtons[row*basicMenuCols+col]
+			index := row*basicMenuCols + col
+			if index < 0 || index >= len(basicMenuButtons) {
+				continue
+			}
+			button := basicMenuButtons[index]
 			key := button.key
 			label := button.label
 			buttons = append(buttons,
 				rotheme.Button(label, func() {
 					m.invoke(key)
 				}).
-					Width(basicMenuButtonW).
-					Height(basicMenuButtonH),
+					Width(float32(basicMenuButtonW)).
+					Height(float32(basicMenuButtonH)),
 			)
+		}
+		if len(buttons) == 0 {
+			continue
 		}
 		rows = append(rows,
 			primitives.HBox(buttons...).
-				Gap(basicMenuGapX).
+				Gap(float32(basicMenuGapX)).
 				CrossAlign(primitives.CrossAxisStretch),
 		)
 	}
@@ -232,14 +248,14 @@ func (m *BasicMenu) widgetTree() widget.Widget {
 		Size(float32(width), float32(height-basicMenuToggleH-basicMenuToggleGap)),
 		Content(
 			primitives.Box(rows...).
-				Padding(basicMenuPad).
-				Gap(basicMenuGapY).
+				Padding(float32(basicMenuPad)).
+				Gap(float32(basicMenuGapY)).
 				CrossAlign(primitives.CrossAxisStretch),
 		),
 	)
 	m.content = primitives.Box(toggle, panel).
 		Width(float32(width)).Height(float32(height)).
-		Gap(basicMenuToggleGap).CrossAlign(primitives.CrossAxisStretch)
+		Gap(float32(basicMenuToggleGap)).CrossAlign(primitives.CrossAxisStretch)
 	return m.content
 }
 

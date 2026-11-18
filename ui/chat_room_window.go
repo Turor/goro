@@ -275,7 +275,7 @@ func (w *ChatRoomWindow) contentTree() widget.Widget {
 				rotheme.Text(line.text).
 					Color(line.color).
 					MaxLines(1),
-			).Height(consoleLineH),
+			).Height(float32(consoleLineH)),
 		)
 	}
 	messageList := primitives.Box(rows...).
