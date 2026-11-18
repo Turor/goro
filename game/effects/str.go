@@ -45,7 +45,7 @@ func (m *System) drawSTREffect(screen *render.Frame, ctx client.Context, project
 		}
 		anim.Pos[0] += float32(component.spriteXOffset)
 		anim.Pos[1] += float32(component.SpriteYOffset)
-		drawSTRAnimation(screen, projection, texture, worldX, worldY, worldZ, anim, component.AttachedEntity)
+		drawSTRAnimation(screen, projection, texture, worldX, worldY, worldZ, anim, component.AttachedEntity, component.Depth)
 		drawn = true
 	}
 	return drawn
@@ -248,7 +248,7 @@ func strAnimFrame(from, to res.STRAnimation, delta float32, texCount int) float3
 	}
 }
 
-func drawSTRAnimation(screen *render.Frame, projection scene.Projection, texture *render.Image, worldX, worldY, worldZ float64, anim res.STRAnimation, attached bool) {
+func drawSTRAnimation(screen *render.Frame, projection scene.Projection, texture *render.Image, worldX, worldY, worldZ float64, anim res.STRAnimation, attached bool, depth float64) {
 	right, up, _, ok := projection.BillboardBasis(worldX, worldY, worldZ)
 	if !ok {
 		return
@@ -267,7 +267,11 @@ func drawSTRAnimation(screen *render.Frame, projection scene.Projection, texture
 		StrAnimationVertex3D(vertexPoint(anim.XY[3], anim.XY[7]), scene.UV{U: 0, V: 1}, tint, w, h, center),
 		StrAnimationVertex3D(vertexPoint(anim.XY[2], anim.XY[6]), scene.UV{U: 1, V: 1}, tint, w, h, center),
 	}
-	screen.DrawTriangles3DOwned(vertices, scene.QuadIndices012213, texture, StrAnimationDrawOptions(anim))
+	options := StrAnimationDrawOptions(anim)
+	if depth != 0 {
+		options.DepthBias = float32(depth)
+	}
+	screen.DrawTriangles3DOwned(vertices, scene.QuadIndices012213, texture, options)
 }
 
 func StrAnimationLocalOffset(anim res.STRAnimation, x, y float32, attached bool) (float64, float64) {

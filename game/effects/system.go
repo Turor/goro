@@ -27,6 +27,7 @@ type System struct {
 	nextRandomSeed uint32
 	Active         []Instance
 	specs          map[int]Spec
+	effectGen      uint64
 	StrEffects     map[string]*res.STR
 	StrEffectMiss  map[string]struct{}
 	EffectViews    map[string]*scene.SpriteView

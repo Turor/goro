@@ -858,6 +858,9 @@ type Spec struct {
 	SfxDelays        []time.Duration
 	SfxRandMin       int
 	SfxRandMax       int
+	Layer            int
+	ZOrder           int
+	Depth            float64
 	Components       []Component
 }
 
@@ -882,6 +885,9 @@ type Component struct {
 	StrRandMax         int
 	AttachedEntity     bool
 	RenderBefore       bool
+	Layer              int
+	ZOrder             int
+	Depth              float64
 	TexturePath        string
 	TextureName        string
 	TextureFile        string
@@ -1544,6 +1550,9 @@ func convertDBWorldEffectSpec(spec db.EffectSpec) Spec {
 		DetachLocalActor: spec.DetachLocalActor,
 		SfxRandMin:       spec.SFXRandMin,
 		SfxRandMax:       spec.SFXRandMax,
+		Layer:            spec.Layer,
+		ZOrder:           spec.ZOrder,
+		Depth:            spec.Depth,
 	}
 	if len(spec.SFX) > 0 {
 		out.Sfx = append([]string(nil), spec.SFX...)
@@ -1582,6 +1591,9 @@ func convertDBWorldEffectComponent(component db.EffectComponent) Component {
 		StrRandMax:         component.STRRandMax,
 		AttachedEntity:     component.AttachedEntity,
 		RenderBefore:       component.RenderBefore,
+		Layer:              component.Layer,
+		ZOrder:             component.ZOrder,
+		Depth:              component.Depth,
 		TexturePath:        component.TexturePath,
 		TextureName:        component.TextureName,
 		TextureFile:        component.TextureFile,
@@ -1736,6 +1748,7 @@ func (m *System) Draw(screen *render.Frame, ctx client.Context, projection scene
 		m.whitePixel = render.NewImage(1, 1)
 		m.whitePixel.Fill(color.White)
 	}
+	m.invalidateSpecsIfStale()
 	active := m.Active[:0]
 	for _, effect := range m.Active {
 		if effect.Expired(now) {
@@ -1790,8 +1803,11 @@ func (m *System) Draw(screen *render.Frame, ctx client.Context, projection scene
 			anchor = effect.ActorOrigin
 		}
 		for index, component := range spec.Components {
-			if component.RenderBefore != beforeEntities {
+			if spec.componentDrawsBeforeEntities(component) != beforeEntities {
 				continue
+			}
+			if component.Depth == 0 {
+				component.Depth = spec.Depth
 			}
 			// These persistent effects play their startup STR only once.
 			if effect.Persistent && effect.EffectID != LKConcentration && effect.EffectID != SafetyWall {
@@ -1809,6 +1825,32 @@ func (m *System) Draw(screen *render.Frame, ctx client.Context, projection scene
 		}
 	}
 	m.Active = active
+}
+
+func (s Spec) componentDrawsBeforeEntities(component Component) bool {
+	layer := component.Layer
+	if layer == 0 {
+		layer = s.Layer
+	}
+	switch {
+	case layer < 0:
+		return true
+	case layer > 0:
+		return false
+	default:
+		return component.RenderBefore
+	}
+}
+
+func (m *System) invalidateSpecsIfStale() {
+	gen := db.EffectTablesGeneration()
+	if m.effectGen == gen {
+		return
+	}
+	if m.effectGen != 0 {
+		m.specs = nil
+	}
+	m.effectGen = gen
 }
 
 func EffectWorldAnchor(ctx client.Context, effect Instance, at time.Time) scene.Point3 {
