@@ -1,11 +1,13 @@
 package res
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
 	"reflect"
+	"time"
 	"unsafe"
 
 	glua "github.com/yuin/gopher-lua"
@@ -66,6 +68,8 @@ func executeLua51Bytecode(data []byte, globals map[string]luaValue) error {
 	}
 	if err := executeLuaFunctionWithGopherLua(fn, globals, nil); err == nil {
 		return nil
+	} else if luaBudgetExceeded(err) {
+		return err
 	}
 	return executeLuaFunction(fn, globals)
 }
@@ -191,6 +195,8 @@ func executeLuaFunctionWithGopherLua(fn luaFunction, globals map[string]luaValue
 	if setup != nil {
 		setup(state)
 	}
+	cancel := attachLuaVMBudget(state)
+	defer cancel()
 	for key, value := range globals {
 		if value.kind != luaNil {
 			state.SetGlobal(key, luaValueToGopherLua(state, value))
@@ -229,6 +235,20 @@ func openLuaResourceLibs(state *glua.LState) {
 	for _, unsafeName := range []string{"dofile", "loadfile"} {
 		state.SetGlobal(unsafeName, glua.LNil)
 	}
+}
+
+// luaVMBudget is the wall-clock limit for data Lua that runs in the VM.
+// Tests may lower it. Pure data tables use the AST path and do not consume this.
+var luaVMBudget = 2 * time.Second
+
+func attachLuaVMBudget(state *glua.LState) context.CancelFunc {
+	ctx, cancel := context.WithTimeout(context.Background(), luaVMBudget)
+	state.SetContext(ctx)
+	return cancel
+}
+
+func luaBudgetExceeded(err error) bool {
+	return err != nil && (errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled))
 }
 
 func gopherLuaProto(fn luaFunction) (*glua.FunctionProto, error) {
@@ -341,7 +361,13 @@ func gopherLuaInstructionABx(op, a, bx int) uint32 {
 	return uint32(op)<<26 | uint32(a&0xff)<<18 | uint32(bx&0x3ffff)
 }
 
+const luaTableMaxDepth = 64
+
 func luaValueToGopherLua(state *glua.LState, value luaValue) glua.LValue {
+	return luaValueToGopherLuaAt(state, value, 0, nil)
+}
+
+func luaValueToGopherLuaAt(state *glua.LState, value luaValue, depth int, seen map[uintptr]*glua.LTable) glua.LValue {
 	switch value.kind {
 	case luaBool:
 		return glua.LBool(value.num != 0)
@@ -350,15 +376,26 @@ func luaValueToGopherLua(state *glua.LState, value luaValue) glua.LValue {
 	case luaString:
 		return glua.LString(value.str)
 	case luaTable:
-		if state == nil {
+		if state == nil || depth >= luaTableMaxDepth {
 			return glua.LNil
 		}
-		var table *glua.LTable
-		table = state.NewTable()
-		for key, child := range value.table {
-			table.RawSet(luaKeyToGopherLua(key), luaValueToGopherLua(state, child))
+		if value.table != nil {
+			id := reflect.ValueOf(value.table).Pointer()
+			if seen != nil {
+				if existing, ok := seen[id]; ok {
+					return existing
+				}
+			} else {
+				seen = make(map[uintptr]*glua.LTable)
+			}
+			table := state.NewTable()
+			seen[id] = table
+			for key, child := range value.table {
+				table.RawSet(luaKeyToGopherLua(key), luaValueToGopherLuaAt(state, child, depth+1, seen))
+			}
+			return table
 		}
-		return table
+		return state.NewTable()
 	default:
 		return glua.LNil
 	}
@@ -378,6 +415,10 @@ func luaKeyToGopherLua(key interface{}) glua.LValue {
 }
 
 func gopherLuaToLuaValue(value glua.LValue) (luaValue, bool) {
+	return gopherLuaToLuaValueAt(value, 0, nil)
+}
+
+func gopherLuaToLuaValueAt(value glua.LValue, depth int, seen map[uintptr]luaValue) (luaValue, bool) {
 	switch value := value.(type) {
 	case glua.LBool:
 		if bool(value) {
@@ -389,9 +430,21 @@ func gopherLuaToLuaValue(value glua.LValue) (luaValue, bool) {
 	case glua.LString:
 		return luaValue{kind: luaString, str: string(value)}, true
 	case *glua.LTable:
+		if depth >= luaTableMaxDepth {
+			return luaValue{}, false
+		}
+		id := uintptr(unsafe.Pointer(value))
+		if seen != nil {
+			if existing, ok := seen[id]; ok {
+				return existing, true
+			}
+		} else {
+			seen = make(map[uintptr]luaValue)
+		}
 		out := luaValue{kind: luaTable, table: make(map[interface{}]luaValue)}
+		seen[id] = out
 		value.ForEach(func(key glua.LValue, child glua.LValue) {
-			if converted, ok := gopherLuaToLuaValue(child); ok {
+			if converted, ok := gopherLuaToLuaValueAt(child, depth+1, seen); ok {
 				out.table[gopherLuaKey(key)] = converted
 			}
 		})

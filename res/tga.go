@@ -24,8 +24,8 @@ func decodeTGA(data []byte) (image.Image, error) {
 	height := int(binary.LittleEndian.Uint16(data[14:16]))
 	bpp := int(data[16])
 	descriptor := data[17]
-	if width <= 0 || height <= 0 {
-		return nil, fmt.Errorf("invalid tga size %dx%d", width, height)
+	if err := checkImageDims("tga", width, height); err != nil {
+		return nil, err
 	}
 	offset := 18 + idLength
 	if offset > len(data) {
@@ -88,13 +88,25 @@ func decodeTGA(data []byte) (image.Image, error) {
 	}
 
 	bytesPerPixel := (bpp + 7) / 8
-	img := image.NewNRGBA(image.Rect(0, 0, width, height))
-	topOrigin := descriptor&0x20 != 0
+	if bytesPerPixel < 1 {
+		return nil, fmt.Errorf("unsupported tga bpp %d", bpp)
+	}
 	total := width * height
+	remaining := len(data) - offset
+	if remaining < 0 {
+		remaining = 0
+	}
 	if imageType&8 == 0 {
-		if offset+total*bytesPerPixel > len(data) {
+		if int64(remaining) < int64(total)*int64(bytesPerPixel) {
 			return nil, fmt.Errorf("truncated tga pixels")
 		}
+	} else if total > 0 && int64(total) > int64(remaining)*128 {
+		// A RLE packet is at least one byte and expands to at most 128 pixels.
+		return nil, fmt.Errorf("truncated tga rle")
+	}
+	img := image.NewNRGBA(image.Rect(0, 0, width, height))
+	topOrigin := descriptor&0x20 != 0
+	if imageType&8 == 0 {
 		for i := 0; i < total; i++ {
 			setTGAPixel(img, i, topOrigin, pixel(data[offset:offset+bytesPerPixel]))
 			offset += bytesPerPixel

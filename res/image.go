@@ -14,6 +14,19 @@ import (
 	_ "golang.org/x/image/bmp"
 )
 
+// maxImageDim is the largest width or height DecodeImageData will accept.
+// It covers Go's png/jpeg/bmp decoders (which trust the header) and our TGA
+// and BMP fallbacks. 16384 is already the BMP fallback cap and is well above
+// any real RO texture.
+const maxImageDim = 16384
+
+func checkImageDims(kind string, width, height int) error {
+	if width <= 0 || height <= 0 || width > maxImageDim || height > maxImageDim {
+		return fmt.Errorf("invalid %s size %dx%d", kind, width, height)
+	}
+	return nil
+}
+
 func LoadImage(manager *Manager, candidates []string) (image.Image, string, error) {
 	return loadImageCandidates(manager, candidates, false)
 }
@@ -35,6 +48,11 @@ func loadImageCandidates(manager *Manager, candidates []string, exact bool) (ima
 }
 
 func DecodeImageData(data []byte) (image.Image, error) {
+	if cfg, _, err := image.DecodeConfig(bytes.NewReader(data)); err == nil {
+		if err := checkImageDims("image", cfg.Width, cfg.Height); err != nil {
+			return nil, fmt.Errorf("decode image: %w", err)
+		}
+	}
 	img, _, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
 		img, err = decodeImageFallback(data, err)
@@ -56,6 +74,11 @@ func decodeImageFallback(data []byte, decodeErr error) (image.Image, error) {
 		fixed, ok := repairPNGChecksums(data)
 		if !ok {
 			return nil, decodeErr
+		}
+		if cfg, err := png.DecodeConfig(bytes.NewReader(fixed)); err == nil {
+			if err := checkImageDims("png", cfg.Width, cfg.Height); err != nil {
+				return nil, err
+			}
 		}
 		img, err := png.Decode(bytes.NewReader(fixed))
 		if err != nil {

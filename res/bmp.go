@@ -31,7 +31,7 @@ func decodeBMPFallback(data []byte) (image.Image, error) {
 	if topDown {
 		height = -height
 	}
-	if width <= 0 || height <= 0 || width > 16384 || height > 16384 {
+	if err := checkImageDims("bmp", width, height); err != nil {
 		return nil, fmt.Errorf("invalid bmp size %dx%d", width, rawHeight)
 	}
 	if compression != 0 && compression != 3 && compression != 6 {

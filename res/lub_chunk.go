@@ -62,6 +62,8 @@ func executeLuaSource(data []byte, globals map[string]luaValue, setup func(*glua
 	if setup != nil {
 		setup(state)
 	}
+	cancel := attachLuaVMBudget(state)
+	defer cancel()
 	for key, value := range globals {
 		if value.kind != luaNil {
 			state.SetGlobal(key, luaValueToGopherLua(state, value))
