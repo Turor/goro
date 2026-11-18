@@ -218,6 +218,8 @@ type RenderConfig struct {
 	MSAA               bool
 	Bloom              bool
 	SSAO               bool
+	FXAA               bool
+	EnhancedLighting   bool
 	VSync              bool
 	MaxFPS             int
 	FPS                bool
@@ -312,6 +314,8 @@ type UserSettings struct {
 	MSAA             bool
 	Bloom            bool
 	SSAO             bool
+	FXAA             bool
+	EnhancedLighting bool
 	BGMVolume        float64
 	SFXVolume        float64
 	NoShift          bool
@@ -387,6 +391,8 @@ func (cfg Config) SaveUserSettings(settings UserSettings) (string, error) {
 			"msaa":              formatINIValueBool(settings.MSAA),
 			"bloom":             formatINIValueBool(settings.Bloom),
 			"ssao":              formatINIValueBool(settings.SSAO),
+			"fxaa":              formatINIValueBool(settings.FXAA),
+			"enhanced_lighting": formatINIValueBool(settings.EnhancedLighting),
 			"vsync":             formatINIValueBool(settings.VSync),
 			"max_fps":           strconv.Itoa(settings.MaxFPS),
 			"fps":               formatINIValueBool(settings.FPS),
@@ -610,6 +616,8 @@ func parseCLI(cfg *Config, args []string) error {
 	fs.IntVar(&cfg.Render.Anisotropy, "anisotropy", cfg.Render.Anisotropy, "anisotropic texture filtering: 0 (off), 2, 4, 8, 16")
 	fs.BoolVar(&cfg.Render.TextureUpscaling, "texture-upscaling", cfg.Render.TextureUpscaling, "upscale terrain, model, and world sprite textures 2x with xBR")
 	fs.BoolVar(&cfg.Render.SSAO, "ssao", cfg.Render.SSAO, "enable subtle ambient occlusion for terrain and models")
+	fs.BoolVar(&cfg.Render.FXAA, "fxaa", cfg.Render.FXAA, "enable FXAA on the resolved world color")
+	fs.BoolVar(&cfg.Render.EnhancedLighting, "enhanced-lighting", cfg.Render.EnhancedLighting, "shade the world from the map sun, tiled point lights, and a directional shadow")
 	fs.BoolVar(&cfg.Render.Bloom, "bloom", cfg.Render.Bloom, "enable subtle bloom for bright world pixels")
 	fs.BoolVar(&cfg.Render.MSAA, "msaa", cfg.Render.MSAA, "enable 4x multisample anti-aliasing for the world")
 	fs.BoolVar(&cfg.Render.SmoothSprites, "smooth-sprites", cfg.Render.SmoothSprites, "smooth world sprites (false uses nearest-neighbor filtering)")
@@ -784,6 +792,10 @@ func applyConfigValue(cfg *Config, section, key, value string) error {
 		return setBool(value, &cfg.Render.TextureUpscaling)
 	case "render.ssao":
 		return setBool(value, &cfg.Render.SSAO)
+	case "render.fxaa":
+		return setBool(value, &cfg.Render.FXAA)
+	case "render.enhancedlighting":
+		return setBool(value, &cfg.Render.EnhancedLighting)
 	case "render.bloom":
 		return setBool(value, &cfg.Render.Bloom)
 	case "render.msaa":

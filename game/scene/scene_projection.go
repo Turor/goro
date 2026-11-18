@@ -124,7 +124,9 @@ func (p Projection) VisibleForTriangle(x, y, z float64) bool {
 	if clipW <= 1 || !finite4(clipX, clipY, clipZ, clipW) {
 		return false
 	}
-	return clipZ >= -clipW && clipZ <= clipW
+	return clipX >= -clipW && clipX <= clipW &&
+		clipY >= -clipW && clipY <= clipW &&
+		clipZ >= -clipW && clipZ <= clipW
 }
 
 func (p Projection) ProjectPoint(x, y, z float64) (Point2, bool) {

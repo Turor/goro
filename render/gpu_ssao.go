@@ -18,16 +18,15 @@ var ssaoDepthShaderWGSL string
 // gpuSSAO keeps its geometry depth separate from the world's MSAA attachment.
 // Only opaque geometry participates; composition precedes water and sprites.
 type gpuSSAO struct {
-	bindings  *wgpu.BindGroupLayout
-	layout    *wgpu.PipelineLayout
-	uniform   *wgpu.Buffer
-	geometry  *wgpu.RenderPipeline
-	estimate  *wgpu.RenderPipeline
-	composite *wgpu.RenderPipeline
-	depth     gpuRenderTarget
-	zbuffer   gpuRenderTarget
-	occlusion gpuRenderTarget
-	groups    [2]*wgpu.BindGroup
+	bindings   *wgpu.BindGroupLayout
+	layout     *wgpu.PipelineLayout
+	uniform    *wgpu.Buffer
+	geometry   *wgpu.RenderPipeline
+	estimate   *wgpu.RenderPipeline
+	composite  *wgpu.RenderPipeline
+	occlusion  gpuRenderTarget
+	groups     [2]*wgpu.BindGroup
+	boundDepth *wgpu.TextureView
 }
 
 func (r *gpuRenderer) newSSAO() (_ *gpuSSAO, err error) {
@@ -37,25 +36,11 @@ func (r *gpuRenderer) newSSAO() (_ *gpuSSAO, err error) {
 			a.release()
 		}
 	}()
-	shader, err := r.dev.CreateShaderModule(&wgpu.ShaderModuleDescriptor{Label: "goro-ssao-depth", WGSL: worldShaderWGSL + ssaoDepthShaderWGSL})
-	if err != nil {
-		return nil, err
-	}
-	defer shader.Release()
-	geometry := r.worldPipelineDescriptor(shader, gputypes.BlendState{}, true, true, "goro-ssao-depth")
-	geometry.Multisample.Count = 1
-	geometry.Fragment.EntryPoint = "ssao_depth"
-	geometry.Fragment.Targets[0].Format = gputypes.TextureFormatRGBA8Unorm
-	geometry.Fragment.Targets[0].Blend = nil
-	a.geometry, err = r.dev.CreateRenderPipeline(geometry)
-	if err != nil {
-		return nil, err
-	}
 	a.bindings, err = r.dev.CreateBindGroupLayout(&wgpu.BindGroupLayoutDescriptor{
 		Label: "goro-ssao-bindings",
 		Entries: []gputypes.BindGroupLayoutEntry{
 			{Binding: 0, Visibility: wgpu.ShaderStageFragment, Buffer: &gputypes.BufferBindingLayout{Type: gputypes.BufferBindingTypeUniform, MinBindingSize: 80}},
-			{Binding: 1, Visibility: wgpu.ShaderStageFragment, Texture: &gputypes.TextureBindingLayout{SampleType: gputypes.TextureSampleTypeFloat, ViewDimension: gputypes.TextureViewDimension2D}},
+			{Binding: 1, Visibility: wgpu.ShaderStageFragment, Texture: &gputypes.TextureBindingLayout{SampleType: gputypes.TextureSampleTypeDepth, ViewDimension: gputypes.TextureViewDimension2D}},
 			{Binding: 2, Visibility: wgpu.ShaderStageFragment, Texture: &gputypes.TextureBindingLayout{SampleType: gputypes.TextureSampleTypeFloat, ViewDimension: gputypes.TextureViewDimension2D}},
 		},
 	})
@@ -94,8 +79,8 @@ func (r *gpuRenderer) newSSAO() (_ *gpuSSAO, err error) {
 		Color: gputypes.BlendComponent{SrcFactor: gputypes.BlendFactorZero, DstFactor: gputypes.BlendFactorSrc, Operation: gputypes.BlendOperationAdd},
 		Alpha: gputypes.BlendComponent{SrcFactor: gputypes.BlendFactorZero, DstFactor: gputypes.BlendFactorOne, Operation: gputypes.BlendOperationAdd},
 	}
-	desc.Multisample = gputypes.MultisampleState{Count: r.sampleCount, Mask: 0xFFFFFFFF}
-	desc.DepthStencil = &wgpu.DepthStencilState{Format: depthFormat, DepthCompare: gputypes.CompareFunctionAlways}
+	desc.Multisample = gputypes.MultisampleState{Count: 1, Mask: 0xFFFFFFFF}
+	desc.DepthStencil = nil
 	a.composite, err = r.dev.CreateRenderPipeline(desc)
 	if err != nil {
 		return nil, err
@@ -103,34 +88,27 @@ func (r *gpuRenderer) newSSAO() (_ *gpuSSAO, err error) {
 	return a, nil
 }
 
-func (a *gpuSSAO) ensure(dev *wgpu.Device, width, height int) error {
-	if a.groups[1] != nil && a.depth.width == width && a.depth.height == height {
+func (a *gpuSSAO) ensure(dev *wgpu.Device, width, height int, depthView *wgpu.TextureView) error {
+	if depthView == nil {
+		return fmt.Errorf("SSAO estimate needs the opaque pass depth")
+	}
+	halfW, halfH := (width+1)/2, (height+1)/2
+	if a.groups[1] != nil && a.occlusion.width == halfW && a.occlusion.height == halfH && a.boundDepth == depthView {
 		return nil
 	}
 	a.releaseTargets()
-	// Full-resolution geometry preserves cutouts and supplies depth for bilateral
-	// upsampling. The expensive occlusion calculation runs at half resolution.
-	for _, target := range []struct {
-		target *gpuRenderTarget
-		w, h   int
-		format gputypes.TextureFormat
-		usage  gputypes.TextureUsage
-	}{
-		{&a.depth, width, height, gputypes.TextureFormatRGBA8Unorm, wgpu.TextureUsageRenderAttachment | wgpu.TextureUsageTextureBinding},
-		{&a.zbuffer, width, height, depthFormat, wgpu.TextureUsageRenderAttachment},
-		{&a.occlusion, (width + 1) / 2, (height + 1) / 2, gputypes.TextureFormatRGBA8Unorm, wgpu.TextureUsageRenderAttachment | wgpu.TextureUsageTextureBinding},
-	} {
-		if err := target.target.ensure(dev, target.w, target.h, target.format, 1, target.usage); err != nil {
-			return err
-		}
+	// The opaque world pass already wrote hardware depth. The estimate reads
+	// that attachment and does not draw the geometry again.
+	if err := a.occlusion.ensure(dev, halfW, halfH, gputypes.TextureFormatRGBA8Unorm, 1, wgpu.TextureUsageRenderAttachment|wgpu.TextureUsageTextureBinding); err != nil {
+		return err
 	}
-	for i, source := range []*wgpu.TextureView{a.depth.view, a.occlusion.view} {
+	for i, source := range []*wgpu.TextureView{a.occlusion.view, a.occlusion.view} {
 		var err error
 		a.groups[i], err = dev.CreateBindGroup(&wgpu.BindGroupDescriptor{
 			Label: "goro-ssao-input", Layout: a.bindings,
 			Entries: []wgpu.BindGroupEntry{
 				{Binding: 0, Buffer: a.uniform, Size: 80},
-				{Binding: 1, TextureView: a.depth.view},
+				{Binding: 1, TextureView: depthView},
 				{Binding: 2, TextureView: source},
 			},
 		})
@@ -138,6 +116,23 @@ func (a *gpuSSAO) ensure(dev *wgpu.Device, width, height int) error {
 			return err
 		}
 	}
+	// Composite reads the occlusion texture in binding 2.
+	group, err := dev.CreateBindGroup(&wgpu.BindGroupDescriptor{
+		Label: "goro-ssao-composite", Layout: a.bindings,
+		Entries: []wgpu.BindGroupEntry{
+			{Binding: 0, Buffer: a.uniform, Size: 80},
+			{Binding: 1, TextureView: depthView},
+			{Binding: 2, TextureView: a.occlusion.view},
+		},
+	})
+	if err != nil {
+		return err
+	}
+	if a.groups[1] != nil {
+		a.groups[1].Release()
+	}
+	a.groups[1] = group
+	a.boundDepth = depthView
 	return nil
 }
 
@@ -152,26 +147,16 @@ func (a *gpuSSAO) uploadCamera(queue *wgpu.Queue, camera Camera3D) error {
 	return queue.WriteBuffer(a.uniform, 0, floatBytes(values[:]))
 }
 
+// drawSSAO estimates occlusion from the opaque pass depth. It does not submit
+// that geometry again; the caller stored the world depth and transitioned it
+// to a texture binding.
 func (r *gpuRenderer) drawSSAO(enc *wgpu.CommandEncoder, meshes []worldMeshBatch, world worldFrame, vertices, indices *wgpu.Buffer) error {
+	_ = meshes
+	_ = world
+	_ = vertices
+	_ = indices
 	a := r.ssao
 	pass, err := enc.BeginRenderPass(&wgpu.RenderPassDescriptor{
-		ColorAttachments: []wgpu.RenderPassColorAttachment{{View: a.depth.view, LoadOp: gputypes.LoadOpClear, StoreOp: gputypes.StoreOpStore}},
-		DepthStencilAttachment: &wgpu.RenderPassDepthStencilAttachment{
-			View: a.zbuffer.view, DepthLoadOp: gputypes.LoadOpClear, DepthStoreOp: gputypes.StoreOpDiscard, DepthClearValue: 1,
-		},
-	})
-	if err != nil {
-		return err
-	}
-	if err := r.drawWorldOpaque(pass, meshes, world, vertices, indices, a.geometry); err != nil {
-		_ = pass.End()
-		return err
-	}
-	if err := pass.End(); err != nil {
-		return err
-	}
-	enc.TransitionTextures([]wgpu.TextureBarrier{{Texture: a.depth.texture, Usage: wgpu.TextureUsageTransition{OldUsage: wgpu.TextureUsageRenderAttachment, NewUsage: wgpu.TextureUsageTextureBinding}}})
-	pass, err = enc.BeginRenderPass(&wgpu.RenderPassDescriptor{
 		ColorAttachments: []wgpu.RenderPassColorAttachment{{View: a.occlusion.view, LoadOp: gputypes.LoadOpClear, StoreOp: gputypes.StoreOpStore}},
 	})
 	if err != nil {
@@ -194,9 +179,8 @@ func (a *gpuSSAO) releaseTargets() {
 			a.groups[i] = nil
 		}
 	}
-	a.depth.release()
-	a.zbuffer.release()
 	a.occlusion.release()
+	a.boundDepth = nil
 }
 
 func (a *gpuSSAO) release() {

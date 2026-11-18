@@ -338,6 +338,14 @@ func (g *Game) RuntimeSSAO() bool {
 	return g.runtime.SSAO()
 }
 
+func (g *Game) RuntimeFXAA() bool {
+	return g.runtime.FXAA()
+}
+
+func (g *Game) RuntimeEnhancedLighting() bool {
+	return g.runtime.EnhancedLighting()
+}
+
 func (g *Game) RuntimeBloom() bool {
 	return g.runtime.Bloom()
 }

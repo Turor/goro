@@ -8,6 +8,11 @@ import (
 // A non-nil pipeline draws the same geometry into the SSAO depth prepass.
 func (r *gpuRenderer) drawWorldOpaque(pass *wgpu.RenderPassEncoder, meshes []worldMeshBatch, world worldFrame, vertices, indices *wgpu.Buffer, pipeline *wgpu.RenderPipeline) error {
 	state := renderPassState{}
+	if pipeline == nil && r.meshesPacked {
+		if err := r.drawArrayMeshes(pass); err != nil {
+			return err
+		}
+	}
 	for _, batch := range meshes {
 		if err := r.drawWorldMeshBatch(pass, batch, &state, pipeline); err != nil {
 			return err
@@ -23,6 +28,11 @@ func (r *gpuRenderer) drawWorldOpaque(pass *wgpu.RenderPassEncoder, meshes []wor
 			continue
 		}
 		if err := r.drawWorldBatch(pass, batch, &state, pipeline); err != nil {
+			return err
+		}
+	}
+	for _, mesh := range r.posedMeshes {
+		if err := r.drawWorldMesh(pass, mesh, &state); err != nil {
 			return err
 		}
 	}
@@ -51,6 +61,7 @@ func (r *gpuRenderer) drawWorldBatch(pass *wgpu.RenderPassEncoder, batch drawBat
 	}
 	state.setPipeline(pass, pipeline)
 	state.setBindGroup(pass, bg)
+	r.bindModelGroup(pass, nil)
 	pass.DrawIndexed(gputypes.DrawIndexedArgs{IndexCount: batch.indexCount, InstanceCount: 1, FirstIndex: batch.firstIndex})
 	return nil
 }

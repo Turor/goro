@@ -4,7 +4,7 @@ struct AOUniforms {
 }
 
 @group(0) @binding(0) var<uniform> ao: AOUniforms;
-@group(0) @binding(1) var scene_depth: texture_2d<f32>;
+@group(0) @binding(1) var scene_depth: texture_depth_2d;
 @group(0) @binding(2) var occlusion: texture_2d<f32>;
 
 struct ScreenVertex {
@@ -21,16 +21,25 @@ fn fullscreen(@builtin(vertex_index) index: u32) -> ScreenVertex {
     return out;
 }
 
-fn depth_at(pixel: vec2<i32>) -> vec4<f32> {
+fn depth_at(pixel: vec2<i32>) -> f32 {
     let size = vec2<i32>(textureDimensions(scene_depth));
     if (pixel.x < 0 || pixel.y < 0 || pixel.x >= size.x || pixel.y >= size.y) {
-        return vec4<f32>(0.0);
+        return 1.0;
     }
     return textureLoad(scene_depth, pixel, 0);
 }
 
-fn unpack_depth(value: vec4<f32>) -> f32 {
-    return dot(value.rgb, vec3<f32>(65536.0, 256.0, 1.0)) * (255.0 / 16777215.0);
+fn covered(depth: f32) -> bool {
+    return depth < 0.999;
+}
+
+fn encode_depth(depth: f32) -> vec3<f32> {
+    let packed = u32(clamp(depth, 0.0, 1.0) * 16777215.0);
+    return vec3<f32>(f32((packed >> 16u) & 255u), f32((packed >> 8u) & 255u), f32(packed & 255u)) / 255.0;
+}
+
+fn unpack_depth(value: vec3<f32>) -> f32 {
+    return dot(value, vec3<f32>(65536.0, 256.0, 1.0)) * (255.0 / 16777215.0);
 }
 
 fn position_at(pixel: vec2<i32>, depth: f32) -> vec3<f32> {
@@ -41,14 +50,13 @@ fn position_at(pixel: vec2<i32>, depth: f32) -> vec3<f32> {
 }
 
 fn surface_step(pixel: vec2<i32>, offset: vec2<i32>, center: vec3<f32>, depth: f32) -> vec3<f32> {
-    let a = depth_at(pixel + offset);
-    let b = depth_at(pixel - offset);
-    // Choose the neighbor on the same surface at silhouettes and creases.
-    if (a.a > 0.0 && (b.a == 0.0 || abs(unpack_depth(a) - depth) <= abs(unpack_depth(b) - depth))) {
-        return position_at(pixel + offset, unpack_depth(a)) - center;
+    let a_depth = depth_at(pixel + offset);
+    let b_depth = depth_at(pixel - offset);
+    if (covered(a_depth) && (!covered(b_depth) || abs(a_depth - depth) <= abs(b_depth - depth))) {
+        return position_at(pixel + offset, a_depth) - center;
     }
-    if (b.a > 0.0) {
-        return center - position_at(pixel - offset, unpack_depth(b));
+    if (covered(b_depth)) {
+        return center - position_at(pixel - offset, b_depth);
     }
     return position_at(pixel + offset, depth) - center;
 }
@@ -56,11 +64,10 @@ fn surface_step(pixel: vec2<i32>, offset: vec2<i32>, center: vec3<f32>, depth: f
 @fragment
 fn estimate(input: ScreenVertex) -> @location(0) vec4<f32> {
     let pixel = vec2<i32>(input.uv * vec2<f32>(textureDimensions(scene_depth)));
-    let encoded_depth = depth_at(pixel);
-    if (encoded_depth.a == 0.0) {
+    let depth = depth_at(pixel);
+    if (!covered(depth)) {
         return vec4<f32>(1.0);
     }
-    let depth = unpack_depth(encoded_depth);
     let center = position_at(pixel, depth);
     let dx = surface_step(pixel, vec2<i32>(1, 0), center, depth);
     let dy = surface_step(pixel, vec2<i32>(0, 1), center, depth);
@@ -83,8 +90,8 @@ fn estimate(input: ScreenVertex) -> @location(0) vec4<f32> {
             let offset = vec2<i32>(round(ray * radius_pixels * f32(step) * 0.25));
             let sample_pixel = pixel + offset;
             let sample_depth = depth_at(sample_pixel);
-            if (sample_depth.a > 0.0) {
-                let delta = position_at(sample_pixel, unpack_depth(sample_depth)) - center;
+            if (covered(sample_depth)) {
+                let delta = position_at(sample_pixel, sample_depth) - center;
                 let distance = length(delta);
                 let elevation = max(0.0, dot(normal, delta) / max(distance, 0.000001) - 0.12);
                 let falloff = max(0.0, 1.0 - distance * distance / (radius * radius));
@@ -95,18 +102,18 @@ fn estimate(input: ScreenVertex) -> @location(0) vec4<f32> {
     }
     let visibility = 1.0 - ao.params.y * shade / 8.0;
     // Keep the sampled depth with AO so upsampling needs only one texture read.
-    return vec4<f32>(encoded_depth.rgb, visibility);
+    return vec4<f32>(encode_depth(depth), visibility);
 }
 
 @fragment
 fn composite(input: ScreenVertex) -> @location(0) vec4<f32> {
     let size = vec2<i32>(textureDimensions(scene_depth));
     let pixel = vec2<i32>(input.uv * vec2<f32>(size));
-    let encoded_depth = depth_at(pixel);
-    if (encoded_depth.a == 0.0) {
+    let depth = depth_at(pixel);
+    if (!covered(depth)) {
         return vec4<f32>(1.0);
     }
-    let center = position_at(pixel, unpack_depth(encoded_depth));
+    let center = position_at(pixel, depth);
     let ao_size = vec2<i32>(textureDimensions(occlusion));
     let sample_position = input.uv * vec2<f32>(ao_size) - vec2<f32>(0.5);
     let base = vec2<i32>(floor(sample_position));
@@ -120,7 +127,7 @@ fn composite(input: ScreenVertex) -> @location(0) vec4<f32> {
             let ao_sample = textureLoad(occlusion, q, 0);
             let uv = (vec2<f32>(q) + vec2<f32>(0.5)) / vec2<f32>(ao_size);
             let sample_pixel = vec2<i32>(uv * vec2<f32>(size));
-            let delta = position_at(sample_pixel, unpack_depth(ao_sample)) - center;
+            let delta = position_at(sample_pixel, unpack_depth(ao_sample.rgb)) - center;
             let bilinear = mix(1.0 - fraction.x, fraction.x, f32(x)) * mix(1.0 - fraction.y, fraction.y, f32(y));
             let weight = bilinear * exp2(-dot(delta, delta) * 64.0 / (ao.params.x * ao.params.x));
             total += ao_sample.a * weight;
@@ -131,6 +138,7 @@ fn composite(input: ScreenVertex) -> @location(0) vec4<f32> {
     if (weights > 0.0001) {
         visibility = total / weights;
     }
-    visibility = mix(1.0, visibility, encoded_depth.a);
+    let coverage = select(0.0, 1.0, covered(depth));
+    visibility = mix(1.0, visibility, coverage);
     return vec4<f32>(visibility, visibility, visibility, 1.0);
 }
