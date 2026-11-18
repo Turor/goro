@@ -209,9 +209,9 @@ func (t *token) parse(raw string) (tokenValue, error) {
 			return tokenValue{}, fmt.Errorf("%s.%s: %w", t.section, t.key, err)
 		}
 		if t.kind == tokenColor {
-			return tokenValue{c: widget.RGBA8(r, g, b, a)}, nil
+			return tokenValue{c: widget.RGBA8(r, g, b, a)}, nil // theme:ok parsed channel bytes
 		}
-		return tokenValue{rgba: color.RGBA{R: r, G: g, B: b, A: a}}, nil
+		return tokenValue{rgba: color.RGBA{R: r, G: g, B: b, A: a}}, nil // theme:ok parsed channel bytes
 	}
 }
 
@@ -260,9 +260,9 @@ func formatHex(r, g, b, a uint8) string {
 const (
 	// MaxLayoutFileSize bounds what a layout file may cost at startup. The
 	// full default dump (every window and screen) is well under half of it.
-	MaxLayoutFileSize = 256 << 10
+	MaxLayoutFileSize = 256 << 10 // theme:ok file size limit
 	// MaxLayoutWarnings bounds unknown-key warnings; the rest are counted.
-	MaxLayoutWarnings = 20
+	MaxLayoutWarnings = 20 // theme:ok warning count limit
 )
 
 // Layout is a validated set of overrides, keyed by token, ready to apply.

@@ -26,19 +26,23 @@ const (
 	homunculusInfoNameH       = 24
 	homunculusInfoStatLabelW  = 40
 	homunculusInfoStatValueW  = 40
-	homunculusInfoLeftW       = homunculusInfoStatLabelW + rotheme.TableGap + homunculusInfoStatValueW
-	homunculusInfoRightW      = homunculusInfoContentW - homunculusInfoLeftW - homunculusInfoColumnGap
 	homunculusInfoInfoLabelW  = 50
 	homunculusInfoInfoGap     = 4
-	homunculusInfoInfoValueW  = homunculusInfoRightW - homunculusInfoInfoLabelW - homunculusInfoInfoGap
 	homunculusInfoNameGap     = 4
 	homunculusInfoNameButtonW = 44
-	homunculusInfoNameInputW  = homunculusInfoRightW - homunculusInfoInfoLabelW - homunculusInfoNameButtonW - homunculusInfoNameGap*2
 	homunculusInfoBarPadX     = homunculusInfoInfoLabelW + homunculusInfoInfoGap
-	homunculusInfoBarW        = homunculusInfoInfoValueW
 	homunculusInfoBarH        = 7
 	homunculusInfoBarGap      = 2
 	homunculusInfoRowGap      = 4
+)
+
+// Widths follow rotheme.TableGap, which ui-layout.ini can change.
+var (
+	homunculusInfoLeftW      = homunculusInfoStatLabelW + rotheme.TableGap + homunculusInfoStatValueW
+	homunculusInfoRightW     = homunculusInfoContentW - homunculusInfoLeftW - homunculusInfoColumnGap
+	homunculusInfoInfoValueW = homunculusInfoRightW - homunculusInfoInfoLabelW - homunculusInfoInfoGap
+	homunculusInfoNameInputW = homunculusInfoRightW - homunculusInfoInfoLabelW - homunculusInfoNameButtonW - homunculusInfoNameGap*2
+	homunculusInfoBarW       = homunculusInfoInfoValueW
 )
 
 var (

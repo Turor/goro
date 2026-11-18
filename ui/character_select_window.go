@@ -51,11 +51,15 @@ const (
 	characterSelectSlotW        = 139
 	characterSelectSlotH        = 144
 	characterSelectArrowGap     = 13
-	characterSelectInfoColumnW  = (float32(characterSelectInfoPanelW-2*characterSelectInfoPanelPad) - rotheme.TableGap) / 2
 	characterSelectInfoLabelW   = float32(44)
-	characterSelectInfoValueW   = characterSelectInfoColumnW - characterSelectInfoLabelW - rotheme.TableGap
 	characterSelectStatLabelW   = float32(32)
-	characterSelectStatValueW   = characterSelectInfoColumnW - characterSelectStatLabelW - rotheme.TableGap
+)
+
+// Column widths follow rotheme.TableGap, which ui-layout.ini can change.
+var (
+	characterSelectInfoColumnW = (float32(characterSelectInfoPanelW-2*characterSelectInfoPanelPad) - rotheme.TableGap) / 2
+	characterSelectInfoValueW  = characterSelectInfoColumnW - characterSelectInfoLabelW - rotheme.TableGap
+	characterSelectStatValueW  = characterSelectInfoColumnW - characterSelectStatLabelW - rotheme.TableGap
 )
 
 var characterSelectSelectedBG = widget.RGBA8(222, 237, 252, 255)

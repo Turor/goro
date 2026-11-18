@@ -24,19 +24,22 @@ var (
 )
 
 const (
-	statsRowGap = rotheme.TableGap
-
 	statsPrimaryLabelWidth  float32 = 44
 	statsPrimaryValueWidth  float32 = 56
 	statsPrimaryCostWidth   float32 = 28
 	statsPrimaryButtonGap   float32 = 7
 	statsPrimaryColumnWidth         = statsPrimaryLabelWidth + statsPrimaryValueWidth + statsPrimaryCostWidth + rotheme.IconButtonSize + statsPrimaryButtonGap
 
-	statsDerivedLabelWidth  float32 = 46
-	statsDerivedValueWidth  float32 = 62
-	statsDerivedPairWidth           = statsDerivedLabelWidth + rotheme.TableGap + statsDerivedValueWidth
-	statsDerivedColumnWidth         = 2*(statsDerivedLabelWidth+statsDerivedValueWidth) + 3*rotheme.TableGap
-	statsPrimaryRows                = 6
+	statsDerivedLabelWidth float32 = 46
+	statsDerivedValueWidth float32 = 62
+	statsPrimaryRows               = 6
+)
+
+// Widths follow rotheme.TableGap, which ui-layout.ini can change.
+var (
+	statsRowGap             = rotheme.TableGap
+	statsDerivedPairWidth   = statsDerivedLabelWidth + rotheme.TableGap + statsDerivedValueWidth
+	statsDerivedColumnWidth = 2*(statsDerivedLabelWidth+statsDerivedValueWidth) + 3*rotheme.TableGap
 )
 
 func statsWindowWidthFor(pad, sectionGap float32) int {
