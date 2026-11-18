@@ -87,6 +87,8 @@ func NewWithResources(cfg config.Config, resource *res.Manager) *Game {
 	var first game.Mode = game.NewLoginMode()
 	if preview := g.previewMode(); preview != nil {
 		first = preview
+		// previewMode writes session and world; rebuild the context after that.
+		ctx = g.modeContext()
 	}
 	g.modes = game.NewManager(ctx, first)
 	return g
