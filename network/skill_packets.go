@@ -12,6 +12,7 @@ import (
 
 const skillInfoEntryLen = 37
 const skillGroundMessageLen = 80
+const skillGroundMessageLen20250716 = 21
 
 const (
 	PacketZCMonsterInfo     uint16 = 0x018C
@@ -135,6 +136,9 @@ type RememberWarpPointAck struct {
 }
 
 func ParseSkillInfoList(packet Packet) (SkillInfoList, bool, error) {
+	if packet.ID == PacketZCSkillInfoList2025 {
+		return parseSkillInfoList2025(packet)
+	}
 	if packet.ID != 0x010F {
 		return SkillInfoList{}, false, nil
 	}
@@ -174,6 +178,8 @@ func ParseSkillInfoUpdate(packet Packet) (SkillInfoUpdate, bool, error) {
 			return SkillInfoUpdate{}, false, fmt.Errorf("ZC_ADD_SKILL too short: %d", len(packet.Data))
 		}
 		return SkillInfoUpdate{Skill: parseSkillInfoEntry(packet.Data[2:39], 0)}, true, nil
+	case PacketZCAddSkill2025, PacketZCSkillInfoUpdate2:
+		return parseSkillInfoUpdate2025(packet)
 	default:
 		return SkillInfoUpdate{}, false, nil
 	}
@@ -272,6 +278,9 @@ func ParseSkillNoDamageNotify(packet Packet) (SkillNoDamageNotify, bool, error) 
 }
 
 func ParseSkillCastNotify(packet Packet) (SkillCastNotify, bool, error) {
+	if packet.ID == PacketZCUseSkillAck2025 {
+		return parseSkillCastNotify2025(packet)
+	}
 	if packet.ID != 0x013E {
 		return SkillCastNotify{}, false, nil
 	}
@@ -464,6 +473,15 @@ func BuildUseSkillToIDPacketForClientDate(skillID, level uint16, targetID uint32
 }
 
 func BuildUseSkillToGroundPacketForClientDate(skillID, level uint16, x, y int, clientDate int) []byte {
+	if IsClientDate20250716(clientDate) {
+		packet := make([]byte, 10)
+		binary.LittleEndian.PutUint16(packet[0:2], PacketCZUseSkillToGround2025)
+		binary.LittleEndian.PutUint16(packet[2:4], level)
+		binary.LittleEndian.PutUint16(packet[4:6], skillID)
+		binary.LittleEndian.PutUint16(packet[6:8], uint16(x))
+		binary.LittleEndian.PutUint16(packet[8:10], uint16(y))
+		return packet
+	}
 	if clientDate >= 20120307 {
 		packet := make([]byte, 10)
 		binary.LittleEndian.PutUint16(packet[0:2], 0x0438)
@@ -493,13 +511,18 @@ func BuildUseSkillToGroundPacketForClientDate(skillID, level uint16, x, y int, c
 
 func BuildUseSkillToGroundWithTextPacketForClientDate(skillID, level uint16, x, y int, text string, clientDate int) []byte {
 	if clientDate >= 20120307 {
-		packet := make([]byte, 10+skillGroundMessageLen)
+		messageLen := skillGroundMessageLen
+		if IsClientDate20250716(clientDate) {
+			// Hercules TALKBOX_MESSAGE_SIZE is 21 here; 0x0367 is 31 bytes.
+			messageLen = skillGroundMessageLen20250716
+		}
+		packet := make([]byte, 10+messageLen)
 		binary.LittleEndian.PutUint16(packet[0:2], 0x0367)
 		binary.LittleEndian.PutUint16(packet[2:4], level)
 		binary.LittleEndian.PutUint16(packet[4:6], skillID)
 		binary.LittleEndian.PutUint16(packet[6:8], uint16(x))
 		binary.LittleEndian.PutUint16(packet[8:10], uint16(y))
-		writeSkillGroundMessage(packet[10:10+skillGroundMessageLen], text)
+		writeSkillGroundMessage(packet[10:10+messageLen], text)
 		return packet
 	}
 	if clientDate >= 20080910 {

@@ -82,7 +82,7 @@ func (w *CardCompositionWindow) Update(ctx Context) bool {
 }
 
 func (w *CardCompositionWindow) widgetTree(ctx Context) widget.Widget {
-	cardName := inventoryItemDisplayName(ctx.Resources, session.InventoryItem{ItemID: w.cardItemID(ctx.Session), Type: db.ItemTypeCard, Identified: true})
+	cardName := inventoryItemDisplayName(ctx.Resources, session.InventoryItem{ItemID: uint32(w.cardItemID(ctx.Session)), Type: db.ItemTypeCard, Identified: true})
 	title := "Insert Card"
 	if w.cardIndex != 0 && cardName != "" {
 		title = fmt.Sprintf("Insert Card (%s)", cardName)
@@ -176,7 +176,7 @@ func (w *CardCompositionWindow) items(s *session.Session) []session.InventoryIte
 	return w.itemList.get(s, w.indexes, false)
 }
 
-func (w *CardCompositionWindow) cardItemID(s *session.Session) uint16 {
+func (w *CardCompositionWindow) cardItemID(s *session.Session) uint32 {
 	if item, ok := findInventoryItemByIndex(s, w.cardIndex); ok {
 		return item.ItemID
 	}

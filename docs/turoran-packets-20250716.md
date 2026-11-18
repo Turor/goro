@@ -35,9 +35,33 @@ Outgoing packets already used the unshuffled 2018+ opcodes (`0x0436` enter,
 `0x035F` walk, `0x0360` tick, `0x0361` direction, `0x0368` name, `0x0437`
 action), which match Hercules `packets_shuffle_main.h` for this date.
 
+## Items, skills and chat (milestone 2)
+
+- **32-bit item IDs.** Item and card IDs are `uint32` across `network`,
+  `session`, `game`, `ui`, `world` and `client`. The 2008 parsers still read
+  2-byte IDs and the 2008 builders still write them.
+- **Inventory.** `0x0B08`/`0x0B0B` bracket each list. `0x0B09` (34-byte
+  `NORMALITEM_INFO`) and `0x0B39` (83-byte `EQUIPITEM_INFO` with options and
+  forge data) are routed by their inventory type byte: 0 inventory, 1 cart,
+  2 storage. `0x0B41` pickup, `0x0ADD` and 19-byte `0x009D` floor items,
+  `0x0999`/`0x099A` equip acks (result 0 is success here), `0x01C8` use ack.
+- **Skills.** `0x0B32` list and `0x0B31`/`0x0B33` updates (15-byte
+  `SKILLDATA`, no name on the wire), `0x0B1A` cast.
+- **Hotkeys.** `0x0B20` tab 0 fills the 27-slot skill bar.
+- **Client packets.** `network/testdata/hercules_cz_handlers_20250716.txt`
+  is the Hercules opcode-to-handler map for this date
+  (`scripts/packets/gen-handlers-20250716.sh`). A test checks that every
+  date-aware builder lands on the intended handler with the Hercules length.
+  That moved storage to `0x0364`/`0x0365` (`0x00F3` is global chat here),
+  wear to `0x0998`, ground skills to `0x0366`, and the ground-skill talkbox
+  to 31 bytes.
+
 ## Not yet in this profile
 
-Inventory and equipment (`0x0B08`–`0x0B0B`, `0x0B39`, `0x0B41`, 32-bit item
-IDs), hotkeys (`0x0B20`), skills and casting (`0x0B1A`, `0x0B32`), and the
-Turoran custom features are parsed in later milestones. Until then the client
-frames and skips them.
+Turoran custom features (`0x0EF1`, `0x0EF5` and the rest), equipment
+locations above 16 bits (shadow gear), item options and grades, guild storage
+(inventory type 3), the extra hotkey tabs, and the remaining map packets
+(`0x0A9B`, `0x097B`, `0x0446`, `0x02D9`, `0x0AE2`, `0x0A3B`, `0x099B`,
+`0x0441`, `0x007F`) are framed and skipped. Builders that do not take a client
+date (party, guild, trade, vending, mail) are not checked against the 20250716
+handler map yet.

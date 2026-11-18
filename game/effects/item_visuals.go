@@ -58,16 +58,16 @@ const (
 // data so future imports can preserve array-valued effectId/effectIdOnCaster.
 var itemEffectSpecs = buildItemEffects()
 
-func buildItemEffects() map[uint16]itemEffectSpec {
-	specs := map[uint16]itemEffectSpec{}
-	add := func(effectID int, itemIDs ...uint16) {
+func buildItemEffects() map[uint32]itemEffectSpec {
+	specs := map[uint32]itemEffectSpec{}
+	add := func(effectID int, itemIDs ...uint32) {
 		for _, itemID := range itemIDs {
 			itemEffect := specs[itemID]
 			itemEffect.effectIDs = append(itemEffect.effectIDs, effectID)
 			specs[itemID] = itemEffect
 		}
 	}
-	target := func(target itemEffectTarget, itemIDs ...uint16) {
+	target := func(target itemEffectTarget, itemIDs ...uint32) {
 		for _, itemID := range itemIDs {
 			itemEffect := specs[itemID]
 			itemEffect.target = target
@@ -139,7 +139,7 @@ func buildItemEffects() map[uint16]itemEffectSpec {
 	return specs
 }
 
-func itemUseEffectSpec(itemID uint16) itemEffectSpec {
+func itemUseEffectSpec(itemID uint32) itemEffectSpec {
 	return itemEffectSpecs[itemID]
 }
 

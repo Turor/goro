@@ -64,7 +64,7 @@ const (
 type shortcutSlotState struct {
 	kind       shortcutKind
 	itemIndex  uint16
-	itemID     uint16
+	itemID     uint32
 	identified bool
 	skillID    uint16
 	skillLevel int
@@ -87,7 +87,7 @@ type ShortcutBar struct {
 }
 
 type shortcutItemIconKey struct {
-	itemID     uint16
+	itemID     uint32
 	identified bool
 }
 
@@ -280,7 +280,7 @@ func skillCanUseShortcut(skill session.Skill) bool {
 	return skill.ID != 0 && skill.Level > 0 && skill.Type != 0
 }
 
-func (b *ShortcutBar) ClearDepletedItem(ctx Context, index, itemID uint16) bool {
+func (b *ShortcutBar) ClearDepletedItem(ctx Context, index uint16, itemID uint32) bool {
 	if itemID != 0 {
 		if _, ok := inventoryItemForShortcut(ctx.Session, 0, itemID); ok {
 			b.redraw()
@@ -742,7 +742,7 @@ func shortcutSlotFromHotkey(h session.HotkeySlot) shortcutSlotState {
 		}
 		return shortcutSlotState{
 			kind:       shortcutItem,
-			itemID:     uint16(h.ID),
+			itemID:     uint32(h.ID),
 			identified: true,
 		}
 	case network.HotkeyTypeSkill:
@@ -813,7 +813,7 @@ func inventoryItemByIndex(s *session.Session, index uint16) (session.InventoryIt
 	return session.InventoryItem{}, false
 }
 
-func inventoryItemForShortcut(s *session.Session, index, itemID uint16) (session.InventoryItem, bool) {
+func inventoryItemForShortcut(s *session.Session, index uint16, itemID uint32) (session.InventoryItem, bool) {
 	if item, ok := inventoryItemByIndex(s, index); ok {
 		if itemID == 0 || item.ItemID == itemID {
 			return item, true

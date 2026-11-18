@@ -62,7 +62,7 @@ func ParseViewedEquipment(packet Packet) (ViewedEquipment, bool, error) {
 		wearState := binary.LittleEndian.Uint16(packet.Data[offset+8 : offset+10])
 		view.Items = append(view.Items, InventoryItem{
 			Index:        binary.LittleEndian.Uint16(packet.Data[offset : offset+2]),
-			ItemID:       binary.LittleEndian.Uint16(packet.Data[offset+2 : offset+4]),
+			ItemID:       uint32(binary.LittleEndian.Uint16(packet.Data[offset+2 : offset+4])),
 			Type:         packet.Data[offset+4],
 			Identified:   packet.Data[offset+5] != 0,
 			Location:     binary.LittleEndian.Uint16(packet.Data[offset+6 : offset+8]),

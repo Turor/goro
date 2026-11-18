@@ -18,7 +18,7 @@ func TestPartyItemPickup(t *testing.T) {
 		t.Fatalf("pickup and following packet = %+v, err = %v", packets, err)
 	}
 	pickup, ok, err := ParsePartyItemPickup(packets[0])
-	want := PartyItemPickup{AccountID: 0x11223344, ItemID: 501, Identified: true, Type: 4, Refine: 7, Cards: [4]uint16{1, 2, 3, 4}}
+	want := PartyItemPickup{AccountID: 0x11223344, ItemID: 501, Identified: true, Type: 4, Refine: 7, Cards: [4]uint32{1, 2, 3, 4}}
 	if err != nil || !ok || pickup != want {
 		t.Fatalf("pickup = %+v, ok = %t, err = %v", pickup, ok, err)
 	}

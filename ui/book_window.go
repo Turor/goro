@@ -30,7 +30,7 @@ type BookWindow struct {
 	totalPages int
 }
 
-func (w *BookWindow) Open(ctx Context, itemID uint16, title string) error {
+func (w *BookWindow) Open(ctx Context, itemID uint32, title string) error {
 	if ctx.Resources == nil {
 		return fmt.Errorf("book resources unavailable")
 	}
