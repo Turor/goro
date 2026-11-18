@@ -6,6 +6,7 @@ import (
 	uiapp "github.com/gogpu/ui/app"
 	"github.com/gogpu/ui/event"
 	"github.com/gogpu/ui/geometry"
+	"github.com/gogpu/ui/primitives"
 	"github.com/gogpu/ui/uitest"
 	"github.com/gogpu/ui/widget"
 	"github.com/kivutar/goro/client"
@@ -198,4 +199,24 @@ type clippedOverlayCanvas struct {
 
 func (c *clippedOverlayCanvas) ClipBounds() geometry.Rect {
 	return c.clip
+}
+
+func TestKeepOverlayOrderRepublishesInPlace(t *testing.T) {
+	m := NewManager()
+	a, b, c, a2 := primitives.Box(), primitives.Box(), primitives.Box(), primitives.Box()
+	m.AddOverlay(a)
+	m.AddOverlay(b)
+	m.AddOverlay(c)
+	m.KeepOverlayOrder(func() {
+		m.RemoveOverlay(a)
+		m.AddOverlay(a2)
+	})
+	if len(m.overlays) != 3 || m.overlays[0] != widget.Widget(a2) || m.overlays[2] != widget.Widget(c) {
+		t.Fatalf("overlay order after a kept-order republish = %v", m.overlays)
+	}
+	d := primitives.Box()
+	m.AddOverlay(d)
+	if m.overlays[3] != widget.Widget(d) {
+		t.Fatal("a later window did not open on top")
+	}
 }
