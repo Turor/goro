@@ -21,7 +21,7 @@ import (
 const (
 	cartGridCols     = 7
 	cartGridRows     = 4
-	cartGridCell     = inventoryBagCell
+	cartGridCell     = 32
 	cartGridW        = cartGridCols * cartGridCell
 	cartGridViewW    = cartGridW + ROScrollbarGutter
 	cartGridViewH    = cartGridRows * cartGridCell

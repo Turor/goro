@@ -53,6 +53,7 @@ func NewWithResources(cfg config.Config, resource *res.Manager) *Game {
 	if !cfg.Headless {
 		loadClientUIFont(resource)
 	}
+	loadUILayout(cfg)
 
 	clientDate := cfg.ResolvePacketClientDate(resource.ClientInfo.PacketVersionForSlot(cfg.Login.ServerSlot))
 	g := &Game{

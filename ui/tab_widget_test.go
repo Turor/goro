@@ -88,7 +88,7 @@ func TestTabWidgetDrawsCounterClockwiseLabelAsCenteredImage(t *testing.T) {
 func TestInventoryBagUsesOnlyVerticalCategoryTabs(t *testing.T) {
 	window := InventoryBagWindow{}
 	column := window.tabColumn(Context{})
-	column.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(inventoryBagTabRail, inventoryBagViewH)))
+	column.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(inventoryBagTabRail, float32(inventoryBagViewH))))
 
 	children := column.Children()
 	if len(children) != len(inventoryBagTabs) {

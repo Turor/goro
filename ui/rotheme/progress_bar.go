@@ -6,7 +6,7 @@ import (
 	"github.com/gogpu/ui/widget"
 )
 
-const ProgressBarHeight float32 = 12
+var ProgressBarHeight float32 = 12
 
 // ProgressBar uses the button gradient and reflection, with room for a label.
 func ProgressBar(opts ...progressbar.Option) *progressbar.Widget {
