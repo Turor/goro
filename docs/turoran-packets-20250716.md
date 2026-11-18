@@ -1,8 +1,11 @@
 # Turoran packet profile 20250716
 
 TuroranRO runs Hercules with `PACKETVER 20250716` (main client, renewal). goro
-keeps the upstream 2008-09-10 profile and adds this one next to it. Select it
-with `--packet-client-date 20250716` or:
+keeps the upstream 2008-09-10 profile and adds this one next to it. 20250716
+is the default for this fork. A `data/clientinfo.xml` `<packet_version>` or a
+config `[packet] client_date` is used when present. `--packet-client-date
+20080910` (or the same value in the config) still selects the classic
+profile.
 
 ```ini
 [packet]

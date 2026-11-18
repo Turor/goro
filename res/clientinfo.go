@@ -23,6 +23,7 @@ type Connection struct {
 	Address         string
 	Port            int
 	Version         int
+	PacketVersion   int
 	LangType        int
 	RegistrationWeb string
 	AdminList       []uint32
@@ -46,6 +47,7 @@ func ParseClientInfo(data []byte) (ClientInfo, error) {
 			Address:         strings.TrimSpace(rawConn.Address),
 			Port:            parseIntDefault(rawConn.Port, 6900),
 			Version:         parseIntDefault(rawConn.Version, 55),
+			PacketVersion:   parseOptionalPositiveInt(rawConn.PacketVersion),
 			LangType:        parseIntDefault(rawConn.LangType, 0),
 			RegistrationWeb: strings.TrimSpace(rawConn.RegistrationWeb),
 			AdminList:       parseClientInfoAdminList(rawConn),
@@ -74,6 +76,27 @@ func clientInfoCharsetReader(charset string, input io.Reader) (io.Reader, error)
 	default:
 		return nil, fmt.Errorf("unsupported clientinfo charset %q", charset)
 	}
+}
+
+// PacketVersionForSlot returns the connection's <packet_version>, or 0 when
+// the slot is missing or the tag was absent or invalid.
+func (info ClientInfo) PacketVersionForSlot(slot int) int {
+	if slot < 0 || slot >= len(info.Connections) {
+		return 0
+	}
+	return info.Connections[slot].PacketVersion
+}
+
+func parseOptionalPositiveInt(value string) int {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return 0
+	}
+	i, err := strconv.Atoi(value)
+	if err != nil || i <= 0 {
+		return 0
+	}
+	return i
 }
 
 func parseIntDefault(value string, fallback int) int {
@@ -126,6 +149,7 @@ type rawConnection struct {
 	Address         string       `xml:"address"`
 	Port            string       `xml:"port"`
 	Version         string       `xml:"version"`
+	PacketVersion   string       `xml:"packet_version"`
 	LangType        string       `xml:"langtype"`
 	RegistrationWeb string       `xml:"registrationweb"`
 	AID             rawAdminList `xml:"aid"`
