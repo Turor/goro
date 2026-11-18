@@ -79,6 +79,9 @@ type AudioConfig struct {
 // 60-144 Hz displays; with vsync on, a cap selects mailbox presentation.
 const DefaultMaxFPS = 144
 
+// MaxAllowedFPS is the highest accepted frame cap. 0 remains unlimited.
+const MaxAllowedFPS = 1000
+
 type RenderConfig struct {
 	GraphicsAPI        string
 	Anisotropy         int
@@ -227,8 +230,8 @@ func (cfg Config) SaveUserSettings(settings UserSettings) (string, error) {
 	if err := validateAnisotropy(settings.Anisotropy); err != nil {
 		return "", err
 	}
-	if settings.MaxFPS < 0 {
-		return "", fmt.Errorf("max fps must be 0 (unlimited) or positive")
+	if err := validateMaxFPS(settings.MaxFPS); err != nil {
+		return "", err
 	}
 	if settings.BGMVolume < 0 || settings.BGMVolume > 1 {
 		return "", fmt.Errorf("bgm volume must be between 0 and 1")
@@ -402,7 +405,7 @@ func parseCLI(cfg *Config, args []string) error {
 	fs.BoolVar(&cfg.Render.MSAA, "msaa", cfg.Render.MSAA, "enable 4x multisample anti-aliasing for the world")
 	fs.BoolVar(&cfg.Render.SmoothSprites, "smooth-sprites", cfg.Render.SmoothSprites, "smooth world sprites (false uses nearest-neighbor filtering)")
 	fs.BoolVar(&cfg.Render.VSync, "vsync", cfg.Render.VSync, "enable vsync")
-	fs.IntVar(&cfg.Render.MaxFPS, "max-fps", cfg.Render.MaxFPS, "cap the frame rate, 0 for unlimited (with vsync, a cap selects low-latency mailbox presentation)")
+	fs.IntVar(&cfg.Render.MaxFPS, "max-fps", cfg.Render.MaxFPS, "cap the frame rate: 0 for unlimited, or 1-1000 (with vsync, a cap selects low-latency mailbox presentation)")
 	fs.BoolVar(&cfg.Render.FPS, "fps", cfg.Render.FPS, "show measured FPS counter")
 	fs.BoolVar(&cfg.Render.NoUI, "no-ui", cfg.Render.NoUI, "disable UI rendering for benchmarking")
 	fs.BoolVar(&cfg.Render.AsyncUI, "async-ui", cfg.Render.AsyncUI, "rasterize UI off the draw thread")
@@ -640,6 +643,9 @@ func validateConfig(cfg *Config) error {
 	if err := validateAnisotropy(cfg.Render.Anisotropy); err != nil {
 		return err
 	}
+	if err := validateMaxFPS(cfg.Render.MaxFPS); err != nil {
+		return err
+	}
 	if cfg.Window.Width <= 0 {
 		return fmt.Errorf("window width must be positive")
 	}
@@ -682,6 +688,13 @@ func validateAnisotropy(level int) error {
 	default:
 		return fmt.Errorf("anisotropy must be 0 (off), 2, 4, 8, or 16")
 	}
+}
+
+func validateMaxFPS(fps int) error {
+	if fps < 0 || fps > MaxAllowedFPS {
+		return fmt.Errorf("max fps must be 0 (unlimited) or between 1 and %d", MaxAllowedFPS)
+	}
+	return nil
 }
 
 func upsertINIValues(src string, values map[string]map[string]string) string {
