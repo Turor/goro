@@ -101,24 +101,10 @@ func (f *windowFrame) Layout(ctx widget.Context, constraints geometry.Constraint
 // window sizes are written against. The live heights are the layout tokens
 // windowTitleHeight and windowFooterHeight; Win grows or shrinks a window by
 // the difference, so the content area keeps its size.
+// theme:ok compiled baselines other window heights add as consts; live sizes are title_height and footer_height
 const (
-	ROWindowTitleHeight   = 28
-	ROWindowFooterHeight  = 42
-	windowScreenMargin    = 8
-	windowDirtyPadding    = 2
-	windowTitleButtonSize = 17
-)
-
-// Window frame spacing is a layout token (see layout_tokens.go).
-var (
-	ROWindowFooterPadding         = 10
-	ROWindowFooterGap             = 8
-	windowTitleButtonGap          = 2
-	windowTitleButtonPadR         = 7
-	windowTitlePadL       float32 = 12
-	windowBorderWidth     float32 = 1
-	windowTitleHeight             = ROWindowTitleHeight
-	windowFooterHeight            = ROWindowFooterHeight
+	ROWindowTitleHeight  = 28
+	ROWindowFooterHeight = 42
 )
 
 func Win(options ...WindowOption) widget.Widget {
@@ -336,7 +322,7 @@ func windowTitleButtons(buttons []windowTitleButton, closeButton bool, onClose f
 
 func windowCloseButton(enabled bool, onClose func()) widget.Widget {
 	if !enabled {
-		return primitives.Box().Width(windowTitleButtonSize).Height(float32(windowTitleHeight))
+		return primitives.Box().Width(float32(windowTitleButtonSize)).Height(float32(windowTitleHeight))
 	}
 	return windowTitleIconButton(rotheme.IconButtonClose, onClose)
 }
@@ -347,7 +333,7 @@ func windowTitleIconButton(kind rotheme.IconButtonKind, onClick func()) widget.W
 		rotheme.IconButton(kind, onClick),
 		primitives.Expanded(primitives.Box()),
 	).
-		Width(windowTitleButtonSize).
+		Width(float32(windowTitleButtonSize)).
 		Height(float32(windowTitleHeight))
 }
 
@@ -376,6 +362,10 @@ type Window struct {
 	fullRedraw   bool
 	CloseOnEsc   bool
 	ctx          client.Context
+	// layoutRebuild rebuilds the content after a layout reload; layoutGen is
+	// the token generation the content was last built with.
+	layoutRebuild func()
+	layoutGen     uint64
 }
 
 func (w *Window) EnsureWindow(width, height int) bool {
@@ -400,6 +390,7 @@ func (w *Window) Close() {
 	w.content = nil
 	w.placed = nil
 	w.Publish(w.ctx)
+	delete(layoutRebuildWindows, w)
 }
 
 func NewWindow(width, height int) Window {
@@ -510,11 +501,13 @@ func (w *Window) Publish(ctx client.Context) {
 		clearPositionedOverlayDamage(old)
 		w.published = root
 		replacer.ReplaceOverlay(old, root)
+		w.trackLayoutRebuild()
 		return
 	}
 	w.Unpublish(ctx)
 	w.published = root
 	ctx.UIManager.AddOverlay(root)
+	w.trackLayoutRebuild()
 }
 
 func (w *Window) Raise(ctx client.Context) {
@@ -534,6 +527,7 @@ func (w *Window) Unpublish(ctx client.Context) {
 	clearPositionedOverlayDamage(w.published)
 	ctx.UIManager.RemoveOverlay(w.published)
 	w.published = nil
+	delete(layoutRebuildWindows, w)
 }
 
 // baseHeight is the height the window asked for, before the title and

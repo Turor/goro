@@ -20,7 +20,7 @@ func TestEmotePageCountMatchesRobrowserWindow(t *testing.T) {
 
 func TestEmotePagerCounterIsHorizontallyCentered(t *testing.T) {
 	nav := (&EmoteWindow{}).navWidget(Context{}, nil)
-	nav.Layout(widget.NewContext(), geometry.BoxConstraints(0, 230, 0, emoteNavHeight))
+	nav.Layout(widget.NewContext(), geometry.BoxConstraints(0, 230, 0, float32(emoteNavHeight)))
 
 	children := nav.Children()
 	if len(children) != 3 || len(children[1].Children()) != 1 {

@@ -48,7 +48,18 @@ func (w *ViewEquipmentWindow) Open(ctx Context, view network.ViewedEquipment, as
 		w.preview = assets.EquipmentPreviewImageForCharacter(ctx, viewedEquipmentCharacter(view, ctx.Resources), view.Sex, equipmentCenterColW, equipmentPreviewImageH)
 	}
 	w.Window.Open(ctx, w.widgetTree(ctx, nil))
+	w.bindLayoutReload()
 	w.Publish(ctx)
+}
+
+func (w *ViewEquipmentWindow) bindLayoutReload() {
+	w.OnLayoutReload(func() {
+		if !w.IsOpen() {
+			return
+		}
+		w.SetSize(equipmentWindowWidth, equipmentWindowHeight-ROWindowFooterHeight)
+		w.SetContent(w.widgetTree(w.ctx, w.itemInfo))
+	})
 }
 
 func (w *ViewEquipmentWindow) Update(ctx Context, itemInfo *ItemWindows) bool {
@@ -73,7 +84,7 @@ func (w *ViewEquipmentWindow) widgetTree(ctx Context, itemInfo *ItemWindows) wid
 			w.Close()
 			w.Publish(ctx)
 		}),
-		Size(equipmentWindowWidth, equipmentWindowHeight-ROWindowFooterHeight),
+		Size(float32(equipmentWindowWidth), float32(equipmentWindowHeight-ROWindowFooterHeight)),
 		Content(
 			primitives.Box(
 				primitives.HBox(
@@ -84,15 +95,15 @@ func (w *ViewEquipmentWindow) widgetTree(ctx Context, itemInfo *ItemWindows) wid
 						w.slotWidget(ctx, itemInfo, equipmentSlotGarment, equipmentLeftColW),
 						w.slotWidget(ctx, itemInfo, equipmentSlotAccessory, equipmentLeftColW),
 					).
-						Width(equipmentLeftColW).
+						Width(float32(equipmentLeftColW)).
 						Gap(0),
 
 					primitives.Box(
 						newStaticImageWidget(w.preview, equipmentCenterColW, equipmentPreviewImageH),
 						w.slotWidget(ctx, itemInfo, equipmentSlotAmmo, equipmentCenterColW),
 					).
-						Width(equipmentCenterColW).
-						Height(equipmentCenterColH).
+						Width(float32(equipmentCenterColW)).
+						Height(float32(equipmentCenterColH)).
 						Gap(0),
 
 					primitives.Box(
@@ -102,12 +113,12 @@ func (w *ViewEquipmentWindow) widgetTree(ctx Context, itemInfo *ItemWindows) wid
 						w.slotWidget(ctx, itemInfo, equipmentSlotShoes, equipmentRightColW),
 						w.slotWidget(ctx, itemInfo, equipmentSlotAccessory2, equipmentRightColW),
 					).
-						Width(equipmentRightColW).
+						Width(float32(equipmentRightColW)).
 						Gap(0),
 				).
 					Gap(0),
 			).
-				Padding(equipmentWindowPad),
+				Padding(float32(equipmentWindowPad)),
 		),
 	)
 }

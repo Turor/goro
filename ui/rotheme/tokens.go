@@ -37,6 +37,7 @@ const (
 	tokenColor
 	tokenRGBA
 	tokenString
+	tokenFloat64
 )
 
 type token struct {
@@ -49,6 +50,7 @@ type token struct {
 
 	intPtr   *int
 	floatPtr *float32
+	f64Ptr   *float64
 	colorPtr *widget.Color
 	rgbaPtr  *color.RGBA
 	strPtr   *string
@@ -61,6 +63,7 @@ type token struct {
 type tokenValue struct {
 	i    int
 	f    float32
+	d    float64
 	c    widget.Color
 	rgba color.RGBA
 	s    string
@@ -83,6 +86,8 @@ func OnLayoutApplied(fn func()) {
 func tokenID(section, key string) string {
 	return normalizeTokenName(section) + "." + normalizeTokenName(key)
 }
+
+func sortStrings(s []string) { sort.Strings(s) }
 
 func normalizeTokenName(s string) string {
 	return strings.ToLower(strings.TrimSpace(s))
@@ -108,6 +113,13 @@ func RegisterInt(section, key string, ptr *int, minValue, maxValue int, doc stri
 // RegisterFloat exposes a float32 value such as a size, padding or alpha.
 func RegisterFloat(section, key string, ptr *float32, minValue, maxValue float64, doc string) {
 	register(&token{section: section, key: key, doc: doc, kind: tokenFloat, floatPtr: ptr, min: minValue, max: maxValue})
+}
+
+// RegisterFloat64 exposes a float64 value (a scale or ratio the code uses as
+// float64), so its compiled default stays exact instead of passing through
+// float32.
+func RegisterFloat64(section, key string, ptr *float64, minValue, maxValue float64, doc string) {
+	register(&token{section: section, key: key, doc: doc, kind: tokenFloat64, f64Ptr: ptr, min: minValue, max: maxValue})
 }
 
 // RegisterColor exposes a gogpu/ui color, written as #rrggbb or #rrggbbaa.
@@ -139,6 +151,8 @@ func (t *token) current() tokenValue {
 		return tokenValue{i: *t.intPtr}
 	case tokenFloat:
 		return tokenValue{f: *t.floatPtr}
+	case tokenFloat64:
+		return tokenValue{d: *t.f64Ptr}
 	case tokenColor:
 		return tokenValue{c: *t.colorPtr}
 	case tokenString:
@@ -154,6 +168,8 @@ func (t *token) set(v tokenValue) {
 		*t.intPtr = v.i
 	case tokenFloat:
 		*t.floatPtr = v.f
+	case tokenFloat64:
+		*t.f64Ptr = v.d
 	case tokenColor:
 		*t.colorPtr = v.c
 	case tokenString:
@@ -169,6 +185,8 @@ func (t *token) format(v tokenValue) string {
 		return strconv.Itoa(v.i)
 	case tokenFloat:
 		return strconv.FormatFloat(float64(v.f), 'f', -1, 32)
+	case tokenFloat64:
+		return strconv.FormatFloat(v.d, 'f', -1, 64)
 	case tokenColor:
 		r, g, b, a := colorBytes(v.c)
 		return formatHex(r, g, b, a)
@@ -190,13 +208,20 @@ func (t *token) parse(raw string) (tokenValue, error) {
 			return tokenValue{}, fmt.Errorf("%s.%s must be between %g and %g, got %d", t.section, t.key, t.min, t.max, n)
 		}
 		return tokenValue{i: n}, nil
-	case tokenFloat:
-		f, err := strconv.ParseFloat(raw, 32)
+	case tokenFloat, tokenFloat64:
+		bits := 32
+		if t.kind == tokenFloat64 {
+			bits = 64
+		}
+		f, err := strconv.ParseFloat(raw, bits)
 		if err != nil || math.IsNaN(f) || math.IsInf(f, 0) {
 			return tokenValue{}, fmt.Errorf("%s.%s must be a finite number, got %q", t.section, t.key, raw)
 		}
 		if f < t.min || f > t.max {
 			return tokenValue{}, fmt.Errorf("%s.%s must be between %g and %g, got %s", t.section, t.key, t.min, t.max, raw)
+		}
+		if t.kind == tokenFloat64 {
+			return tokenValue{d: f}, nil
 		}
 		return tokenValue{f: float32(f)}, nil
 	case tokenString:
@@ -207,9 +232,9 @@ func (t *token) parse(raw string) (tokenValue, error) {
 			return tokenValue{}, fmt.Errorf("%s.%s: %w", t.section, t.key, err)
 		}
 		if t.kind == tokenColor {
-			return tokenValue{c: widget.RGBA8(r, g, b, a)}, nil
+			return tokenValue{c: widget.RGBA8(r, g, b, a)}, nil // theme:ok parsed channel bytes
 		}
-		return tokenValue{rgba: color.RGBA{R: r, G: g, B: b, A: a}}, nil
+		return tokenValue{rgba: color.RGBA{R: r, G: g, B: b, A: a}}, nil // theme:ok parsed channel bytes
 	}
 }
 
@@ -257,10 +282,10 @@ func formatHex(r, g, b, a uint8) string {
 
 const (
 	// MaxLayoutFileSize bounds what a layout file may cost at startup. The
-	// full default dump is about 3 KiB.
-	MaxLayoutFileSize = 256 << 10
+	// full default dump (every window and screen) is well under half of it.
+	MaxLayoutFileSize = 256 << 10 // theme:ok file size limit
 	// MaxLayoutWarnings bounds unknown-key warnings; the rest are counted.
-	MaxLayoutWarnings = 20
+	MaxLayoutWarnings = 20 // theme:ok warning count limit
 )
 
 // Layout is a validated set of overrides, keyed by token, ready to apply.
@@ -424,9 +449,12 @@ func WriteLayout(w io.Writer) error {
 	fmt.Fprintln(bw, "# With --ui-dev (or [ui_layout] watch = true) edits apply while the game runs; F10 reloads.")
 	for _, section := range order {
 		fmt.Fprintf(bw, "\n[%s]\n", section)
+		if doc := sectionDocs[section]; doc != "" {
+			fmt.Fprintf(bw, "# %s\n\n", doc)
+		}
 		for _, t := range sections[section] {
 			doc := t.doc
-			if t.kind == tokenInt || t.kind == tokenFloat {
+			if t.kind == tokenInt || t.kind == tokenFloat || t.kind == tokenFloat64 {
 				doc = fmt.Sprintf("%s (%g to %g)", doc, t.min, t.max)
 			}
 			if doc != "" {

@@ -6,11 +6,6 @@ import (
 	"github.com/gogpu/ui/widget"
 )
 
-const (
-	SliderTrackHeight float32 = 6
-	SliderThumbSize   float32 = 16
-)
-
 func Slider(opts ...slider.Option) *slider.Widget {
 	opts = append(opts, slider.PainterOpt(SliderPainter{}))
 	return slider.New(opts...).Padding(0)
@@ -62,7 +57,7 @@ func paintVerticalSlider(canvas widget.Canvas, state slider.PaintState) {
 }
 
 func paintHorizontalSliderTrack(canvas widget.Canvas, track geometry.Rect, filled float32, disabled bool) {
-	back := widget.RGBA8(224, 232, 242, 255)
+	back := sliderTrackColor
 	fill := Default.Colors.WindowBorder
 	border := Default.Colors.WindowBorder
 	if disabled {
@@ -81,7 +76,7 @@ func paintHorizontalSliderTrack(canvas widget.Canvas, track geometry.Rect, fille
 }
 
 func paintVerticalSliderTrack(canvas widget.Canvas, track geometry.Rect, fillTop, filled float32, disabled bool) {
-	back := widget.RGBA8(224, 232, 242, 255)
+	back := sliderTrackColor
 	fill := Default.Colors.WindowBorder
 	border := Default.Colors.WindowBorder
 	if disabled {

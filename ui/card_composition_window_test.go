@@ -79,14 +79,14 @@ func TestCardCompositionTableSelectionCapturesDisplayedItem(t *testing.T) {
 	w.selected = session.InventoryItem{}
 	table := w.tableWidget(Context{Session: s})
 	ctx := widget.NewContext()
-	size := geometry.Sz(cardCompositionWindowWidth, cardCompositionTableHeight())
+	size := geometry.Sz(float32(cardCompositionWindowWidth), cardCompositionTableHeight())
 	table.Layout(ctx, geometry.Tight(size))
 	table.SetBounds(geometry.FromPointSize(geometry.Pt(0, 0), size))
 
 	want := s.Inventory.Items[1]
 	// Click the original row while an inventory update awaits the next UI frame.
 	s.Inventory.Items[1].Refine = 7
-	point := geometry.Pt(8, cardCompositionTableHeaderH+cardCompositionRowH+8)
+	point := geometry.Pt(8, float32(cardCompositionTableHeaderH+cardCompositionRowH+8))
 	if !table.Event(ctx, event.NewMouseEvent(event.MousePress, event.ButtonLeft, event.ButtonStateLeft, point, point, 0)) {
 		t.Fatal("item row click was not consumed")
 	}

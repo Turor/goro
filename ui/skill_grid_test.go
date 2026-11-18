@@ -59,7 +59,7 @@ func TestSkillGridHoverInvalidatesOnlyAffectedCells(t *testing.T) {
 			{position: 2, skill: session.Skill{ID: db.SkillALHeal}},
 		},
 	})
-	grid.Layout(ctx, geometry.Tight(geometry.Sz(skillGridViewW, skillGridViewH)))
+	grid.Layout(ctx, geometry.Tight(geometry.Sz(float32(skillGridViewW), float32(skillGridViewH))))
 	for _, step := range []struct {
 		name      string
 		position  int
@@ -103,7 +103,7 @@ func TestSkillGridHoverDrawsRequiredLevelEvenWhenAlreadyLearned(t *testing.T) {
 			},
 		})
 		ctx := widget.NewContext()
-		grid.Layout(ctx, geometry.Tight(geometry.Sz(skillGridViewW, skillGridViewH)))
+		grid.Layout(ctx, geometry.Tight(geometry.Sz(float32(skillGridViewW), float32(skillGridViewH))))
 		grid.setHover(ctx, 0, skillGridPartCell, true)
 		canvas := &uitest.MockCanvas{}
 		grid.Draw(ctx, canvas)
@@ -171,8 +171,8 @@ func TestSkillGridKeepsFixedPositionsAndMinimumRows(t *testing.T) {
 		{position: 0, skill: session.Skill{ID: db.SkillNVBasic}},
 	}})
 	grid.Layout(widget.NewContext(), geometry.Constraints{
-		MinWidth:  skillGridViewW,
-		MaxWidth:  skillGridViewW,
+		MinWidth:  float32(skillGridViewW),
+		MaxWidth:  float32(skillGridViewW),
 		MinHeight: 0,
 		MaxHeight: geometry.Infinity,
 	})
@@ -183,7 +183,7 @@ func TestSkillGridKeepsFixedPositionsAndMinimumRows(t *testing.T) {
 	if entry, ok := grid.entryAtPosition(14); !ok || entry.skill.ID != db.SkillNVTrickdead {
 		t.Fatalf("position 14 = %+v, %v; want Trick Dead", entry, ok)
 	}
-	if got := grid.cellBounds(14).Min.Y; got != 2*skillGridCellH {
+	if got := grid.cellBounds(14).Min.Y; got != float32(skillGridCellH)*2 {
 		t.Fatalf("position 14 y = %.1f, want %d", got, 2*skillGridCellH)
 	}
 }
@@ -197,7 +197,7 @@ func TestSkillGridUpgradableCellStagesInsteadOfPressingSkill(t *testing.T) {
 		onStage: func(session.Skill) { staged++ },
 		onPress: func(session.Skill) { pressed++ },
 	})
-	grid.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(skillGridViewW, skillGridViewH)))
+	grid.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(float32(skillGridViewW), float32(skillGridViewH))))
 	slot := skillGridSlotBounds(grid.cellBounds(0))
 	point := geometry.Pt(slot.Min.X+1, slot.Min.Y+1)
 	grid.Event(widget.NewContext(), event.NewMouseEvent(
@@ -219,7 +219,7 @@ func TestSkillGridUpgradableCellUsesBlueBackground(t *testing.T) {
 	grid := newSkillGridWidget(skillGridConfig{
 		entries: []skillGridEntry{{position: 0, skill: skill, display: skill, canStage: true}},
 	})
-	grid.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(skillGridViewW, skillGridViewH)))
+	grid.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(float32(skillGridViewW), float32(skillGridViewH))))
 	canvas := &uitest.MockCanvas{}
 	grid.Draw(widget.NewContext(), canvas)
 
@@ -333,7 +333,7 @@ func TestSkillWindowFullTreeSurvivesViewChanges(t *testing.T) {
 					} else {
 						window.ensureScrollSignal().Set(0)
 						canvas := &uitest.MockCanvas{}
-						window.content.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(skillWindowWidth, skillWindowHeight)))
+						window.content.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(float32(skillWindowWidth), float32(skillWindowHeight))))
 						window.content.Draw(widget.NewContext(), canvas)
 						if !slices.ContainsFunc(canvas.StyledTexts, func(call uitest.DrawStyledTextCall) bool {
 							return call.Text == skillDisplayName(nil, skills[0])
@@ -368,7 +368,7 @@ func TestSkillWindowTogglesBetweenListAndGridSizes(t *testing.T) {
 	if !window.gridMode || window.width != skillGridWindowWidth || window.height != skillGridWindowHeight || window.grid == nil {
 		t.Fatalf("expanded window = mode %t size %dx%d grid %p", window.gridMode, window.width, window.height, window.grid)
 	}
-	window.content.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(skillGridWindowWidth, skillGridWindowHeight)))
+	window.content.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(float32(skillGridWindowWidth), float32(skillGridWindowHeight))))
 	window.content.Draw(widget.NewContext(), &uitest.MockCanvas{})
 
 	window.toggleGridMode(ctx, nil, nil)

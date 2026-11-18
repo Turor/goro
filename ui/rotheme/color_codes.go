@@ -17,7 +17,7 @@ func ParseColorCode(text string) (color.RGBA, bool) {
 		}
 	}
 	value, _ := strconv.ParseUint(text[1:7], 16, 32)
-	return color.RGBA{R: uint8(value >> 16), G: uint8(value >> 8), B: uint8(value), A: 255}, true
+	return color.RGBA{R: uint8(value >> 16), G: uint8(value >> 8), B: uint8(value), A: 255}, true // theme:ok parsed ^rrggbb chat colour
 }
 
 func StripColorCodes(text string) string {

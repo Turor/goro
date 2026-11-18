@@ -10,8 +10,6 @@ import (
 	"github.com/gogpu/ui/widget"
 )
 
-const IconButtonSize float32 = 17
-
 type IconButtonKind int
 
 const (
@@ -32,8 +30,6 @@ var iconButtonSegments = map[IconButtonKind][][4]float32{
 	IconButtonPlus:  {{-1, 0, 1, 0}, {0, -1, 0, 1}},
 	IconButtonMinus: {{-1, 0, 1, 0}},
 }
-
-const iconButtonGlyphYOffset float32 = 0.25
 
 func IconButton(kind IconButtonKind, onClick func()) *primitives.BoxWidget {
 	return IconButtonDisabled(kind, false, onClick)
@@ -101,15 +97,17 @@ func DrawIconButton(canvas widget.Canvas, bounds geometry.Rect, kind IconButtonK
 func drawIconGlyph(canvas widget.Canvas, bounds geometry.Rect, kind IconButtonKind, color widget.Color) {
 	if kind == IconButtonCollapse || kind == IconButtonExpand {
 		// Keep these small, flat triangles independent of the button's size.
-		// The 6x6 view box contains a centered 6x3 triangle.
+		// The path is authored in a 6-unit box; FillSVGPath scales that view
+		// box into iconButtonTriangleSize.
 		path := "M0 4.5L3 1.5L6 4.5Z"
 		if kind == IconButtonExpand {
 			path = "M0 1.5L3 4.5L6 1.5Z"
 		}
 		if filler, ok := canvas.(widget.SVGFiller); ok {
 			filler.FillSVGPath(path, 6, geometry.NewRect(
-				bounds.Min.X+(bounds.Width()-6)/2,
-				bounds.Min.Y+(bounds.Height()-6)/2, 6, 6,
+				bounds.Min.X+(bounds.Width()-iconButtonTriangleSize)/2,
+				bounds.Min.Y+(bounds.Height()-iconButtonTriangleSize)/2,
+				iconButtonTriangleSize, iconButtonTriangleSize,
 			), color)
 		}
 		return
@@ -119,8 +117,8 @@ func drawIconGlyph(canvas widget.Canvas, bounds geometry.Rect, kind IconButtonKi
 		size = bounds.Height()
 	}
 	icon := int(size) / 2
-	if icon < 6 {
-		icon = int(size) - 6
+	if icon < iconButtonMinGlyph {
+		icon = int(size) - iconButtonMinGlyph
 	}
 	if icon%2 == 0 {
 		icon--
@@ -133,7 +131,7 @@ func drawIconGlyph(canvas widget.Canvas, bounds geometry.Rect, kind IconButtonKi
 	half := float32(icon / 2)
 	if kind == IconButtonSearch {
 		canvas.StrokeCircle(geometry.Pt(midX-1, midY-1), half, color, 1)
-		canvas.DrawLine(geometry.Pt(midX+half-1, midY+half-1), geometry.Pt(midX+half+2, midY+half+2), color, 1)
+		canvas.DrawLine(geometry.Pt(midX+half-1, midY+half-1), geometry.Pt(midX+half+iconButtonSearchHandle, midY+half+iconButtonSearchHandle), color, 1)
 		return
 	}
 	for _, s := range iconButtonSegments[kind] {
@@ -152,24 +150,37 @@ type directionalArrowSpec struct {
 	points     [3]geometry.Point
 }
 
-const (
-	directionalArrowCornerFraction float32 = 0.24
-	directionalArrowBorderInset    float32 = 1.25
-)
+// directionalArrows is filled in init and again after every layout apply, so
+// the baked SVG paths follow the icon_button point tokens.
+var directionalArrows [IconButtonDown + 1]directionalArrowSpec
 
-var directionalArrows = [...]directionalArrowSpec{
-	IconButtonLeft: newDirectionalArrow([3]geometry.Point{
-		geometry.Pt(12.95, 1.65), geometry.Pt(3.05, 8.25), geometry.Pt(12.95, 14.85),
-	}),
-	IconButtonRight: newDirectionalArrow([3]geometry.Point{
-		geometry.Pt(3.05, 1.65), geometry.Pt(12.95, 8.25), geometry.Pt(3.05, 14.85),
-	}),
-	IconButtonUp: newDirectionalArrow([3]geometry.Point{
-		geometry.Pt(1.4, 13.2), geometry.Pt(8, 3.3), geometry.Pt(14.6, 13.2),
-	}),
-	IconButtonDown: newDirectionalArrow([3]geometry.Point{
-		geometry.Pt(1.4, 3.3), geometry.Pt(8, 13.2), geometry.Pt(14.6, 3.3),
-	}),
+func init() {
+	directionalArrows = buildDirectionalArrows()
+	OnLayoutApplied(func() { directionalArrows = buildDirectionalArrows() })
+}
+
+func buildDirectionalArrows() (arrows [IconButtonDown + 1]directionalArrowSpec) {
+	arrows[IconButtonLeft] = newDirectionalArrow([3]geometry.Point{
+		geometry.Pt(iconArrowLROuterX, iconArrowLRTopY),
+		geometry.Pt(iconArrowLRTipX, iconArrowLRMidY),
+		geometry.Pt(iconArrowLROuterX, iconArrowLRBottomY),
+	})
+	arrows[IconButtonRight] = newDirectionalArrow([3]geometry.Point{
+		geometry.Pt(iconArrowLRTipX, iconArrowLRTopY),
+		geometry.Pt(iconArrowLROuterX, iconArrowLRMidY),
+		geometry.Pt(iconArrowLRTipX, iconArrowLRBottomY),
+	})
+	arrows[IconButtonUp] = newDirectionalArrow([3]geometry.Point{
+		geometry.Pt(iconArrowUDLeftX, iconArrowUDBaseY),
+		geometry.Pt(iconArrowUDCenterX, iconArrowUDTipY),
+		geometry.Pt(iconArrowUDRightX, iconArrowUDBaseY),
+	})
+	arrows[IconButtonDown] = newDirectionalArrow([3]geometry.Point{
+		geometry.Pt(iconArrowUDLeftX, iconArrowUDTipY),
+		geometry.Pt(iconArrowUDCenterX, iconArrowUDBaseY),
+		geometry.Pt(iconArrowUDRightX, iconArrowUDTipY),
+	})
+	return arrows
 }
 
 func isDirectionalIconButton(kind IconButtonKind) bool {

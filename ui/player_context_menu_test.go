@@ -29,7 +29,7 @@ func TestPlayerContextGMEntriesUseTheSelectedPlayer(t *testing.T) {
 			app.Frame()
 			app.Window().DrawTo(&uitest.MockCanvas{})
 			x := float32(menu.x + 30)
-			y := float32(menu.y + contextMenuPadding + (2+i)*contextMenuRowH + contextMenuRowH/2)
+			y := float32(menu.y + contextMenuPadding + (2+i)*contextMenuRowH() + contextMenuRowH()/2)
 			app.Window().HandleEvent(uitest.Click(x, y))
 			app.Window().HandleEvent(uitest.Release(x, y))
 			action := menu.PopAction()
@@ -42,7 +42,7 @@ func TestPlayerContextGMEntriesUseTheSelectedPlayer(t *testing.T) {
 	app.Frame()
 	app.Window().DrawTo(&uitest.MockCanvas{})
 	x := float32(menu.x + 30)
-	y := float32(menu.y + contextMenuPadding + 3*contextMenuRowH + contextMenuRowH/2)
+	y := float32(menu.y + contextMenuPadding + 3*contextMenuRowH() + contextMenuRowH()/2)
 	app.Window().HandleEvent(uitest.Click(x, y))
 	app.Window().HandleEvent(uitest.Release(x, y))
 	if action := menu.PopAction(); action.Command != "/kill 99" {

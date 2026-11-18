@@ -24,7 +24,7 @@ func itemTableView(
 ) *rotheme.TableViewWidget {
 	options := []rotheme.TableViewOption{
 		rotheme.TableViewColumns([]rotheme.TableViewColumn{
-			{Key: "item", Title: title, Flex: 1, MinWidth: 120},
+			{Key: "item", Title: title, Flex: 1, MinWidth: itemTableMinW},
 		}),
 		rotheme.TableViewRowCount(len(rows)),
 		rotheme.TableViewRowHeight(rowHeight),

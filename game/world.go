@@ -2,7 +2,6 @@ package game
 
 import (
 	"context"
-	"github.com/kivutar/goro/ui/rotheme"
 	"image"
 	"math"
 	"sort"
@@ -31,10 +30,13 @@ import (
 	"github.com/kivutar/goro/render"
 	"github.com/kivutar/goro/session"
 	gameui "github.com/kivutar/goro/ui"
+	"github.com/kivutar/goro/ui/rotheme"
 	worldstate "github.com/kivutar/goro/world"
 )
 
 type WorldMode struct {
+	// previewWindows are sample windows the offline preview opens once.
+	previewWindows    []string
 	petSystem         pet.System
 	battleSystem      battle.System
 	actorSystem       actors.System
@@ -508,6 +510,7 @@ func (m *WorldMode) Update(ctx client.Context) (Mode, error) {
 	if !ctx.Config.Headless {
 		m.restoreUISettings(ctx)
 		m.rebuildUIAfterLayoutReload(ctx)
+		m.openPreviewWindows(ctx)
 	}
 	// Status presentation must follow server updates even when a window or
 	// modal consumes input for the rest of the frame.

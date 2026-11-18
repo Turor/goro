@@ -108,11 +108,11 @@ func TestBasicMenuRowsUsePointerCursor(t *testing.T) {
 
 	firstRow := geometry.Pt(
 		float32(basicMenuX+basicMenuPad+basicMenuButtonW/2),
-		float32(basicMenuY+basicMenuToggleH+basicMenuToggleGap+basicMenuPad+basicMenuButtonH/2),
+		float32(basicMenuY()+basicMenuToggleH+basicMenuToggleGap+basicMenuPad+basicMenuButtonH/2),
 	)
 	secondRow := geometry.Pt(
 		firstRow.X,
-		float32(basicMenuY+basicMenuToggleH+basicMenuToggleGap+basicMenuPad+basicMenuButtonH+basicMenuGapY+basicMenuButtonH/2),
+		float32(basicMenuY()+basicMenuToggleH+basicMenuToggleGap+basicMenuPad+basicMenuButtonH+basicMenuGapY+basicMenuButtonH/2),
 	)
 
 	app.Window().HandleEvent(event.NewMouseEvent(event.MouseMove, event.ButtonNone, 0, firstRow, firstRow, event.ModNone))
@@ -283,7 +283,7 @@ func TestBasicMenuRebindRefreshesButtonCallbacks(t *testing.T) {
 	app.Window().DrawTo(&uitest.MockCanvas{})
 	point := geometry.Pt(
 		float32(basicMenuX+basicMenuPad+basicMenuButtonW/2),
-		float32(basicMenuY+basicMenuToggleH+basicMenuToggleGap+basicMenuPad+basicMenuButtonH/2),
+		float32(basicMenuY()+basicMenuToggleH+basicMenuToggleGap+basicMenuPad+basicMenuButtonH/2),
 	)
 	app.Window().HandleEvent(uitest.Click(point.X, point.Y))
 	app.Window().HandleEvent(uitest.Release(point.X, point.Y))
@@ -316,7 +316,7 @@ func TestBasicMenuButtonDoesNotReinvokeFromEnterKey(t *testing.T) {
 	app.Window().DrawTo(&uitest.MockCanvas{})
 	point := geometry.Pt(
 		float32(basicMenuX+basicMenuPad+2*(basicMenuButtonW+basicMenuGapX)+basicMenuButtonW/2),
-		float32(basicMenuY+basicMenuToggleH+basicMenuToggleGap+basicMenuPad+basicMenuButtonH/2),
+		float32(basicMenuY()+basicMenuToggleH+basicMenuToggleGap+basicMenuPad+basicMenuButtonH/2),
 	)
 	app.Window().HandleEvent(uitest.Click(point.X, point.Y))
 	app.Window().HandleEvent(uitest.Release(point.X, point.Y))

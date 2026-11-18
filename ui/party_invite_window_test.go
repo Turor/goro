@@ -27,7 +27,7 @@ func TestPartyInvitePromptPresentationAndLimit(t *testing.T) {
 	}
 	wc := widget.NewContext()
 	window.content.Layout(wc, geometry.Loose(geometry.Sz(800, 600)))
-	if got := window.content.(interface{ Bounds() geometry.Rect }).Bounds().Width(); got != partyInviteW {
+	if got := window.content.(interface{ Bounds() geometry.Rect }).Bounds().Width(); got != float32(partyInviteW) {
 		t.Fatalf("content width = %g, want %d", got, partyInviteW)
 	}
 	for range 24 {

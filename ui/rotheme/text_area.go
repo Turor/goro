@@ -10,8 +10,6 @@ import (
 	"github.com/gogpu/ui/widget"
 )
 
-const textAreaLineHeight = float32(18)
-
 // TextAreaWidget is a small, wrapped multiline editor. It uses the same font,
 // focus, clipboard and pointer capture services as the other UI inputs.
 // Positions are rune offsets; maxBytes bounds the encoded text, not its glyphs.
@@ -52,7 +50,7 @@ func (w *TextAreaWidget) SetReadOnly(readOnly bool) { w.readOnly = readOnly }
 func (w *TextAreaWidget) IsFocusable() bool         { return w.IsEnabled() }
 
 func (w *TextAreaWidget) Layout(_ widget.Context, constraints geometry.Constraints) geometry.Size {
-	size := constraints.Constrain(geometry.Sz(300, 108))
+	size := constraints.Constrain(geometry.Sz(textAreaWidth, textAreaHeight))
 	w.SetBounds(geometry.FromPointSize(w.Position(), size))
 	return size
 }
@@ -68,7 +66,7 @@ func (w *TextAreaWidget) Draw(_ widget.Context, canvas widget.Canvas) {
 		drawTextFieldInsetShadow(canvas, bounds)
 	}
 	canvas.StrokeRect(bounds, border, 1)
-	content := bounds.Inset(geometry.UniformInsets(6))
+	content := bounds.Inset(geometry.UniformInsets(textAreaPadding))
 	w.wrap(canvas, content.Width())
 	w.clampScroll()
 	if w.revealCursor {
@@ -88,7 +86,7 @@ func (w *TextAreaWidget) Draw(_ widget.Context, canvas widget.Canvas) {
 		if w.IsFocused() && start != end {
 			a, b := max(start, line.start), min(end, line.end)
 			if a < b {
-				canvas.DrawRect(geometry.NewRect(content.Min.X+line.stops[a-line.start], y, line.stops[b-line.start]-line.stops[a-line.start], textAreaLineHeight), widget.RGBA8(121, 169, 215, 110))
+				canvas.DrawRect(geometry.NewRect(content.Min.X+line.stops[a-line.start], y, line.stops[b-line.start]-line.stops[a-line.start], textAreaLineHeight), textAreaSelection)
 			}
 		}
 		DrawText(canvas, string(runes[line.start:line.end]), geometry.NewRect(content.Min.X, y, content.Width(), textAreaLineHeight), Default.Typography.TextSize, Default.Colors.Text, false, widget.TextAlignLeft)
@@ -98,7 +96,7 @@ func (w *TextAreaWidget) Draw(_ widget.Context, canvas widget.Canvas) {
 		line := w.lines[row]
 		x := content.Min.X + line.stops[min(w.cursor-line.start, len(line.stops)-1)]
 		y := content.Min.Y + float32(row-w.scroll)*textAreaLineHeight
-		canvas.DrawLine(geometry.Pt(x, y+2), geometry.Pt(x, y+textAreaLineHeight-2), Default.Colors.Text, 1)
+		canvas.DrawLine(geometry.Pt(x, y+textAreaCaretInset), geometry.Pt(x, y+textAreaLineHeight-textAreaCaretInset), Default.Colors.Text, 1)
 	}
 }
 
@@ -162,7 +160,7 @@ func (w *TextAreaWidget) keepCursorVisible() {
 	if len(w.lines) == 0 {
 		return
 	}
-	visible := max(1, int((w.Bounds().Height()-12)/textAreaLineHeight))
+	visible := max(1, int((w.Bounds().Height()-textAreaPadding*2)/textAreaLineHeight))
 	row := w.cursorLine()
 	if row < w.scroll {
 		w.scroll = row
@@ -174,7 +172,7 @@ func (w *TextAreaWidget) keepCursorVisible() {
 }
 
 func (w *TextAreaWidget) clampScroll() {
-	visible := max(1, int((w.Bounds().Height()-12)/textAreaLineHeight))
+	visible := max(1, int((w.Bounds().Height()-textAreaPadding*2)/textAreaLineHeight))
 	w.scroll = max(0, min(w.scroll, len(w.lines)-visible))
 }
 
@@ -182,7 +180,7 @@ func (w *TextAreaWidget) cursorAt(p geometry.Point) (pos, row int) {
 	if len(w.lines) == 0 {
 		return 0, -1
 	}
-	content := w.Bounds().Inset(geometry.UniformInsets(6))
+	content := w.Bounds().Inset(geometry.UniformInsets(textAreaPadding))
 	row = max(0, min(w.scroll+int((p.Y-content.Min.Y)/textAreaLineHeight), len(w.lines)-1))
 	line := w.lines[row]
 	x := p.X - content.Min.X

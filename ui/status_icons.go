@@ -13,18 +13,16 @@ import (
 	"github.com/kivutar/goro/db"
 	"github.com/kivutar/goro/res"
 	"github.com/kivutar/goro/session"
+	"github.com/kivutar/goro/ui/rotheme"
 	xdraw "golang.org/x/image/draw"
 )
 
-const (
-	statusIconSize           = 32
-	statusIconSpacing        = 36
-	statusIconGap            = 8
-	statusIconRedrawInterval = 250 * time.Millisecond
-	// Status-icon descriptions were introduced after our 2008 target client.
-	// Keep the implementation available for now, but do not display it.
-	statusIconTooltipsEnabled = false
-)
+// theme:ok status icon redraw interval
+const statusIconRedrawInterval = 250 * time.Millisecond
+
+// Status-icon descriptions were introduced after our 2008 target client.
+// Keep the implementation available for now, but do not display it.
+const statusIconTooltipsEnabled = false
 
 type StatusIcons struct {
 	widget     *statusIconsWidget
@@ -38,6 +36,7 @@ type StatusIcons struct {
 	height     int
 	lastIDs    []uint16
 	lastRedraw time.Time
+	layoutGen  uint64
 }
 
 func (s *StatusIcons) Update(ctx Context, now time.Time) bool {
@@ -53,13 +52,19 @@ func (s *StatusIcons) Update(ctx Context, now time.Time) bool {
 	if s.widget == nil {
 		s.widget = newStatusIconsWidget()
 	}
+	layoutChanged := false
+	if gen := rotheme.Generation(); gen != s.layoutGen {
+		s.layoutGen = gen
+		s.icons = nil
+		layoutChanged = true
+	}
 	width, height := ctx.ScreenSize()
 	x, y, w, h := statusIconOverlayBounds(width, height, len(ids))
 	s.widget.ctx = ctx
 	s.widget.now = now
 	s.widget.ids = ids
 	s.widget.icons = s.statusIconImages(ctx.Resources, ids)
-	needsRedraw := !sameStatusIconIDs(ids, s.lastIDs) || s.lastRedraw.IsZero() || now.Sub(s.lastRedraw) >= statusIconRedrawInterval
+	needsRedraw := layoutChanged || !sameStatusIconIDs(ids, s.lastIDs) || s.lastRedraw.IsZero() || now.Sub(s.lastRedraw) >= statusIconRedrawInterval
 	root := s.overlayRoot(x, y, w, h)
 	if root != s.root {
 		s.Unpublish(ctx)
@@ -138,8 +143,8 @@ func (s *StatusIcons) statusIconImage(manager *res.Manager, id uint16) image.Ima
 	bounds := img.Bounds()
 	if bounds.Dx() > 0 && bounds.Dy() > 0 {
 		scale := minFloat64(float64(statusIconSize)/float64(bounds.Dx()), float64(statusIconSize)/float64(bounds.Dy()))
-		drawW := int(float64(bounds.Dx())*scale + 0.5)
-		drawH := int(float64(bounds.Dy())*scale + 0.5)
+		drawW := int(float64(bounds.Dx())*scale + 0.5) // theme:ok nearest-neighbor pixel rounding
+		drawH := int(float64(bounds.Dy())*scale + 0.5) // theme:ok nearest-neighbor pixel rounding
 		drawX := (statusIconSize - drawW) / 2
 		drawY := (statusIconSize - drawH) / 2
 		xdraw.NearestNeighbor.Scale(icon, image.Rect(drawX, drawY, drawX+drawW, drawY+drawH), img, bounds, xdraw.Over, nil)
@@ -213,7 +218,7 @@ func (w *statusIconsWidget) Draw(_ widget.Context, canvas widget.Canvas) {
 	bounds := w.Bounds()
 	height := w.ctx.ScreenH
 	startY := int(bounds.Min.Y)
-	maxRows := maxInt(1, (height-startY-16)/statusIconSpacing)
+	maxRows := maxInt(1, (height-startY-statusIconDrawBottom)/statusIconSpacing)
 	hovered := -1
 	for i, id := range w.ids {
 		col := i / maxRows
@@ -239,7 +244,7 @@ func (w *statusIconsWidget) drawStatusIcon(canvas widget.Canvas, id uint16, effe
 	if icon := w.icons[id]; icon != nil {
 		canvas.DrawImage(icon, geometry.Pt(float32(x), float32(y)))
 	} else {
-		canvas.DrawText("?", geometry.NewRect(float32(x), float32(y+7), statusIconSize, 16), 11, Color(MutedTextColor), false, widget.TextAlignCenter)
+		canvas.DrawText("?", geometry.NewRect(float32(x), float32(y+statusIconFallbackDY), float32(statusIconSize), float32(statusIconFallbackTextH)), statusIconFontSize, Color(MutedTextColor), false, widget.TextAlignCenter)
 	}
 	if effect.HasDuration && !effect.ExpiresAt.IsZero() && effect.ExpiresAt.After(effect.StartedAt) {
 		total := effect.ExpiresAt.Sub(effect.StartedAt)
@@ -249,9 +254,10 @@ func (w *statusIconsWidget) drawStatusIcon(canvas widget.Canvas, id uint16, effe
 		}
 		frac := float64(remaining) / float64(total)
 		fillW := int(float64(statusIconSize) * clampUnit(frac))
-		canvas.DrawRect(geometry.NewRect(float32(x), float32(y+statusIconSize-4), statusIconSize, 4), Color(color.RGBA{R: 18, G: 24, B: 34, A: 180}))
+		barY := float32(y + statusIconSize - statusIconDurationH)
+		canvas.DrawRect(geometry.NewRect(float32(x), barY, float32(statusIconSize), float32(statusIconDurationH)), statusIconDurationTrack)
 		if fillW > 0 {
-			canvas.DrawRect(geometry.NewRect(float32(x), float32(y+statusIconSize-4), float32(fillW), 4), Color(color.RGBA{R: 244, G: 228, B: 130, A: 230}))
+			canvas.DrawRect(geometry.NewRect(float32(x), barY, float32(fillW), float32(statusIconDurationH)), statusIconDurationFill)
 		}
 	}
 }
@@ -267,14 +273,14 @@ func (w *statusIconsWidget) drawTooltip(canvas widget.Canvas, statusID uint16, e
 	}
 	width, height := w.ctx.ScreenSize()
 	tipW := statusIconTooltipWidth(lines)
-	tipH := len(lines)*16 + 6
-	x := clampWindowInt(mouseX+12, 4, maxInt(4, width-tipW-4))
-	y := clampWindowInt(mouseY+12, 4, maxInt(4, height-tipH-4))
+	tipH := len(lines)*statusIconTooltipLineH + statusIconTooltipExtra
+	x := clampWindowInt(mouseX+statusIconTooltipCursor, statusIconTooltipMargin, maxInt(statusIconTooltipMargin, width-tipW-statusIconTooltipMargin))
+	y := clampWindowInt(mouseY+statusIconTooltipCursor, statusIconTooltipMargin, maxInt(statusIconTooltipMargin, height-tipH-statusIconTooltipMargin))
 	rect := geometry.NewRect(float32(x), float32(y), float32(tipW), float32(tipH))
-	canvas.DrawRect(rect, Color(color.RGBA{R: 0, G: 0, B: 0, A: 128}))
-	canvas.StrokeRect(rect, Color(color.RGBA{R: 198, G: 198, B: 198, A: 255}), 1)
+	canvas.DrawRect(rect, statusIconTooltipBg)
+	canvas.StrokeRect(rect, statusIconTooltipBorder, 1)
 	for i, line := range lines {
-		canvas.DrawText(line.text, geometry.NewRect(float32(x+5), float32(y+3+i*16), float32(tipW-10), 14), 11, Color(line.color), false, widget.TextAlignLeft)
+		canvas.DrawText(line.text, geometry.NewRect(float32(x+statusIconTooltipTextX), float32(y+statusIconTooltipTextY+i*statusIconTooltipLineH), float32(tipW-statusIconTooltipTextInset), float32(statusIconTooltipTextH)), statusIconFontSize, Color(line.color), false, widget.TextAlignLeft)
 	}
 }
 
@@ -293,7 +299,7 @@ func statusIconTooltipLines(info db.StatusIconInfo, effect session.StatusEffect,
 				continue
 			}
 		}
-		c := color.RGBA{R: 255, G: 255, B: 255, A: 255}
+		c := statusIconTooltipText
 		if line.HasColor {
 			c = line.Color
 		}
@@ -318,9 +324,9 @@ func statusIconRemainingTime(effect session.StatusEffect, now time.Time) string 
 func statusIconTooltipWidth(lines []statusIconTooltipLine) int {
 	width := 0
 	for _, line := range lines {
-		width = maxInt(width, len([]rune(line.text))*7+10)
+		width = maxInt(width, len([]rune(line.text))*statusIconTooltipCharW+statusIconTooltipTextInset)
 	}
-	return clampWindowInt(width, 42, 300)
+	return clampWindowInt(width, statusIconTooltipMinW, statusIconTooltipMaxW)
 }
 
 func minFloat64(a, b float64) float64 {

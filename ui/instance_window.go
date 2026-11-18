@@ -11,11 +11,6 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	instanceWindowW = 320
-	instanceWindowH = 178
-)
-
 type InstanceWindow struct {
 	Window
 	Confirm    ConfirmModal
@@ -79,6 +74,10 @@ func (w *InstanceWindow) openWindow(ctx Context) {
 	w.EnsureWindow(instanceWindowW, instanceWindowH)
 	w.CloseOnEsc = false
 	w.Window.Open(ctx, w.widgetTree(ctx))
+	w.OnLayoutReload(func() {
+		w.SetSize(instanceWindowW, instanceWindowH)
+		w.SetContent(w.widgetTree(w.ctx))
+	})
 	w.Publish(ctx)
 }
 
@@ -152,8 +151,8 @@ func (w *InstanceWindow) widgetTree(ctx Context) widget.Widget {
 	if i.Queued {
 		label = "Cancel reservation"
 	}
-	return Win(Title("Memorial Dungeon"), CloseButton(true), OnClose(w.Close), Size(instanceWindowW, instanceWindowH),
-		Content(primitives.Box(rows...).Padding(12).Gap(6)),
+	return Win(Title("Memorial Dungeon"), CloseButton(true), OnClose(w.Close), Size(float32(instanceWindowW), float32(instanceWindowH)),
+		Content(primitives.Box(rows...).Padding(float32(instancePad)).Gap(float32(instanceGap))),
 		Footer(primitives.Expanded(primitives.Box()),
 			rotheme.ButtonDisabled(label, !w.canDestroy, func() { w.requestDestroy(ctx) }),
 			rotheme.Button("Close", w.Close),

@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -51,7 +52,7 @@ func loadUIFont(layoutPath string) error {
 	if next == loadedUIFont {
 		return nil
 	}
-	data, err := os.ReadFile(file)
+	data, err := readUIFontFile(file)
 	if err != nil {
 		return fmt.Errorf("font_file: %w", err)
 	}
@@ -63,4 +64,24 @@ func loadUIFont(layoutPath string) error {
 	}
 	loadedUIFont = next
 	return nil
+}
+
+// readUIFontFile reads at most maxUIFontFileSize+1 bytes, the same way the
+// layout file is read, so a file replaced or grown after the Stat cannot make
+// it allocate more. A file that is no longer regular once opened (swapped for
+// a FIFO or device) is rejected before any read.
+func readUIFontFile(path string) ([]byte, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() {
+		return nil, fmt.Errorf("%s is not a regular file", path)
+	}
+	return io.ReadAll(io.LimitReader(f, maxUIFontFileSize+1))
 }

@@ -20,14 +20,6 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	mailWindowW     = 450
-	mailWindowH     = 366
-	mailRowsPerPage = 7
-	mailReadW       = 410
-	mailReadH       = 330
-)
-
 type MailActionKind uint8
 
 const (
@@ -79,6 +71,7 @@ type MailWindow struct {
 
 func (w *MailWindow) Open(ctx Context, onError func(string)) {
 	w.EnsureWindow(mailWindowW, mailWindowH)
+	w.SetSize(mailWindowW, mailWindowH)
 	w.ctx = ctx
 	w.onError = onError
 	w.clearDraft()
@@ -88,6 +81,14 @@ func (w *MailWindow) Open(ctx Context, onError func(string)) {
 	w.message = nil
 	w.closeRead()
 	w.Window.Open(ctx, w.widgetTree())
+	w.OnLayoutReload(func() {
+		w.SetSize(mailWindowW, mailWindowH)
+		w.SetContent(w.widgetTree())
+		if w.readWindow.IsOpen() && w.message != nil {
+			w.readWindow.SetSize(mailReadW, mailReadH)
+			w.readWindow.SetContent(w.readTree())
+		}
+	})
 	w.Publish(ctx)
 }
 
@@ -207,7 +208,15 @@ func (w *MailWindow) ShowMail(message network.MailMessage) {
 		}
 	}
 	w.readWindow.EnsureWindow(mailReadW, mailReadH)
+	w.readWindow.SetSize(mailReadW, mailReadH)
 	w.readWindow.Open(w.ctx, w.readTree())
+	w.readWindow.OnLayoutReload(func() {
+		if w.message == nil {
+			return
+		}
+		w.readWindow.SetSize(mailReadW, mailReadH)
+		w.readWindow.SetContent(w.readTree())
+	})
 	w.readWindow.Publish(w.ctx)
 	w.refresh()
 }
@@ -331,12 +340,12 @@ func (w *MailWindow) widgetTree() widget.Widget {
 	if w.compose {
 		title = "Write Mail"
 	}
-	inboxTab := newTabWidget(tabWidgetConfig{label: "Inbox", width: 72, height: 24, active: !w.compose, disabled: w.busy, onClick: func() {
+	inboxTab := newTabWidget(tabWidgetConfig{label: "Inbox", width: mailTabW, height: mailTabH, active: !w.compose, disabled: w.busy, onClick: func() {
 		if w.compose {
 			w.request(MailAction{Kind: MailActionRefresh})
 		}
 	}})
-	writeTab := newTabWidget(tabWidgetConfig{label: "Write", width: 72, height: 24, active: w.compose, disabled: w.busy, onClick: func() {
+	writeTab := newTabWidget(tabWidgetConfig{label: "Write", width: mailTabW, height: mailTabH, active: w.compose, disabled: w.busy, onClick: func() {
 		if !w.compose {
 			w.request(MailAction{Kind: MailActionCompose})
 		}
@@ -355,9 +364,9 @@ func (w *MailWindow) widgetTree() widget.Widget {
 		CrossAlign(primitives.CrossAxisStretch)
 	body := primitives.Box(primitives.Expanded(content)).CrossAlign(primitives.CrossAxisStretch)
 	if w.compose {
-		body.Padding(8)
+		body.Padding(float32(mailComposePad))
 	}
-	return Win(Title(title), CloseButton(true), OnClose(w.requestClose), Size(mailWindowW, mailWindowH),
+	return Win(Title(title), CloseButton(true), OnClose(w.requestClose), Size(float32(mailWindowW), float32(mailWindowH)),
 		Content(primitives.Box(
 			tabs,
 			primitives.Box().Height(1).Background(rotheme.Default.Colors.WindowBorder),
@@ -376,8 +385,8 @@ func (w *MailWindow) inboxTree() widget.Widget {
 		}
 	}
 	table := rotheme.TableView(
-		rotheme.TableViewColumns([]rotheme.TableViewColumn{{Key: "subject", Title: "Subject", Flex: 1, MinWidth: 150}, {Key: "sender", Title: "From", Width: 112}, {Key: "date", Title: "Date", Width: 85}}),
-		rotheme.TableViewRowCount(len(rows)), rotheme.TableViewRowHeight(24), rotheme.TableViewHeaderHeight(24),
+		rotheme.TableViewColumns([]rotheme.TableViewColumn{{Key: "subject", Title: "Subject", Flex: 1, MinWidth: mailSubjectMinW}, {Key: "sender", Title: "From", Width: mailSenderW}, {Key: "date", Title: "Date", Width: mailDateW}}),
+		rotheme.TableViewRowCount(len(rows)), rotheme.TableViewRowHeight(mailRowH), rotheme.TableViewHeaderHeight(mailHeaderH),
 		rotheme.TableViewEmptyText("Your mailbox is empty."), rotheme.TableViewSelectedRow(state.NewSignal(selected)),
 		rotheme.TableViewBuildSimpleCell(func(cell rotheme.TableViewCellContext) rotheme.TableViewSimpleCell {
 			e := rows[cell.Row]
@@ -410,8 +419,8 @@ func (w *MailWindow) inboxTree() widget.Widget {
 	page := primitives.HBox(rotheme.IconButtonDisabled(rotheme.IconButtonLeft, w.busy || w.page == 0, func() { w.page--; w.refresh() }),
 		rotheme.Text(fmt.Sprintf("%d / %d", w.page+1, w.pageCount())), rotheme.IconButtonDisabled(rotheme.IconButtonRight, w.busy || w.page+1 >= w.pageCount(), func() { w.page++; w.refresh() }),
 		primitives.Expanded(primitives.Box()), rotheme.Text(fmt.Sprintf("%d / %d", len(w.inbox), network.MailInboxCapacity))).
-		Gap(8).CrossAlign(primitives.CrossAxisCenter).PaddingLeft(8).PaddingRight(8).PaddingBottom(8)
-	return primitives.Box(primitives.Expanded(table), page).Gap(6).CrossAlign(primitives.CrossAxisStretch)
+		Gap(float32(mailPageGap)).CrossAlign(primitives.CrossAxisCenter).PaddingLeft(float32(mailPagePad)).PaddingRight(float32(mailPagePad)).PaddingBottom(float32(mailPagePad))
+	return primitives.Box(primitives.Expanded(table), page).Gap(float32(mailInboxGap)).CrossAlign(primitives.CrossAxisStretch)
 }
 
 func (w *MailWindow) composeTree() widget.Widget {
@@ -442,12 +451,12 @@ func (w *MailWindow) composeTree() widget.Widget {
 		primitives.Expanded(primitives.Box()),
 	)
 	attachment := primitives.HBox(w.composeSlot, primitives.Expanded(rotheme.Text(itemName)), remove).
-		Gap(8).CrossAlign(primitives.CrossAxisCenter).Height(40)
-	return primitives.Box(mailFieldRow("To", w.recipientField), mailFieldRow("Subject", w.titleField), primitives.Expanded(w.bodyField), attachment, mailFieldRow("Zeny", w.zenyField)).Gap(5).CrossAlign(primitives.CrossAxisStretch)
+		Gap(float32(mailAttachmentGap)).CrossAlign(primitives.CrossAxisCenter).Height(mailAttachmentH)
+	return primitives.Box(mailFieldRow("To", w.recipientField), mailFieldRow("Subject", w.titleField), primitives.Expanded(w.bodyField), attachment, mailFieldRow("Zeny", w.zenyField)).Gap(float32(mailComposeGap)).CrossAlign(primitives.CrossAxisStretch)
 }
 
 func mailFieldRow(label string, field widget.Widget) widget.Widget {
-	return primitives.HBox(primitives.Box(rotheme.Label(label)).Width(65), primitives.Expanded(field)).Gap(6).Height(24).CrossAlign(primitives.CrossAxisCenter)
+	return primitives.HBox(primitives.Box(rotheme.Label(label)).Width(mailFieldLabelW), primitives.Expanded(field)).Gap(float32(mailFieldGap)).Height(mailFieldH).CrossAlign(primitives.CrossAxisCenter)
 }
 
 func (w *MailWindow) send() {
@@ -482,10 +491,10 @@ func (w *MailWindow) readTree() widget.Widget {
 	if item.ItemID != 0 {
 		itemName = inventoryItemDisplayName(w.ctx.Resources, item)
 	}
-	return Win(Title("Read Mail"), CloseButton(true), OnClose(w.closeRead), Size(mailReadW, mailReadH),
+	return Win(Title("Read Mail"), CloseButton(true), OnClose(w.closeRead), Size(float32(mailReadW), float32(mailReadH)),
 		Content(primitives.Box(rotheme.Label(m.Title), rotheme.Text("From: "+m.Sender), primitives.Expanded(w.readBodyField),
-			primitives.HBox(w.newAttachmentSlot(item), primitives.Expanded(rotheme.Text(itemName))).Gap(8).Height(40).CrossAlign(primitives.CrossAxisCenter),
-			rotheme.Text(fmt.Sprintf("Zeny: %s", formatHUDNumber(int64(m.Zeny))))).Padding(10).Gap(6).CrossAlign(primitives.CrossAxisStretch)),
+			primitives.HBox(w.newAttachmentSlot(item), primitives.Expanded(rotheme.Text(itemName))).Gap(float32(mailAttachmentGap)).Height(mailAttachmentH).CrossAlign(primitives.CrossAxisCenter),
+			rotheme.Text(fmt.Sprintf("Zeny: %s", formatHUDNumber(int64(m.Zeny))))).Padding(float32(mailReadPad)).Gap(float32(mailReadGap)).CrossAlign(primitives.CrossAxisStretch)),
 		Footer(rotheme.ButtonDisabled("Get", w.busy || !hasAttachment, func() { w.request(MailAction{Kind: MailActionTake, ID: m.ID}) }),
 			rotheme.ButtonDisabled("Reply", w.busy, func() {
 				title := m.Title
@@ -540,7 +549,7 @@ func (w *MailWindow) AcceptInventoryDrop(ctx Context, item session.InventoryItem
 		w.request(MailAction{Kind: MailActionAttach, Item: item})
 	}
 	if item.Amount > 1 {
-		w.amount.Open(ctx, "Amount to attach", 1, uint16(min(item.Amount, 32767)), request)
+		w.amount.Open(ctx, "Amount to attach", 1, uint16(min(item.Amount, 32767)), request) // theme:ok protocol amount cap
 	} else {
 		request(1)
 	}
@@ -575,7 +584,7 @@ func (w *MailWindow) newAttachmentSlot(item session.InventoryItem) *mailAttachme
 	return slot
 }
 func (s *mailAttachmentSlot) Layout(_ widget.Context, c geometry.Constraints) geometry.Size {
-	size := c.Constrain(geometry.Sz(40, 40))
+	size := c.Constrain(geometry.Sz(mailSlot, mailSlot))
 	s.SetBounds(geometry.FromPointSize(s.Position(), size))
 	return size
 }
@@ -587,7 +596,7 @@ func (s *mailAttachmentSlot) Draw(_ widget.Context, canvas widget.Canvas) {
 		canvas.DrawImage(s.icon, geometry.Pt(b.Min.X+(b.Width()-float32(ib.Dx()))/2, b.Min.Y+(b.Height()-float32(ib.Dy()))/2))
 	}
 	if s.item.Amount > 1 {
-		rotheme.DrawText(canvas, strconv.Itoa(s.item.Amount), geometry.NewRect(b.Min.X, b.Max.Y-14, b.Width()-2, 14), rotheme.Default.Typography.TextSize, rotheme.Default.Colors.Text, false, widget.TextAlignRight)
+		rotheme.DrawText(canvas, strconv.Itoa(s.item.Amount), geometry.NewRect(b.Min.X, b.Max.Y-mailAmountLabelH, b.Width()-mailAmountInset, mailAmountLabelH), rotheme.Default.Typography.TextSize, rotheme.Default.Colors.Text, false, widget.TextAlignRight)
 	}
 }
 func (s *mailAttachmentSlot) Event(_ widget.Context, e event.Event) bool {

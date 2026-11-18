@@ -10,11 +10,6 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	textPromptW        = 306
-	textPromptContentH = 70
-)
-
 type TextPromptAction struct {
 	Text      string
 	Submitted bool
@@ -42,7 +37,7 @@ func (w *TextPromptWindow) OpenPassword(ctx Context, title, label string, maxLen
 }
 
 func (w *TextPromptWindow) openPrompt(ctx Context, title, label, placeholder string, maxLength int, inputType textfield.InputType) {
-	w.EnsureWindow(textPromptW, ROWindowTitleHeight+textPromptContentH+ROWindowFooterHeight)
+	w.EnsureWindow(textPromptW, textPromptHeight())
 	w.ctx = ctx
 	w.title = title
 	w.label = label
@@ -53,8 +48,16 @@ func (w *TextPromptWindow) openPrompt(ctx Context, title, label, placeholder str
 	w.inputField = nil
 	w.action = TextPromptAction{}
 	w.Window.Open(ctx, w.widgetTree(ctx))
+	w.OnLayoutReload(w.reloadForLayout)
 	w.Publish(ctx)
 	w.focusInput(ctx)
+}
+
+func (w *TextPromptWindow) reloadForLayout() {
+	w.SetSize(textPromptW, textPromptHeight())
+	w.inputField = nil
+	w.SetContent(w.widgetTree(w.ctx))
+	w.focusInput(w.ctx)
 }
 
 func (w *TextPromptWindow) Update(ctx Context) bool {
@@ -110,11 +113,11 @@ func (w *TextPromptWindow) widgetTree(ctx Context) widget.Widget {
 			primitives.Box(
 				rotheme.Label(w.label),
 				primitives.Box(w.input(ctx)).
-					Height(24).
+					Height(float32(textPromptFieldH)).
 					CrossAlign(primitives.CrossAxisStretch),
 			).
-				Padding(14).
-				Gap(8),
+				Padding(float32(textPromptPad)).
+				Gap(float32(textPromptGap)),
 		),
 		Footer(
 			primitives.Expanded(primitives.Box()),

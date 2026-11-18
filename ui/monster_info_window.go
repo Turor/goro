@@ -10,16 +10,6 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	monsterInfoWindowW  = 400
-	monsterInfoWindowH  = 250
-	monsterInfoPreviewW = 110
-	monsterInfoPreviewH = 160
-	monsterInfoStatsW   = 260
-	monsterInfoRowH     = 19
-	monsterInfoElementH = 23
-)
-
 type MonsterInfoView struct {
 	Info    network.MonsterInfo
 	Name    string
@@ -36,6 +26,10 @@ func (w *MonsterInfoWindow) OpenInfo(ctx Context, view MonsterInfoView) {
 	w.EnsureWindow(monsterInfoWindowW, monsterInfoWindowH)
 	w.view = view
 	w.Window.Open(ctx, w.widgetTree(ctx))
+	w.OnLayoutReload(func() {
+		w.SetSize(monsterInfoWindowW, monsterInfoWindowH)
+		w.SetContent(w.widgetTree(w.ctx))
+	})
 	w.Publish(ctx)
 }
 
@@ -57,7 +51,7 @@ func (w *MonsterInfoWindow) widgetTree(ctx Context) widget.Widget {
 			w.Close()
 			w.Publish(ctx)
 		}),
-		Size(monsterInfoWindowW, monsterInfoWindowH),
+		Size(float32(monsterInfoWindowW), float32(monsterInfoWindowH)),
 		Content(
 			primitives.HBox(
 				w.previewPanel(),
@@ -65,11 +59,11 @@ func (w *MonsterInfoWindow) widgetTree(ctx Context) widget.Widget {
 					w.statsPanel(),
 					w.elementsPanel(),
 				).
-					Width(monsterInfoStatsW).
-					Gap(7),
+					Width(float32(monsterInfoStatsW)).
+					Gap(float32(monsterInfoStatsGap)),
 			).
-				PaddingXY(10, 5).
-				Gap(10).
+				PaddingXY(float32(monsterInfoPadX), float32(monsterInfoPadY)).
+				Gap(float32(monsterInfoContentGap)).
 				CrossAlign(primitives.CrossAxisCenter),
 		),
 		Footer(
@@ -86,8 +80,8 @@ func (w *MonsterInfoWindow) previewPanel() widget.Widget {
 	return primitives.Box(
 		newStaticImageWidget(w.view.Preview, monsterInfoPreviewW, monsterInfoPreviewH),
 	).
-		Width(monsterInfoPreviewW).
-		Height(monsterInfoPreviewH)
+		Width(float32(monsterInfoPreviewW)).
+		Height(float32(monsterInfoPreviewH))
 }
 
 func (w *MonsterInfoWindow) statsPanel() widget.Widget {
@@ -109,12 +103,12 @@ func (w *MonsterInfoWindow) displayName() string {
 
 func monsterInfoStatRow(leftLabel, leftValue, rightLabel, rightValue string) widget.Widget {
 	return primitives.HBox(
-		monsterInfoStatLabel(leftLabel, 38),
-		monsterInfoStatValue(leftValue, 92),
-		monsterInfoStatLabel(rightLabel, 50),
-		monsterInfoStatValue(rightValue, 80),
+		monsterInfoStatLabel(leftLabel, float32(monsterInfoNameLabelW)),
+		monsterInfoStatValue(leftValue, float32(monsterInfoNameValueW)),
+		monsterInfoStatLabel(rightLabel, float32(monsterInfoExtraLabelW)),
+		monsterInfoStatValue(rightValue, float32(monsterInfoExtraValueW)),
 	).
-		Height(monsterInfoRowH).
+		Height(float32(monsterInfoRowH)).
 		CrossAlign(primitives.CrossAxisCenter)
 }
 
@@ -148,11 +142,11 @@ func (w *MonsterInfoWindow) elementsPanel() widget.Widget {
 			monsterElementCell("Holy", e.Holy),
 			monsterElementCell("Undead", e.Undead),
 		),
-	).Gap(3)
+	).Gap(float32(monsterInfoElementRowGap))
 }
 
 func monsterInfoElementRow(cells ...widget.Widget) widget.Widget {
-	return primitives.HBox(cells...).Gap(4).Height(monsterInfoElementH)
+	return primitives.HBox(cells...).Gap(float32(monsterInfoElementGap)).Height(float32(monsterInfoElementH))
 }
 
 func monsterElementCell(name string, rate uint8) widget.Widget {
@@ -171,12 +165,12 @@ func monsterElementCell(name string, rate uint8) widget.Widget {
 	return primitives.HBox(
 		primitives.Expanded(label),
 	).
-		Width(84).
-		Height(monsterInfoElementH).
+		Width(float32(monsterInfoElementW)).
+		Height(float32(monsterInfoElementH)).
 		CrossAlign(primitives.CrossAxisCenter).
 		Background(rotheme.Default.Colors.PanelBody).
-		BorderStyle(1, rotheme.Default.Colors.WindowBorder).
-		Rounded(3)
+		BorderStyle(float32(monsterInfoElementBorder), rotheme.Default.Colors.WindowBorder).
+		Rounded(float32(monsterInfoElementRadius))
 }
 
 func monsterHPText(current, maximum uint32) string {

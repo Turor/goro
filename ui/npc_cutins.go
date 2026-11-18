@@ -86,19 +86,34 @@ func (c *NPCCutinOverlay) Update(ctx Context) bool {
 func (c *NPCCutinOverlay) openWindow(ctx Context, bounds image.Rectangle) {
 	c.window = NewWindow(bounds.Dx(), bounds.Dy())
 	c.window.CloseOnEsc = false
+	c.window.OpenAt(bounds.Min.X, bounds.Min.Y, c.cutinContent(bounds))
+	c.window.OnLayoutReload(func() { c.reloadWindow(ctx) })
+	c.window.Publish(ctx)
+}
+
+func (c *NPCCutinOverlay) cutinContent(bounds image.Rectangle) widget.Widget {
 	texture := c.texture.RGBA()
-	var content widget.Widget
 	if c.position == network.NPCCutinWindow {
-		content = Win(
+		return Win(
 			Title(""),
 			Content(newStaticImageWidget(texture, texture.Bounds().Dx(), texture.Bounds().Dy())),
 			Size(float32(bounds.Dx()), float32(bounds.Dy())),
 		)
-	} else {
-		content = newNPCWindowlessCutinWidget(texture, c.Clear)
 	}
-	c.window.OpenAt(bounds.Min.X, bounds.Min.Y, content)
-	c.window.Publish(ctx)
+	return newNPCWindowlessCutinWidget(texture, c.Clear)
+}
+
+func (c *NPCCutinOverlay) reloadWindow(ctx Context) {
+	if c.texture == nil || !c.window.IsOpen() {
+		return
+	}
+	screenW, screenH := ctx.ScreenSize()
+	bounds, ok := npcCutinBounds(image.Rect(0, 0, screenW, screenH), c.position, c.texture)
+	if !ok {
+		return
+	}
+	c.window.SetSize(bounds.Dx(), bounds.Dy())
+	c.window.SetContent(c.cutinContent(bounds))
 }
 
 func (c *NPCCutinOverlay) PointerBlocked(screenWidth, screenHeight, x, y int) bool {
