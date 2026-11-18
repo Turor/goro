@@ -172,7 +172,7 @@ func (m *Manager) loadAccessoryResourceNames() {
 		if !ok {
 			return
 		}
-		if err := executeLua51Bytecode(data, globals); err != nil {
+		if err := executeLuaChunk(data, globals); err != nil {
 			return
 		}
 	}

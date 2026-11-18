@@ -286,7 +286,7 @@ func setGopherLuaStringConstants(proto *glua.FunctionProto, constants []string) 
 
 func luaBuiltinGlobal(name string) bool {
 	switch name {
-	case "_G", "_VERSION",
+	case "_G", "_VERSION", "_GOPHER_LUA_VERSION",
 		"assert", "collectgarbage", "dofile", "error", "getfenv", "getmetatable",
 		"ipairs", "load", "loadfile", "loadstring", "module", "next", "pairs",
 		"pcall", "print", "rawequal", "rawget", "rawset", "require", "select",

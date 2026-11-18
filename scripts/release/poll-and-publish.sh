@@ -106,8 +106,10 @@ windows="goro-windows-amd64-${sha}.exe"
 remote_root "set -e; pkill -KILL -u $BUILD_USER || true; crontab -r -u $BUILD_USER 2>/dev/null || true
   find /home/$BUILD_USER -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
   find /tmp /var/tmp /dev/shm -xdev -user $BUILD_USER -delete 2>/dev/null || true"
-remote_base=$(remote_root "runuser -u $BUILD_USER -- mktemp -d /home/$BUILD_USER/run.XXXXXXXX")
-[[ "$remote_base" =~ ^/home/$BUILD_USER/run\.[A-Za-z0-9]{8}$ ]] || die "bad remote run dir"
+# Only a validated path ever reaches remote_base (and the EXIT trap's rm -rf).
+new_base=$(remote_root "runuser -u $BUILD_USER -- mktemp -d /home/$BUILD_USER/run.XXXXXXXX")
+[[ "$new_base" =~ ^/home/$BUILD_USER/run\.[A-Za-z0-9]{8}$ ]] || die "bad remote run dir"
+remote_base="$new_base"
 log "remote gate+build sha=$sha build=$build on $BUILD_HOST as $BUILD_USER in $remote_base"
 # shellcheck disable=SC2087
 ssh -o BatchMode=yes "$BUILD_HOST" -- runuser -u "$BUILD_USER" -- env -i \
@@ -134,8 +136,14 @@ stage="$WORK/staging/$sha"
 rm -rf "$stage"
 mkdir -p "$stage"
 chmod 700 "$stage"
+# Kill every build-user process first, so nothing left running by the build
+# can swap an artifact between the checks and the read, and cap the read at
+# MAX_BYTES+1 so even a swapped-in endless file cannot fill this disk (the
+# size check below then rejects it).
+remote_root "pkill -KILL -u $BUILD_USER || true"
+read_cap=$((MAX_BYTES + 1))
 for f in "$linux" "$windows"; do
-  remote_root "runuser -u $BUILD_USER -- sh -c 'test -f \"\$1\" && test ! -L \"\$1\" && cat -- \"\$1\"' sh '$remote_base/out/$f'" >"$stage/$f" \
+  remote_root "runuser -u $BUILD_USER -- sh -c 'test -f \"\$1\" && test ! -L \"\$1\" && head -c $read_cap -- \"\$1\"' sh '$remote_base/out/$f'" >"$stage/$f" \
     || die "artifact $f missing, not a regular file, or a symlink"
 done
 for f in "$linux" "$windows"; do
