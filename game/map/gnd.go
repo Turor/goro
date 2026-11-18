@@ -1,6 +1,7 @@
 package maps
 
 import (
+	"errors"
 	"fmt"
 	"image/color"
 	"math"
@@ -379,13 +380,18 @@ func (m *System) waterTexture(manager *res.Manager, waterType, frame int) *rende
 	if texture, ok := m.Textures[key]; ok {
 		return texture
 	}
-	if _, ok := m.TextureMiss[key]; ok {
+	img, _, err := res.LoadTexture(manager, res.WaterTextureCandidates(waterType, frame))
+	if errors.Is(err, res.ErrRemotePending) {
 		return nil
 	}
-	img, _, err := res.LoadImage(manager, res.WaterTextureCandidates(waterType, frame))
 	if err != nil {
-		m.TextureMiss[key] = struct{}{}
 		return nil
+	}
+	if res.IsMissingCheckerboard(img) {
+		if m.TextureMiss == nil {
+			m.TextureMiss = make(map[string]struct{})
+		}
+		m.TextureMiss[key] = struct{}{}
 	}
 	texture := m.Images.Own(render.NewImageFromImage(img))
 	m.Textures[key] = texture
@@ -399,14 +405,19 @@ func (m *System) groundTexture(manager *res.Manager, name string) *render.Image 
 	if texture, ok := m.Textures[name]; ok {
 		return texture
 	}
-	if _, ok := m.TextureMiss[name]; ok {
+
+	img, _, err := res.LoadTexture(manager, res.GroundTextureCandidates(name))
+	if errors.Is(err, res.ErrRemotePending) {
 		return nil
 	}
-
-	img, _, err := res.LoadImage(manager, res.GroundTextureCandidates(name))
 	if err != nil {
-		m.TextureMiss[name] = struct{}{}
 		return nil
+	}
+	if res.IsMissingCheckerboard(img) {
+		if m.TextureMiss == nil {
+			m.TextureMiss = make(map[string]struct{})
+		}
+		m.TextureMiss[name] = struct{}{}
 	}
 	if m.UpscaleTextures {
 		img = render.UpscaleTexture2x(img)

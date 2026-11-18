@@ -114,7 +114,7 @@ func TestNinjaNativeAssetsAndRendering(t *testing.T) {
 			if c.SpriteFile != "" && m.EffectSpriteView(ctx.Resources, c.SpriteFile) == nil {
 				t.Fatalf("missing SPR %s", c.SpriteFile)
 			}
-			if c.TextureFile != "" && m.EffectFileTexture(ctx.Resources, c.TextureFile) == nil {
+			if c.TextureFile != "" && !TextureLoaded(m.EffectFileTexture(ctx.Resources, c.TextureFile)) {
 				t.Fatalf("missing texture %s", c.TextureFile)
 			}
 		}
@@ -267,7 +267,7 @@ func TestTaekwonEffectsRenderWithNativeAssets(t *testing.T) {
 		spec, _ := Lookup(tc.id)
 		for _, component := range spec.Components {
 			for _, file := range append([]string{component.TextureFile}, component.TextureFiles...) {
-				if file != "" && m.EffectFileTexture(ctx.Resources, file) == nil {
+				if file != "" && !TextureLoaded(m.EffectFileTexture(ctx.Resources, file)) {
 					t.Fatalf("effect %d missing texture %s", tc.id, file)
 				}
 			}
@@ -334,10 +334,13 @@ func TestCrashEarthSpec(t *testing.T) {
 	if !ok || len(crash.Components) != 1 {
 		t.Fatalf("EF_CRASHEARTH spec = %+v ok=%t", crash, ok)
 	}
-	if crash.CameraShakeDelay != 35*db.EffectFrameDuration || crash.CameraShake != 650*time.Millisecond {
+	if crash.CameraShakeDelay != 350*time.Millisecond || crash.CameraShake != 650*time.Millisecond {
 		t.Fatalf("EF_CRASHEARTH camera shake = delay %s duration %s", crash.CameraShakeDelay, crash.CameraShake)
 	}
-	if component := crash.Components[0]; component.Kind != ComponentSTR || component.StrFile != "crashearth" || component.AttachedEntity {
+	if len(crash.Sfx) != 1 || crash.Sfx[0] != "effect\\black_hammerfall.wav" || len(crash.SfxDelays) != 0 {
+		t.Fatalf("EF_CRASHEARTH sfx = %v delays = %v", crash.Sfx, crash.SfxDelays)
+	}
+	if component := crash.Components[0]; component.Kind != ComponentSTR || component.StrFile != "crashearth" || component.AttachedEntity || component.DrawsBeforeEntities() {
 		t.Fatalf("EF_CRASHEARTH component = %+v", component)
 	}
 
@@ -2156,6 +2159,13 @@ func TestSTRAnimationDrawOptionsDisableFogToMatchRobrowser(t *testing.T) {
 	options := StrAnimationDrawOptions(res.STRAnimation{SrcAlpha: 5, DestAlpha: 6})
 	if !options.DisableFog {
 		t.Fatal("STR draw options enabled map fog, want disabled")
+	}
+	if !options.AfterBillboards {
+		t.Fatal("after-entity STR must draw after actor billboards")
+	}
+	before := StrAnimationDrawOptionsAfterBillboards(res.STRAnimation{SrcAlpha: 5, DestAlpha: 6}, false)
+	if before.AfterBillboards {
+		t.Fatal("pre-entity STR must draw in the first world alpha pass")
 	}
 }
 
