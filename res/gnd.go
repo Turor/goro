@@ -53,7 +53,49 @@ type GNDCell struct {
 	Right   int
 }
 
+// GND lightmap layouts. Every kRO map we ship (1.7, and the renewal 1.8/1.9
+// maps that add water blocks) stores raw 256-byte lightmaps. The 5-bit indexed
+// channel layout is kept only as a fallback for archives where the raw layout
+// does not line up with the file length.
+type gndLightmapLayout int
+
+const (
+	gndLightmapsRaw gndLightmapLayout = iota
+	gndLightmapsIndexed
+)
+
+const (
+	gndSurfaceSize = 40
+	gndCellSize    = 28
+)
+
 func ParseGND(data []byte) (*GND, error) {
+	// 1.7 has one layout, and some shipped 1.7 maps carry trailing padding.
+	// For 1.8+ prefer the layout that ends exactly at the water block.
+	attempts := []struct {
+		layout gndLightmapLayout
+		exact  bool
+	}{{gndLightmapsRaw, false}}
+	if len(data) >= 6 && data[4] == 1 && data[5] >= 8 {
+		attempts = []struct {
+			layout gndLightmapLayout
+			exact  bool
+		}{{gndLightmapsRaw, true}, {gndLightmapsIndexed, true}, {gndLightmapsRaw, false}, {gndLightmapsIndexed, false}}
+	}
+	var firstErr error
+	for _, attempt := range attempts {
+		gnd, err := parseGND(data, attempt.layout, attempt.exact)
+		if err == nil {
+			return gnd, nil
+		}
+		if firstErr == nil {
+			firstErr = err
+		}
+	}
+	return nil, firstErr
+}
+
+func parseGND(data []byte, layout gndLightmapLayout, exact bool) (*GND, error) {
 	reader := gndReader{data: data}
 	if string(reader.bytes(4)) != "GRGN" {
 		return nil, fmt.Errorf("invalid gnd signature")
@@ -70,14 +112,17 @@ func ParseGND(data []byte) (*GND, error) {
 	if major != 1 || minor <= 6 {
 		return nil, fmt.Errorf("unsupported gnd version %d.%d", major, minor)
 	}
-	if width <= 0 || height <= 0 {
+	if width <= 0 || height <= 0 || width > 4096 || height > 4096 {
 		return nil, fmt.Errorf("invalid gnd size %dx%d", width, height)
 	}
 
 	textureCount := int(reader.i32())
 	textureNameLength := int(reader.i32())
-	if textureCount < 0 || textureNameLength <= 0 {
+	if textureCount < 0 || textureNameLength <= 0 || textureNameLength > 1024 {
 		return nil, fmt.Errorf("invalid gnd texture table count=%d length=%d", textureCount, textureNameLength)
+	}
+	if err := reader.need(textureCount, textureNameLength, "texture table"); err != nil {
+		return nil, err
 	}
 	textures := make([]string, textureCount)
 	for i := range textures {
@@ -94,12 +139,19 @@ func ParseGND(data []byte) (*GND, error) {
 	if lightmapWidth <= 0 || lightmapHeight <= 0 || lightmapFormat <= 0 {
 		return nil, fmt.Errorf("invalid gnd lightmap header count=%d size=%dx%d format=%d", lightmapCount, lightmapWidth, lightmapHeight, lightmapFormat)
 	}
-	lightmaps := make([]GNDLightmap, lightmapCount)
-	if minor == 7 {
+	var lightmaps []GNDLightmap
+	if layout == gndLightmapsRaw {
+		if err := reader.need(lightmapCount, 256, "lightmaps"); err != nil {
+			return nil, err
+		}
+		lightmaps = make([]GNDLightmap, lightmapCount)
 		for i := range lightmaps {
 			lightmaps[i] = decodeGNDLightmapRaw(reader.bytes(256))
 		}
 	} else {
+		if err := reader.need(lightmapCount, 16, "lightmap indexes"); err != nil {
+			return nil, err
+		}
 		indexes := make([][4]int, lightmapCount)
 		for i := range indexes {
 			indexes[i] = [4]int{int(reader.i32()), int(reader.i32()), int(reader.i32()), int(reader.i32())}
@@ -108,10 +160,14 @@ func ParseGND(data []byte) (*GND, error) {
 		if colorChannelCount < 0 {
 			return nil, fmt.Errorf("invalid gnd color channel count=%d", colorChannelCount)
 		}
+		if err := reader.need(colorChannelCount, 40, "lightmap channels"); err != nil {
+			return nil, err
+		}
 		colorChannels := make([][40]byte, colorChannelCount)
 		for i := range colorChannels {
 			copy(colorChannels[i][:], reader.bytes(40))
 		}
+		lightmaps = make([]GNDLightmap, lightmapCount)
 		for i, index := range indexes {
 			lightmaps[i] = decodeGNDLightmapIndexed(index, colorChannels)
 		}
@@ -120,6 +176,9 @@ func ParseGND(data []byte) (*GND, error) {
 	surfaceCount := int(reader.i32())
 	if surfaceCount < 0 {
 		return nil, fmt.Errorf("invalid gnd surface count=%d", surfaceCount)
+	}
+	if err := reader.need(surfaceCount, gndSurfaceSize, "surfaces"); err != nil {
+		return nil, err
 	}
 	surfaces := make([]GNDSurface, surfaceCount)
 	for i := range surfaces {
@@ -141,6 +200,9 @@ func ParseGND(data []byte) (*GND, error) {
 	}
 
 	cellCount := width * height
+	if err := reader.need(cellCount, gndCellSize, "cells"); err != nil {
+		return nil, err
+	}
 	cells := make([]GNDCell, cellCount)
 	for i := range cells {
 		var cell GNDCell
@@ -155,22 +217,9 @@ func ParseGND(data []byte) (*GND, error) {
 	if reader.err != nil {
 		return nil, reader.err
 	}
-	var water GNDWater
-	if minor >= 8 && reader.remaining() >= 32 {
-		water = GNDWater{
-			Present:     true,
-			Level:       -reader.f32() / 5,
-			Type:        reader.i32(),
-			WaveHeight:  reader.f32() / 5,
-			WaveSpeed:   reader.f32(),
-			WavePitch:   reader.f32(),
-			AnimSpeed:   reader.i32(),
-			SplitWidth:  reader.i32(),
-			SplitHeight: reader.i32(),
-		}
-		if minor >= 9 && water.SplitWidth > 0 && water.SplitHeight > 0 {
-			reader.skip(int(water.SplitWidth * water.SplitHeight * 24))
-		}
+	water, err := readGNDWater(&reader, minor, exact)
+	if err != nil {
+		return nil, err
 	}
 
 	return &GND{
@@ -185,6 +234,48 @@ func ParseGND(data []byte) (*GND, error) {
 		Surfaces:     surfaces,
 		Cells:        cells,
 	}, nil
+}
+
+// readGNDWater reads the water block that GND 1.8+ appends after the cells:
+// level, type, wave height, wave speed, wave pitch and texture animation
+// speed, then the split grid. Each split stores its own level in 1.8 and a
+// full six-field water record in 1.9. With exact set, the block must end the
+// file, which is how the raw lightmap layout is validated.
+func readGNDWater(reader *gndReader, minor byte, exact bool) (GNDWater, error) {
+	var water GNDWater
+	if minor < 8 || reader.remaining() < 24 {
+		if exact && reader.remaining() != 0 {
+			return water, fmt.Errorf("gnd has %d unexpected trailing bytes", reader.remaining())
+		}
+		return water, nil
+	}
+	water = GNDWater{
+		Present:    true,
+		Level:      -reader.f32() / 5,
+		Type:       reader.i32(),
+		WaveHeight: reader.f32() / 5,
+		WaveSpeed:  reader.f32(),
+		WavePitch:  reader.f32(),
+		AnimSpeed:  reader.i32(),
+	}
+	if reader.remaining() >= 8 {
+		water.SplitWidth = reader.i32()
+		water.SplitHeight = reader.i32()
+		if water.SplitWidth > 0 && water.SplitHeight > 0 && water.SplitWidth <= 4096 && water.SplitHeight <= 4096 {
+			record := 4
+			if minor >= 9 {
+				record = 24
+			}
+			reader.skip(int(water.SplitWidth) * int(water.SplitHeight) * record)
+		}
+	}
+	if reader.err != nil {
+		return GNDWater{}, reader.err
+	}
+	if exact && reader.remaining() != 0 {
+		return GNDWater{}, fmt.Errorf("gnd water block leaves %d unexpected trailing bytes", reader.remaining())
+	}
+	return water, nil
 }
 
 func (g *GND) InBounds(x, y int) bool {
@@ -307,6 +398,20 @@ func (r *gndReader) bytes(n int) []byte {
 	out := r.data[r.offset : r.offset+n]
 	r.offset += n
 	return out
+}
+
+// need fails before an allocation when count records of size bytes cannot fit
+// in the rest of the file, so a corrupt or misread count never allocates more
+// than the file could describe.
+func (r *gndReader) need(count, size int, what string) error {
+	if r.err != nil {
+		return r.err
+	}
+	if count < 0 || size <= 0 || count > (len(r.data)-r.offset)/size {
+		r.err = fmt.Errorf("gnd %s count %d exceeds remaining %d bytes", what, count, len(r.data)-r.offset)
+		return r.err
+	}
+	return nil
 }
 
 func (r *gndReader) skip(n int) {

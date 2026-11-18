@@ -40,7 +40,7 @@ func (m *Manager) loadNonPCResourceNames() {
 		if !ok {
 			continue
 		}
-		if err := executeLua51Bytecode(data, globals); err != nil {
+		if err := executeLuaChunk(data, globals); err != nil {
 			continue
 		}
 	}

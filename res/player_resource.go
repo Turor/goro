@@ -9,6 +9,8 @@ import (
 
 const (
 	playerHumanSpriteRoot = "data\\sprite\\인간족\\"
+	playerDoramSpriteRoot = "data\\sprite\\도람족\\"
+	playerDoramPaletteDir = "도람족"
 	playerAccessoryRoot   = "data\\sprite\\악세사리\\"
 	playerShieldRoot      = "data\\sprite\\방패\\"
 	playerEffectRoot      = "data\\sprite\\이팩트\\"
@@ -78,9 +80,17 @@ func PlayerBodyResourceCandidates(job int, sex byte, extension string) []string 
 	}
 	out := make([]string, 0, len(tokens))
 	for _, token := range tokens {
-		out = append(out, fmt.Sprintf("%s%s\\%s\\%s_%s.%s", playerHumanSpriteRoot, playerBodyDir, sexToken, token, sexToken, extension))
+		out = append(out, fmt.Sprintf("%s%s\\%s\\%s_%s.%s", playerRaceSpriteRoot(job), playerBodyDir, sexToken, token, sexToken, extension))
 	}
 	return out
+}
+
+// playerRaceSpriteRoot picks the body and head sprite folder for a job.
+func playerRaceSpriteRoot(job int) string {
+	if db.IsDoramJob(job) {
+		return playerDoramSpriteRoot
+	}
+	return playerHumanSpriteRoot
 }
 
 func PlayerAdminBodyResourceCandidates(sex byte, extension string) []string {
@@ -104,6 +114,17 @@ func PlayerCartResourceCandidates(cartNum int, extension string) []string {
 
 func PlayerHeadResourceCandidates(job int, head int, sex byte, extension string) []string {
 	sexToken := PlayerSexToken(sex)
+	if db.IsDoramJob(job) {
+		// Doram hair IDs map one to one (roBrowser HairIndexTable rows 2 and 3).
+		if head < 1 {
+			head = 1
+		}
+		out := []string{fmt.Sprintf("%s%s\\%s\\%d_%s.%s", playerDoramSpriteRoot, playerHeadDir, sexToken, head, sexToken, extension)}
+		if head != 1 {
+			out = append(out, fmt.Sprintf("%s%s\\%s\\%d_%s.%s", playerDoramSpriteRoot, playerHeadDir, sexToken, 1, sexToken, extension))
+		}
+		return out
+	}
 	head = NormalizePlayerHead(head, job)
 	return []string{
 		fmt.Sprintf("%s%s\\%s\\%d_%s.%s", playerHumanSpriteRoot, playerHeadDir, sexToken, head, sexToken, extension),
@@ -151,7 +172,7 @@ func (m *Manager) loadAccessoryResourceNames() {
 		if !ok {
 			return
 		}
-		if err := executeLua51Bytecode(data, globals); err != nil {
+		if err := executeLuaChunk(data, globals); err != nil {
 			return
 		}
 	}
@@ -368,6 +389,14 @@ func PlayerHeadPaletteResourceCandidates(job int, head int, sex byte, palette in
 		return nil
 	}
 	sexToken := PlayerSexToken(sex)
+	if db.IsDoramJob(job) {
+		if head < 1 {
+			head = 1
+		}
+		return []string{
+			fmt.Sprintf("%s%s\\%s\\%s%d_%s_%d.%s", playerPaletteRoot, playerDoramPaletteDir, playerPaletteHeadDir, playerPaletteHeadFile, head, sexToken, palette, extension),
+		}
+	}
 	head = NormalizePlayerHead(head, job)
 	return []string{
 		fmt.Sprintf("%s%s\\%s%d_%s_%d.%s", playerPaletteRoot, playerPaletteHeadDir, playerPaletteHeadFile, head, sexToken, palette, extension),

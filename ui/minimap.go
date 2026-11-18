@@ -647,7 +647,7 @@ func (w *minimapWidget) Draw(_ widget.Context, canvas widget.Canvas) {
 			drawMinimapPlayerMarker(canvas, rect, mapW, mapH, w.ctx.World.Player.X, w.ctx.World.Player.Y, w.arrow)
 			drawMinimapCompassMarkers(canvas, rect, mapW, mapH, w.compassMarkers, w.now, w.ctx.Started)
 		}
-		label := minimapDisplayName(w.ctx.World.MapName)
+		label := minimapDisplayName(w.ctx.Resources, w.ctx.World.MapName)
 		footerY := bounds.Min.Y + bounds.Height() - 19
 		canvas.DrawText(trimRunes(label, 13), geometry.NewRect(bounds.Min.X+minimapPad, footerY, bounds.Width()/2, 16), float32(rotheme.Default.Typography.TextSize), Color(minimapTextColor), false, widget.TextAlignLeft)
 		coords := fmt.Sprintf("X:%d Y:%d", w.ctx.World.Player.X, w.ctx.World.Player.Y)
@@ -1032,7 +1032,12 @@ func minimapMemberColor(accountID uint32) color.RGBA {
 	}
 }
 
-func minimapDisplayName(mapName string) string {
+func minimapDisplayName(resources *res.Manager, mapName string) string {
+	if resources != nil {
+		if name, ok := resources.MapDisplayName(mapName); ok {
+			return name
+		}
+	}
 	name := normalizeMinimapMapName(mapName)
 	if name == "" {
 		return "unknown"

@@ -29,6 +29,9 @@ type ItemMetadata struct {
 var itemInfoLuaCandidates = []string{
 	"System\\itemInfo.lub",
 	"System/itemInfo.lub",
+	"System\\itemInfo.lua",
+	"System\\itemInfo_true.lub",
+	"System\\LuaFiles514\\itemInfo.lua",
 	"data\\luafiles514\\lua files\\datainfo\\itemInfo.lub",
 	"data\\luafiles514\\lua files\\datainfo\\iteminfo.lub",
 	"data\\lua files\\datainfo\\itemInfo.lub",
@@ -306,7 +309,7 @@ func (m *Manager) loadItemInfoLuaMetadata() {
 		return
 	}
 	globals := make(map[string]luaValue)
-	_ = executeLua51BytecodeWithSetup(data, globals, func(state *glua.LState) {
+	_ = executeLuaChunkWithSetup(data, globals, func(state *glua.LState) {
 		state.SetGlobal("AddItem", state.NewFunction(func(state *glua.LState) int {
 			id := state.OptInt(1, 0)
 			if id <= 0 {
@@ -347,6 +350,68 @@ func (m *Manager) loadItemInfoLuaMetadata() {
 			state.SetGlobal(name, state.NewFunction(func(state *glua.LState) int { return 1 }))
 		}
 	})
+	// 2010+ clients keep the table in tbl and only call AddItem from main()
+	// in itemInfo_f; read the table directly so neither file is required.
+	m.applyItemInfoTable(globals["tbl"])
+}
+
+// applyItemInfoTable reads an itemInfo tbl = { [id] = { identifiedDisplayName
+// = ..., ... } } table. Text is decoded from CP949 when it is not UTF-8.
+func (m *Manager) applyItemInfoTable(tbl luaValue) {
+	if tbl.kind != luaTable {
+		return
+	}
+	text := func(entry luaValue, key string) string {
+		value := luaField(entry, key)
+		if value.kind != luaString {
+			return ""
+		}
+		return decodeROText([]byte(value.str))
+	}
+	lines := func(entry luaValue, key string) []string {
+		raw := luaStringList(luaField(entry, key))
+		out := make([]string, 0, len(raw))
+		for _, line := range raw {
+			out = append(out, decodeROText([]byte(line)))
+		}
+		if len(out) == 1 && out[0] == "" {
+			return nil
+		}
+		return out
+	}
+	for rawID, entry := range tbl.table {
+		id, ok := rawID.(int)
+		if !ok || id <= 0 || entry.kind != luaTable {
+			continue
+		}
+		metadata := m.itemMetadata[id]
+		if v := text(entry, "unidentifiedDisplayName"); v != "" {
+			metadata.UnidentifiedDisplayName = normalizeItemDisplayToken(v)
+		}
+		if v := text(entry, "identifiedDisplayName"); v != "" {
+			metadata.IdentifiedDisplayName = normalizeItemDisplayToken(v)
+		}
+		if v := text(entry, "unidentifiedResourceName"); v != "" {
+			metadata.UnidentifiedResource = v
+		}
+		if v := text(entry, "identifiedResourceName"); v != "" {
+			metadata.IdentifiedResource = v
+		}
+		if v := lines(entry, "unidentifiedDescriptionName"); len(v) > 0 {
+			metadata.UnidentifiedDescription = v
+		}
+		if v := lines(entry, "identifiedDescriptionName"); len(v) > 0 {
+			metadata.IdentifiedDescription = v
+		}
+		if v := luaField(entry, "slotCount"); v.kind == luaNumber {
+			metadata.SlotCount = int(v.num)
+		}
+		if v := luaField(entry, "ClassNum"); v.kind == luaNumber {
+			metadata.ClassNum = int(v.num)
+			metadata.ClassNumSet = true
+		}
+		m.itemMetadata[id] = metadata
+	}
 }
 
 func luaOptionalString(state *glua.LState, index int) string {
