@@ -6,7 +6,7 @@
 #
 # kgap pool characters only. Credentials are read from the account file and
 # never printed. The TEST login host comes from that uncommitted file or from
-# data/clientinfo.xml — never commit 192.168 addresses.
+# data/clientinfo.xml — never commit LAN addresses.
 set -euo pipefail
 # Do not set -x: it would print --password.
 cd "$(git rev-parse --show-toplevel)"
