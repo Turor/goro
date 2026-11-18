@@ -419,7 +419,7 @@ func (d *NPCDialog) ensureWindows(ctx Context) {
 		d.dialogWindow = NewWindow(w, h)
 		d.dialogWindow.SetAutoPosition(x, y)
 	} else {
-		if d.dialogWindow.width != w || d.dialogWindow.height != h {
+		if d.dialogWindow.width != w || d.dialogWindow.baseHeight() != h {
 			d.dirty = true
 		}
 		d.dialogWindow.SetSize(w, h)
@@ -432,7 +432,7 @@ func (d *NPCDialog) ensureWindows(ctx Context) {
 		d.menuWindow = NewWindow(menuW, menuH)
 		d.menuWindow.SetAutoPosition(menuX, menuY)
 	} else {
-		if d.menuWindow.width != menuW || d.menuWindow.height != menuH {
+		if d.menuWindow.width != menuW || d.menuWindow.baseHeight() != menuH {
 			d.dirty = true
 		}
 		d.menuWindow.SetSize(menuW, menuH)
@@ -447,7 +447,7 @@ func (d *NPCDialog) ensureWindows(ctx Context) {
 		d.inputWindow.SetAutoPosition(inputX, inputY)
 	} else {
 		d.inputWindow.titleHeight = 0
-		if d.inputWindow.width != inputW || d.inputWindow.height != inputH {
+		if d.inputWindow.width != inputW || d.inputWindow.baseHeight() != inputH {
 			d.dirty = true
 		}
 		d.inputWindow.SetSize(inputW, inputH)
@@ -463,10 +463,10 @@ func (d *NPCDialog) openWindows(ctx Context) bool {
 	// Menus and input prompts can be sent without a preceding text dialog.
 	if d.hasDialog || d.status != "" {
 		if !d.dialogWindow.IsOpen() {
-			d.dialogWindow.OpenAt(d.dialogWindow.x, d.dialogWindow.y, d.dialogTree(ctx, d.dialogWindow.width, d.dialogWindow.height))
+			d.dialogWindow.OpenAt(d.dialogWindow.x, d.dialogWindow.y, d.dialogTree(ctx, d.dialogWindow.width, d.dialogWindow.baseHeight()))
 			changed = true
 		} else if d.dirty {
-			d.dialogWindow.SetContent(d.dialogTree(ctx, d.dialogWindow.width, d.dialogWindow.height))
+			d.dialogWindow.SetContent(d.dialogTree(ctx, d.dialogWindow.width, d.dialogWindow.baseHeight()))
 		}
 	} else if d.dialogWindow.IsOpen() {
 		d.dialogWindow.Close()
@@ -474,10 +474,10 @@ func (d *NPCDialog) openWindows(ctx Context) bool {
 	}
 	if d.action == npcDialogActionMenu {
 		if !d.menuWindow.IsOpen() {
-			d.menuWindow.OpenAt(d.menuWindow.x, d.menuWindow.y, d.menuTree(ctx, d.menuWindow.width, d.menuWindow.height))
+			d.menuWindow.OpenAt(d.menuWindow.x, d.menuWindow.y, d.menuTree(ctx, d.menuWindow.width, d.menuWindow.baseHeight()))
 			changed = true
 		} else if d.dirty {
-			d.menuWindow.SetContent(d.menuTree(ctx, d.menuWindow.width, d.menuWindow.height))
+			d.menuWindow.SetContent(d.menuTree(ctx, d.menuWindow.width, d.menuWindow.baseHeight()))
 		}
 	} else if d.menuWindow.IsOpen() {
 		d.menuWindow.Close()
@@ -485,10 +485,10 @@ func (d *NPCDialog) openWindows(ctx Context) bool {
 	}
 	if d.isInputAction() {
 		if !d.inputWindow.IsOpen() {
-			d.inputWindow.OpenAt(d.inputWindow.x, d.inputWindow.y, d.inputTree(ctx, d.inputWindow.width, d.inputWindow.height))
+			d.inputWindow.OpenAt(d.inputWindow.x, d.inputWindow.y, d.inputTree(ctx, d.inputWindow.width, d.inputWindow.baseHeight()))
 			changed = true
 		} else if d.dirty {
-			d.inputWindow.SetContent(d.inputTree(ctx, d.inputWindow.width, d.inputWindow.height))
+			d.inputWindow.SetContent(d.inputTree(ctx, d.inputWindow.width, d.inputWindow.baseHeight()))
 		}
 	} else if d.inputWindow.IsOpen() {
 		d.inputWindow.Close()

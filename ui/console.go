@@ -268,7 +268,7 @@ func (c *ChatConsole) Rebind(ctx client.Context) {
 		c.inputBinding.console = c
 	}
 	if c.window.IsOpen() {
-		c.window.RebindContent(ctx, c.widgetTree(c.window.width, c.window.height))
+		c.window.RebindContent(ctx, c.widgetTree(c.window.width, c.window.baseHeight()))
 		c.setActive(c.active)
 	}
 }

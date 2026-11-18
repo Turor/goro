@@ -526,6 +526,12 @@ func (w *Window) Unpublish(ctx client.Context) {
 	w.published = nil
 }
 
+// baseHeight is the height the window asked for, before the title and
+// footer token delta; build window trees from it so the delta is not doubled.
+func (w *Window) baseHeight() int {
+	return w.height - w.heightDelta
+}
+
 // SetSize takes the base size; the title and footer token delta is added.
 func (w *Window) SetSize(width, height int) {
 	height += w.heightDelta

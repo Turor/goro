@@ -105,7 +105,7 @@ func (w *TextPromptWindow) widgetTree(ctx Context) widget.Widget {
 		Title(w.title),
 		CloseButton(true),
 		OnClose(func() { w.cancel(ctx) }),
-		Size(float32(w.width), float32(w.height)),
+		Size(float32(w.width), float32(w.baseHeight())),
 		Content(
 			primitives.Box(
 				rotheme.Label(w.label),
