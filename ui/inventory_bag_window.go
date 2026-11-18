@@ -26,17 +26,32 @@ import (
 const (
 	inventoryBagTabW    = 32
 	inventoryBagTabH    = 44
-	inventoryBagCell    = 32
-	inventoryBagCols    = 8
-	inventoryBagRows    = 5
 	inventoryBagTabOver = 1
 	inventoryBagTabRail = inventoryBagTabW + inventoryBagTabOver*2
-	inventoryBagGridW   = inventoryBagCols * inventoryBagCell
 	inventoryBagWidth   = characterWindowWidth
 	inventoryBagViewW   = inventoryBagWidth - inventoryBagTabRail - verticalTabDividerW
-	inventoryBagViewH   = inventoryBagRows * inventoryBagCell
-	inventoryBagHeight  = ROWindowTitleHeight + inventoryBagViewH
+)
 
+// The cell size, columns and visible rows are layout tokens (see
+// layout_tokens.go); the rest are derived by recomputeInventoryBagMetrics.
+var (
+	inventoryBagCell   = 32
+	inventoryBagCols   = 8
+	inventoryBagRows   = 5
+	inventoryBagGridW  int
+	inventoryBagViewH  int
+	inventoryBagHeight int
+)
+
+func recomputeInventoryBagMetrics() {
+	inventoryBagGridW = inventoryBagCols * inventoryBagCell
+	inventoryBagViewH = inventoryBagRows * inventoryBagCell
+	inventoryBagHeight = ROWindowTitleHeight + inventoryBagViewH
+}
+
+func init() { recomputeInventoryBagMetrics() }
+
+const (
 	inventoryBagCellShadowInset  float32 = 3
 	inventoryBagCellShadowRadius float32 = 3
 	inventoryBagCellShadowAlpha  float32 = 0.4
@@ -62,6 +77,7 @@ var inventoryBagTabs = []struct {
 
 type InventoryBagWindow struct {
 	Window
+	layoutGen     uint64
 	tab           int
 	scrollY       state.Signal[float32]
 	snapshot      string
@@ -97,6 +113,8 @@ func (w *InventoryBagWindow) Toggle(ctx Context) {
 	w.snapshot = w.inventorySnapshot(ctx.Session)
 	x, y := inventoryBagDefaultPosition(ctx)
 	w.SetAutoPosition(x, y)
+	w.layoutGen = rotheme.Generation()
+	w.SetSize(inventoryBagWidth, inventoryBagHeight)
 	w.Open(ctx, w.widgetTree(ctx, nil))
 	w.Publish(ctx)
 }
@@ -130,6 +148,12 @@ func (w *InventoryBagWindow) UpdatePresentation(ctx Context, itemInfo *ItemWindo
 	}
 	w.ClampScroll(ctx.Session)
 	snapshot := w.inventorySnapshot(ctx.Session)
+	if gen := rotheme.Generation(); gen != w.layoutGen {
+		// A reloaded ui-layout.ini may change the cell size or rows.
+		w.layoutGen = gen
+		w.SetSize(inventoryBagWidth, inventoryBagHeight)
+		w.snapshot = ""
+	}
 	if snapshot != w.snapshot || itemInfo != w.itemInfo {
 		w.hideTooltip()
 		w.snapshot = snapshot
@@ -273,7 +297,7 @@ func (w *InventoryBagWindow) widgetTree(ctx Context, itemInfo *ItemWindows) widg
 		scrollview.DirectionOpt(scrollview.Vertical),
 		scrollview.ScrollbarOpt(scrollview.ScrollbarAuto),
 		scrollview.ScrollYSignal(w.ensureScrollSignal()),
-		scrollview.ScrollStep(inventoryBagCell),
+		scrollview.ScrollStep(float32(inventoryBagCell)),
 	)
 	return Win(
 		Title("Inventory"),
@@ -283,13 +307,13 @@ func (w *InventoryBagWindow) widgetTree(ctx Context, itemInfo *ItemWindows) widg
 			w.Window.Close()
 			w.Publish(ctx)
 		}),
-		Size(inventoryBagWidth, inventoryBagHeight),
+		Size(inventoryBagWidth, float32(inventoryBagHeight)),
 		Content(
 			verticalTabFrame(
 				w.tabColumn(ctx),
 				primitives.Box(scroll).
 					Width(inventoryBagViewW).
-					Height(inventoryBagViewH),
+					Height(float32(inventoryBagViewH)),
 			),
 		),
 	)
@@ -316,7 +340,7 @@ func (w *InventoryBagWindow) tabColumn(ctx Context) widget.Widget {
 	}
 	return primitives.Box(tabs...).
 		Width(inventoryBagTabRail).
-		Height(inventoryBagViewH).
+		Height(float32(inventoryBagViewH)).
 		Gap(-inventoryBagTabOver)
 }
 

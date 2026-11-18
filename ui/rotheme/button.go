@@ -8,7 +8,8 @@ import (
 	"github.com/gogpu/ui/widget"
 )
 
-const (
+// Button metrics are layout tokens (see theme_tokens.go).
+var (
 	ButtonRadius        float32 = 6
 	ButtonPaddingX      float32 = 8
 	ButtonPaddingY      float32 = 5.5

@@ -349,9 +349,9 @@ func TestInventoryGridStartsAtLeftEdge(t *testing.T) {
 		items:     []session.InventoryItem{{Index: 1, ItemID: 501}},
 		viewWidth: inventoryBagViewW,
 	})
-	grid.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(inventoryBagViewW, inventoryBagViewH)))
+	grid.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(inventoryBagViewW, float32(inventoryBagViewH))))
 
-	if got := grid.indexAt(geometry.Pt(inventoryBagCell/2, inventoryBagCell/2)); got != 0 {
+	if got := grid.indexAt(geometry.Pt(float32(inventoryBagCell/2), float32(inventoryBagCell/2))); got != 0 {
 		t.Fatalf("first cell hit index %d, want 0", got)
 	}
 	if got := grid.cellBounds(0).Min.X; got != 0 {
@@ -364,7 +364,7 @@ func TestInventoryGridDrawsOnlyBottomShadowInEveryCell(t *testing.T) {
 		items:     []session.InventoryItem{{Index: 1, ItemID: 501}},
 		viewWidth: inventoryBagViewW,
 	})
-	grid.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(inventoryBagViewW, inventoryBagViewH)))
+	grid.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(inventoryBagViewW, float32(inventoryBagViewH))))
 	canvas := &uitest.MockCanvas{}
 	grid.Draw(widget.NewContext(), canvas)
 
@@ -434,10 +434,10 @@ func TestInventoryGridUsesScrollableContentCoordinates(t *testing.T) {
 	if got, want := size.Height, float32((inventoryBagRows+1)*inventoryBagCell); got != want {
 		t.Fatalf("grid height = %.1f, want %.1f", got, want)
 	}
-	if got, want := grid.indexAt(geometry.Pt(inventoryBagCell/2, inventoryBagRows*inventoryBagCell+inventoryBagCell/2)), inventoryBagCols*inventoryBagRows; got != want {
+	if got, want := grid.indexAt(geometry.Pt(float32(inventoryBagCell/2), float32(inventoryBagRows*inventoryBagCell+inventoryBagCell/2))), inventoryBagCols*inventoryBagRows; got != want {
 		t.Fatalf("scrolled content index = %d, want %d", got, want)
 	}
-	if got := grid.indexAt(geometry.Pt(inventoryBagGridW+1, inventoryBagCell/2)); got != -1 {
+	if got := grid.indexAt(geometry.Pt(float32(inventoryBagGridW+1), float32(inventoryBagCell/2))); got != -1 {
 		t.Fatalf("scrollbar gutter hit index = %d, want -1", got)
 	}
 }
