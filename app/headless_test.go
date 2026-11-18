@@ -67,7 +67,7 @@ end
 		Headless: true, DataDir: root,
 		Audio:  config.AudioConfig{Disabled: true},
 		Window: config.WindowConfig{Width: 800, Height: 600},
-		Packet: config.PacketConfig{ClientDate: 20080910},
+		Packet: config.PacketConfig{ClientDate: 20080910, ClientDateExplicit: true},
 		Login:  config.LoginConfig{AutoLogin: true, Username: "tester", Password: "test-password", ServerSlot: serverSlot, CharServerSlot: serverSlot, CharSlot: 0},
 		Script: config.ScriptConfig{Path: filepath.Join(root, "bot.lua")},
 	}

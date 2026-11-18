@@ -33,7 +33,8 @@ func TestNewForceUserAIEnablesCompanionCustomAI(t *testing.T) {
 			Height: 720,
 		},
 		Packet: config.PacketConfig{
-			ClientDate: 20080910,
+			ClientDate:         20080910,
+			ClientDateExplicit: true,
 		},
 		Audio: config.AudioConfig{
 			BGMVolume: 0.55,
