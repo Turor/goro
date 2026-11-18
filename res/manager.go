@@ -61,6 +61,8 @@ type Manager struct {
 	questMetadataLoaded      bool
 	worldMapEntries          []WorldMapEntry
 	worldMapEntriesLoaded    bool
+	mapDisplayNames          map[string]string
+	mapDisplayNamesLoaded    bool
 }
 
 type CameraViewPoint struct {

@@ -43,6 +43,7 @@ When roBrowser bumps one of these names, bump the script in the same change.
   0.5 s through the tree walk.
 - Measured on CT119 with an assembled dir: items 0.5 s, skills (ids, info
   list, descriptions) 0.8 s, skill trees 0.4 s, NPC names 8 ms, all lazy.
+- **Map names:** `mapnametable.txt` is loaded lazily (`Manager.MapDisplayName`). The minimap footer uses the display name when present, otherwise the map file stem. Renewal maps that the English table does not list (for example `rag_fes`, `bl_grass`) still show the stem.
 
 ## Checking a data set
 
