@@ -1,19 +1,16 @@
 package ui
 
 import (
-	"image/color"
 	"strings"
 	"time"
 
 	"github.com/kivutar/goro/render"
 )
 
+// theme:ok poptip show and fade durations
 const (
-	poptipMaxItems = 2
-	poptipSolid    = 3 * time.Second
-	poptipFade     = time.Second
-	poptipBaseY    = 90
-	poptipPadding  = 4
+	poptipSolid = 3 * time.Second
+	poptipFade  = time.Second
 )
 
 type poptipItem struct {
@@ -60,21 +57,22 @@ func (p *Poptips) Draw(screen *render.Frame, now time.Time) {
 	if now.IsZero() {
 		now = time.Now()
 	}
-	lineHeight := 20
 	for index, item := range p.items {
 		alpha := poptipAlpha(now.Sub(item.shownAt))
 		if alpha == 0 {
 			continue
 		}
 		textW, textH := render.BitmapTextSize(item.text)
-		boxW := textW + 2*poptipPadding
-		boxH := textH + 2*poptipPadding
+		boxW := textW + poptipPadding + poptipPadding
+		boxH := textH + poptipPadding + poptipPadding
 		x := (screen.Bounds().Dx() - boxW) / 2
-		y := poptipBaseY - index*lineHeight - boxH/2
-		backgroundAlpha := uint8(float64(204) * alpha)
-		textAlpha := uint8(float64(255) * alpha)
-		render.DrawRect(screen, float64(x), float64(y), float64(boxW), float64(boxH), color.RGBA{A: backgroundAlpha})
-		render.DrawCenteredUITextAt(screen, item.text, float64(screen.Bounds().Dx())/2, float64(y+poptipPadding-2), color.RGBA{R: 255, G: 255, B: 255, A: textAlpha})
+		y := poptipBaseY - index*poptipLineH - boxH/2
+		background := poptipBackground
+		background.A = uint8(float64(poptipBackground.A) * alpha)
+		foreground := poptipText
+		foreground.A = uint8(float64(poptipText.A) * alpha)
+		render.DrawRect(screen, float64(x), float64(y), float64(boxW), float64(boxH), background)
+		render.DrawCenteredUITextAt(screen, item.text, float64(screen.Bounds().Dx())/2, float64(y+poptipPadding-poptipTextNudge), foreground)
 	}
 }
 

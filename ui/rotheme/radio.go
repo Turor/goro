@@ -6,11 +6,6 @@ import (
 	"github.com/gogpu/ui/widget"
 )
 
-const (
-	RadioSize float32 = 13
-	RadioGap  float32 = 7
-)
-
 func Radio(opts ...radio.GroupOption) *radio.Group {
 	opts = append(opts, radio.GroupPainter(RadioPainter{}))
 	return radio.NewGroup(opts...)
@@ -32,10 +27,10 @@ func (RadioPainter) PaintRadio(canvas widget.Canvas, state radio.PaintState) {
 	canvas.DrawCircle(center, RadioSize/2, Default.Colors.Button)
 	canvas.StrokeCircle(center, RadioSize/2, border, 1)
 	if state.Selected {
-		canvas.DrawCircle(center, 3, Default.Colors.TitleText)
+		canvas.DrawCircle(center, radioDotRadius, Default.Colors.TitleText)
 	}
 	if state.Focused && !state.Disabled {
-		canvas.StrokeCircle(center, RadioSize/2+2, Default.Colors.InputFocus, 1)
+		canvas.StrokeCircle(center, RadioSize/2+radioFocusOutset, Default.Colors.InputFocus, 1)
 	}
 	if state.Label != "" {
 		x := state.Bounds.Min.X + RadioSize + RadioGap

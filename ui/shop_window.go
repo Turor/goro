@@ -18,19 +18,6 @@ import (
 )
 
 const (
-	shopBuyListWindowW = 420
-	shopBuyCartWindowW = 420
-	shopTableHeaderH   = 36
-	shopRowH           = 32
-	shopListRows       = 7
-	shopBuyCartRows    = 4
-	shopSellCartRows   = 10
-
-	shopDealWidth  = smallPromptWidth
-	shopDealHeight = smallPromptHeight
-)
-
-const (
 	shopModeNone = iota
 	shopModeBuy
 	shopModeSell
@@ -223,16 +210,20 @@ func (w *ShopWindow) DrawDragGhost(screen *render.Frame, ctx Context, assets Ass
 
 func (w *ShopWindow) ensureDealWindow() {
 	if w.dealWindow.width == 0 {
-		w.dealWindow = NewWindow(shopDealWidth, shopDealHeight)
+		w.dealWindow = NewWindow(smallPromptWidth, smallPromptHeight)
 	}
 }
 
 func (w *ShopWindow) openDealWindow(ctx Context) {
 	w.ensureDealWindow()
 	width, height := ctx.ScreenSize()
-	x := (width - shopDealWidth) / 2
-	y := (height - shopDealHeight) * 2 / 3
+	x := (width - smallPromptWidth) / 2
+	y := (height - smallPromptHeight) * 2 / 3
 	w.dealWindow.OpenAt(x, y, w.dealWidgetTree(ctx))
+	w.dealWindow.OnLayoutReload(func() {
+		w.dealWindow.SetSize(smallPromptWidth, smallPromptHeight)
+		w.dealWindow.SetContent(w.dealWidgetTree(ctx))
+	})
 	w.dealWindow.Publish(ctx)
 }
 
@@ -248,7 +239,7 @@ func (w *ShopWindow) dealWidgetTree(ctx Context) widget.Widget {
 	return Win(
 		Title("Shop"),
 		CloseButton(false),
-		Size(shopDealWidth, shopDealHeight),
+		Size(float32(smallPromptWidth), float32(smallPromptHeight)),
 		Content(smallPromptContent("Select a transaction type", smallPromptDefaultLines)),
 		Footer(
 			primitives.Expanded(primitives.Box()),
@@ -281,7 +272,15 @@ func (w *ShopWindow) ensureBuyWindow() {
 func (w *ShopWindow) openBuyWindow(ctx Context) {
 	w.ensureBuyWindow()
 	w.buyWindow.OpenAt(w.x, w.y, w.buyListWidgetTree(ctx))
-	w.buyCartWindow.OpenAt(w.x+shopBuyListWindowW+20, w.y, w.buyCartWidgetTree(ctx))
+	w.buyCartWindow.OpenAt(w.x+shopBuyListWindowW+shopWindowGap, w.y, w.buyCartWidgetTree(ctx))
+	w.buyWindow.OnLayoutReload(func() {
+		w.ensureBuyWindow()
+		w.buyWindow.SetContent(w.buyListWidgetTree(ctx))
+	})
+	w.buyCartWindow.OnLayoutReload(func() {
+		w.ensureBuyWindow()
+		w.buyCartWindow.SetContent(w.buyCartWidgetTree(ctx))
+	})
 	w.buyWindow.Publish(ctx)
 	w.buyCartWindow.Publish(ctx)
 }
@@ -327,7 +326,7 @@ func (w *ShopWindow) buyListWidgetTree(ctx Context) widget.Widget {
 		OnClose(func() {
 			w.cancel(ctx)
 		}),
-		Size(shopBuyListWindowW, float32(shopListWindowHeight())),
+		Size(float32(shopBuyListWindowW), float32(shopListWindowHeight())),
 		Content(
 			primitives.Box(
 				primitives.Box(w.buyTableWidget(ctx)).
@@ -354,7 +353,7 @@ func (w *ShopWindow) buyCartWidgetTree(ctx Context) widget.Widget {
 		OnClose(func() {
 			w.cancel(ctx)
 		}),
-		Size(shopBuyCartWindowW, float32(w.cartWindowHeight())),
+		Size(float32(shopBuyCartWindowW), float32(w.cartWindowHeight())),
 		Content(
 			primitives.Box(w.buyCartTableWidget(ctx)).
 				Height(float32(w.cartTableHeight())).
@@ -725,8 +724,8 @@ func shopTableWidget(rows []shopTableRow, amountColumn bool, scroll state.Signal
 	options := []rotheme.TableViewOption{
 		rotheme.TableViewColumns(shopTableColumns(amountColumn)),
 		rotheme.TableViewRowCount(len(rows)),
-		rotheme.TableViewRowHeight(shopRowH),
-		rotheme.TableViewHeaderHeight(shopTableHeaderH),
+		rotheme.TableViewRowHeight(float32(shopRowH)),
+		rotheme.TableViewHeaderHeight(float32(shopTableHeaderH)),
 		rotheme.TableViewEmptyText("No items"),
 		rotheme.TableViewScrollYSignal(scroll),
 		rotheme.TableViewDispatchHoverToCells(false),
@@ -746,14 +745,14 @@ func shopTableWidget(rows []shopTableRow, amountColumn bool, scroll state.Signal
 func shopTableColumns(amountColumn bool) []rotheme.TableViewColumn {
 	if amountColumn {
 		return []rotheme.TableViewColumn{
-			{Key: "item", Title: "Item", Flex: 1, MinWidth: 120},
-			{Key: "price", Title: "Price", Width: 104, Align: widget.TextAlignRight},
-			{Key: "amount", Title: "Qty", Width: 66, Align: widget.TextAlignCenter},
+			{Key: "item", Title: "Item", Flex: 1, MinWidth: shopItemMinW},
+			{Key: "price", Title: "Price", Width: shopPriceW, Align: widget.TextAlignRight},
+			{Key: "amount", Title: "Qty", Width: shopQtyW, Align: widget.TextAlignCenter},
 		}
 	}
 	return []rotheme.TableViewColumn{
-		{Key: "item", Title: "Item", Flex: 1, MinWidth: 120},
-		{Key: "price", Title: "Price", Width: 124, Align: widget.TextAlignRight},
+		{Key: "item", Title: "Item", Flex: 1, MinWidth: shopItemMinW},
+		{Key: "price", Title: "Price", Width: shopPriceOnlyW, Align: widget.TextAlignRight},
 	}
 }
 
@@ -774,7 +773,7 @@ func shopTableCell(row shopTableRow, cell rotheme.TableViewCellContext) rotheme.
 		return rotheme.TableViewSimpleCell{
 			Text:  row.amount,
 			Align: widget.TextAlignCenter,
-			Color: widget.RGBA8(54, 128, 76, 255),
+			Color: shopQtyColor,
 		}
 	default:
 		return rotheme.TableViewSimpleCell{Hidden: true}
@@ -785,7 +784,7 @@ func tableRowAt(mx, my, tableX, tableY, tableW, tableH, rowCount, rowHeight int,
 	if !pointInRect(mx, my, tableX, tableY+shopTableHeaderH, scrollbarSafeIntWidth(tableW), tableH-shopTableHeaderH) {
 		return 0, false
 	}
-	localY := float32(my-tableY) - shopTableHeaderH + scrollY
+	localY := float32(my-tableY) - float32(shopTableHeaderH) + scrollY
 	row := int(localY / float32(rowHeight))
 	if row < 0 || row >= rowCount {
 		return 0, false
@@ -1129,7 +1128,7 @@ func (w *ShopWindow) sendDealSelection(ctx Context, dealType uint8) {
 
 func (w *ShopWindow) ensureBuyPosition(ctx Context) {
 	width, height := ctx.ScreenSize()
-	totalWidth := shopBuyListWindowW + 20 + shopBuyCartWindowW
+	totalWidth := shopBuyListWindowW + shopWindowGap + shopBuyCartWindowW
 	totalHeight := maxInt(shopListWindowHeight(), w.cartWindowHeight())
 	w.x = maxInt(windowScreenMargin, (width-totalWidth)/2)
 	w.y = clampWindowInt((height-totalHeight)/2, windowScreenMargin, maxInt(windowScreenMargin, height-totalHeight-windowScreenMargin))

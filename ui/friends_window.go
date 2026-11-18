@@ -12,14 +12,7 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	friendsWindowWidth  = 286
-	friendsWindowHeight = 256
-	friendsRowHeight    = 24
-	friendsTabWidth     = 72
-	friendsTabHeight    = 24
-	friendsListMax      = 40
-)
+const friendsListMax = 40 // theme:ok protocol friend list cap
 
 type FriendsWindow struct {
 	Window
@@ -92,11 +85,18 @@ func (w *FriendsWindow) toggleTab(ctx Context, tab friendsWindowTab) {
 
 func (w *FriendsWindow) openTab(ctx Context, tab friendsWindowTab) {
 	w.EnsureWindow(friendsWindowWidth, friendsWindowHeight)
+	w.SetSize(friendsWindowWidth, friendsWindowHeight)
 	w.ctx = ctx
 	w.snapshot = friendsWindowSnapshot(ctx.Session)
 	w.tab = tab
 	w.Open(ctx, w.widgetTree(ctx))
+	w.OnLayoutReload(w.reloadLayout)
 	w.Publish(ctx)
+}
+
+func (w *FriendsWindow) reloadLayout() {
+	w.SetSize(friendsWindowWidth, friendsWindowHeight)
+	w.SetContent(w.widgetTree(w.ctx))
 }
 
 func (w *FriendsWindow) Close() {
@@ -185,7 +185,7 @@ func (w *FriendsWindow) widgetTree(ctx Context) widget.Widget {
 		Title(title),
 		CloseButton(true),
 		OnClose(w.Close),
-		Size(friendsWindowWidth, friendsWindowHeight),
+		Size(float32(friendsWindowWidth), float32(friendsWindowHeight)),
 		Content(
 			primitives.Box(
 				w.friendsTabs(),
@@ -343,7 +343,7 @@ type friendRowWidget struct {
 }
 
 func (w *friendRowWidget) Layout(_ widget.Context, constraints geometry.Constraints) geometry.Size {
-	size := constraints.Constrain(geometry.Sz(friendsWindowWidth, friendsRowHeight))
+	size := constraints.Constrain(geometry.Sz(float32(friendsWindowWidth), float32(friendsRowHeight)))
 	w.SetBounds(geometry.FromPointSize(w.Position(), size))
 	return size
 }
@@ -355,9 +355,10 @@ func (w *friendRowWidget) Draw(_ widget.Context, canvas widget.Canvas) {
 		bg = rotheme.Default.Colors.ButtonHover
 	}
 	canvas.DrawRect(bounds, bg)
-	textY := bounds.Min.Y + (bounds.Height()-14)/2
-	rotheme.DrawText(canvas, trimRunes(w.name, 24), geometry.NewRect(bounds.Min.X+8, textY, bounds.Width()-88, 14), rotheme.Default.Typography.TextSize, rotheme.Default.Colors.Text, false, widget.TextAlignLeft)
-	rotheme.DrawText(canvas, w.state, geometry.NewRect(bounds.Max.X-72, textY, 64, 14), rotheme.Default.Typography.TextSize, w.stateColor, false, widget.TextAlignRight)
+	textH := float32(friendsRowTextH)
+	textY := bounds.Min.Y + (bounds.Height()-textH)/2
+	rotheme.DrawText(canvas, trimRunes(w.name, 24), geometry.NewRect(bounds.Min.X+float32(friendsRowTextX), textY, bounds.Width()-float32(friendsRowTextRight), textH), rotheme.Default.Typography.TextSize, rotheme.Default.Colors.Text, false, widget.TextAlignLeft)
+	rotheme.DrawText(canvas, w.state, geometry.NewRect(bounds.Max.X-float32(friendsRowStateRight), textY, float32(friendsRowStateW), textH), rotheme.Default.Typography.TextSize, w.stateColor, false, widget.TextAlignRight)
 }
 
 func (w *friendRowWidget) Event(ctx widget.Context, e event.Event) bool {
@@ -477,7 +478,7 @@ type partyRowWidget struct {
 }
 
 func (w *partyRowWidget) Layout(_ widget.Context, constraints geometry.Constraints) geometry.Size {
-	size := constraints.Constrain(geometry.Sz(friendsWindowWidth, friendsRowHeight))
+	size := constraints.Constrain(geometry.Sz(float32(friendsWindowWidth), float32(friendsRowHeight)))
 	w.SetBounds(geometry.FromPointSize(w.Position(), size))
 	return size
 }
@@ -489,11 +490,13 @@ func (w *partyRowWidget) Draw(_ widget.Context, canvas widget.Canvas) {
 		bg = rotheme.Default.Colors.ButtonHover
 	}
 	canvas.DrawRect(bounds, bg)
-	textY := bounds.Min.Y + 3
-	rotheme.DrawText(canvas, trimRunes(w.name, 20), geometry.NewRect(bounds.Min.X+8, textY, bounds.Width()-88, 13), rotheme.Default.Typography.TextSize, rotheme.Default.Colors.Text, false, widget.TextAlignLeft)
-	rotheme.DrawText(canvas, w.state, geometry.NewRect(bounds.Max.X-72, textY, 64, 13), rotheme.Default.Typography.TextSize, w.stateColor, false, widget.TextAlignRight)
-	bar := geometry.NewRect(bounds.Min.X+8, bounds.Max.Y-8, bounds.Width()-16, 5)
-	canvas.DrawRect(bar, widget.RGBA8(224, 232, 242, 255))
+	textY := bounds.Min.Y + float32(friendsPartyTextY)
+	textH := float32(friendsPartyTextH)
+	rotheme.DrawText(canvas, trimRunes(w.name, 20), geometry.NewRect(bounds.Min.X+float32(friendsRowTextX), textY, bounds.Width()-float32(friendsRowTextRight), textH), rotheme.Default.Typography.TextSize, rotheme.Default.Colors.Text, false, widget.TextAlignLeft)
+	rotheme.DrawText(canvas, w.state, geometry.NewRect(bounds.Max.X-float32(friendsRowStateRight), textY, float32(friendsRowStateW), textH), rotheme.Default.Typography.TextSize, w.stateColor, false, widget.TextAlignRight)
+	barInset := float32(friendsPartyBarInset)
+	bar := geometry.NewRect(bounds.Min.X+barInset, bounds.Max.Y-barInset, bounds.Width()-barInset*2, float32(friendsPartyBarH))
+	canvas.DrawRect(bar, friendsPartyBarTrack)
 	fillW := float32(0)
 	if w.maxHP > 0 && w.hp > 0 {
 		fillW = bar.Width() * float32(w.hp) / float32(w.maxHP)

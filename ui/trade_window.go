@@ -16,19 +16,6 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	tradeWindowW     = 560
-	tradeWindowH     = 360
-	tradePanelPad    = 10
-	tradePanelGap    = 12
-	tradePanelW      = (tradeWindowW - 2*tradePanelPad - tradePanelGap) / 2
-	tradePanelH      = 216
-	tradeRowH        = 28
-	tradeZenyFieldW  = 96
-	tradeZenyFieldH  = 24
-	tradeVisibleRows = 7
-)
-
 type TradeWindow struct {
 	Window
 
@@ -52,6 +39,7 @@ type tradeWindowItem struct {
 
 func (w *TradeWindow) Open(ctx Context, partnerName string) {
 	w.EnsureWindow(tradeWindowW, tradeWindowH)
+	w.SetSize(tradeWindowW, tradeWindowH)
 	w.partnerName = strings.TrimSpace(partnerName)
 	if w.partnerName == "" {
 		w.partnerName = "Trade"
@@ -65,6 +53,10 @@ func (w *TradeWindow) Open(ctx Context, partnerName string) {
 	w.selfOK = false
 	w.otherOK = false
 	w.Window.Open(ctx, w.widgetTree(ctx))
+	w.OnLayoutReload(func() {
+		w.SetSize(tradeWindowW, tradeWindowH)
+		w.SetContent(w.widgetTree(ctx))
+	})
 	w.Publish(ctx)
 }
 
@@ -185,10 +177,10 @@ func (w *TradeWindow) widgetTree(ctx Context) widget.Widget {
 		OnClose(func() {
 			w.cancel(ctx)
 		}),
-		Size(tradeWindowW, tradeWindowH),
+		Size(float32(tradeWindowW), float32(tradeWindowH)),
 		Content(
 			primitives.Box(w.tradePanels()).
-				Padding(tradePanelPad),
+				Padding(float32(tradePanelPad)),
 		),
 		Footer(
 			primitives.Expanded(primitives.Box()),
@@ -210,14 +202,14 @@ func (w *TradeWindow) tradePanels() widget.Widget {
 		primitives.Expanded(w.tradePanel("My Items", w.sendItems, w.sendZeny, true)),
 		primitives.Expanded(w.tradePanel(w.partnerName, w.recvItems, w.recvZeny, false)),
 	).
-		Gap(tradePanelGap)
+		Gap(float32(tradePanelGap))
 }
 
 func (w *TradeWindow) tradePanel(title string, items []tradeWindowItem, zeny uint32, editable bool) widget.Widget {
-	rows := make([]widget.Widget, 0, tradeVisibleRows+3)
+	rows := make([]widget.Widget, 0, tradeVisibleRows+3) // theme:ok title, zeny and status rows
 	rows = append(rows,
 		primitives.Box(rotheme.Text(title)).
-			Height(20),
+			Height(float32(tradeTitleH)),
 	)
 	for i := 0; i < tradeVisibleRows; i++ {
 		var row tradeWindowItem
@@ -229,12 +221,12 @@ func (w *TradeWindow) tradePanel(title string, items []tradeWindowItem, zeny uin
 	rows = append(rows,
 		primitives.HBox(
 			primitives.Box(rotheme.Text("Zeny")).
-				Width(42),
+				Width(float32(tradeZenyLabelW)),
 			primitives.Expanded(primitives.Box()),
 			w.zenyWidget(zeny, editable),
 		).
 			CrossAlign(primitives.CrossAxisCenter).
-			Height(30),
+			Height(float32(tradeZenyRowH)),
 	)
 	status := ""
 	if editable && w.selfOK {
@@ -244,11 +236,11 @@ func (w *TradeWindow) tradePanel(title string, items []tradeWindowItem, zeny uin
 		status = "OK"
 	}
 	if status != "" {
-		rows = append(rows, primitives.Box(rotheme.Text(status).Color(rotheme.Default.Colors.MutedText)).Height(18))
+		rows = append(rows, primitives.Box(rotheme.Text(status).Color(rotheme.Default.Colors.MutedText)).Height(float32(tradeStatusH)))
 	}
 	return primitives.Box(rows...).
-		Height(tradePanelH + 40).
-		Gap(2).
+		Height(float32(tradePanelH + tradePanelExtra)).
+		Gap(float32(tradeRowGap)).
 		CrossAlign(primitives.CrossAxisStretch)
 }
 
@@ -265,29 +257,29 @@ func tradeItemRowWidget(item tradeWindowItem) widget.Widget {
 		newTradeIconWidget(item.icon),
 		primitives.Expanded(primitives.Box(rotheme.Text(name))),
 		primitives.Box(rotheme.Text(qty).Align(widget.TextAlignRight)).
-			Width(42).
+			Width(float32(tradeQtyW)).
 			CrossAlign(primitives.CrossAxisCenter),
 	).
 		CrossAlign(primitives.CrossAxisCenter).
-		Height(tradeRowH).
+		Height(float32(tradeRowH)).
 		Background(rotheme.Default.Colors.PanelBody)
 }
 
 func (w *TradeWindow) zenyWidget(zeny uint32, editable bool) widget.Widget {
 	if !editable {
 		return primitives.Box(rotheme.Text(formatTradeZeny(zeny)).Align(widget.TextAlignRight)).
-			Width(tradeZenyFieldW).
+			Width(float32(tradeZenyFieldW)).
 			CrossAlign(primitives.CrossAxisCenter)
 	}
 	return primitives.Box(rotheme.TextField(w.zenyInput, textfield.TypeNumber, func(value string) {
 		w.zenyInput = value
 	}, nil)).
-		Width(tradeZenyFieldW).
-		Height(tradeZenyFieldH)
+		Width(float32(tradeZenyFieldW)).
+		Height(float32(tradeZenyFieldH))
 }
 
 func newTradeIconWidget(img image.Image) widget.Widget {
-	return newStaticImageWidget(img, inventoryIconSize+8, tradeRowH)
+	return newStaticImageWidget(img, inventoryIconSize+tradeIconExtra, tradeRowH)
 }
 
 func (w *TradeWindow) sendPanelX() int {

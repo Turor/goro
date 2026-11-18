@@ -159,7 +159,11 @@ func (g *Game) Update() error {
 		g.ui.RefreshLayout()
 	}
 	g.modes.UpdateContext(g.modeContext())
-	return g.modes.Update()
+	err := g.modes.Update()
+	// Windows that copied layout values when built (login and character
+	// select screens, shops, trades, prompts) rebuild once after a reload.
+	g.ui.RebuildStaleWindows()
+	return err
 }
 
 // InLogin reports whether platform controls for login may be shown.

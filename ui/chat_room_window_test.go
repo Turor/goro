@@ -113,8 +113,8 @@ func TestChatRoomMessagesScrollToMeasuredBottom(t *testing.T) {
 
 	root := window.Window.Widget()
 	root.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(
-		chatRoomWindowW,
-		ROWindowTitleHeight+chatRoomWindowContentH+ROWindowFooterHeight,
+		float32(chatRoomWindowW),
+		float32(ROWindowTitleHeight+chatRoomWindowContentH+ROWindowFooterHeight),
 	)))
 	view := findChatRoomScrollView(root)
 	if view == nil {

@@ -11,11 +11,6 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	amountPromptW = 218
-	amountPromptH = 112
-)
-
 type amountPrompt struct {
 	Window
 	label    string
@@ -32,7 +27,12 @@ func (p *amountPrompt) Open(ctx Context, label string, initial, maxAmount uint16
 	p.onSubmit = onSubmit
 	p.field = nil
 	p.EnsureWindow(amountPromptW, amountPromptH)
+	p.SetSize(amountPromptW, amountPromptH)
 	p.Window.Open(ctx, p.widgetTree(ctx))
+	p.OnLayoutReload(func() {
+		p.SetSize(amountPromptW, amountPromptH)
+		p.SetContent(p.widgetTree(ctx))
+	})
 	p.focusInput()
 	p.Publish(ctx)
 }
@@ -75,16 +75,16 @@ func (p *amountPrompt) BringToFront(ctx Context) {
 func (p *amountPrompt) widgetTree(ctx Context) widget.Widget {
 	return Win(
 		TitleBar(false),
-		Size(amountPromptW, amountPromptH),
+		Size(float32(amountPromptW), float32(amountPromptH)),
 		Content(
 			primitives.Box(
 				rotheme.Text(p.label),
 				primitives.Box(p.input(ctx)).
-					Height(24).
+					Height(float32(amountPromptFieldH)).
 					CrossAlign(primitives.CrossAxisStretch),
 			).
-				Padding(10).
-				Gap(7),
+				Padding(float32(amountPromptPad)).
+				Gap(float32(amountPromptGap)),
 		),
 		Footer(
 			primitives.Expanded(primitives.Box()),

@@ -1618,7 +1618,7 @@ func TestSkillWindowSkillAtMouseUsesTableViewBody(t *testing.T) {
 		t.Fatalf("skill at top row = %+v, %v; want id %d", skill, ok, db.SkillNVBasic)
 	}
 
-	window.ensureScrollSignal().Set(skillRowH)
+	window.ensureScrollSignal().Set(float32(skillRowH))
 	skill, ok = window.skillAtMouse(ctx, tableX+8, window.y+ROWindowTitleHeight+skillHeaderH+1)
 	if !ok || skill.ID != db.SkillNVFirstaid {
 		t.Fatalf("skill at scrolled top row = %+v, %v; want id %d", skill, ok, db.SkillNVFirstaid)

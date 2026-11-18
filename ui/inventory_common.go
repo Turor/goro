@@ -11,8 +11,6 @@ import (
 	"github.com/kivutar/goro/session"
 )
 
-const inventoryIconSize = 24
-
 var (
 	inventoryTextColor = TextColor
 )

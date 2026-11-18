@@ -13,19 +13,16 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
+// theme:ok skill ids
 const (
-	teleportSkillID      = 26
-	warpPortalSkillID    = 27
+	teleportSkillID   = 26
+	warpPortalSkillID = 27
+)
+
+const (
 	teleportRandomMap    = "Random"
 	teleportSavePointMap = "SavePoint"
 	warpPointCancelMap   = "cancel"
-
-	teleportModalWidth   = 260
-	teleportModalMinH    = 168
-	teleportModalMaxRows = 6
-	teleportModalPad     = 14
-	teleportModalGap     = 8
-	teleportModalRowH    = 20
 )
 
 const (
@@ -193,6 +190,10 @@ func (m *TeleportModal) openWindow(ctx Context) {
 	m.ensureWindow()
 	if m.content == nil {
 		m.Open(ctx, m.widgetTree())
+		m.OnLayoutReload(func() {
+			m.ensureWindow()
+			m.SetContent(m.widgetTree())
+		})
 	}
 	m.Publish(ctx)
 }
@@ -217,15 +218,15 @@ func (m *TeleportModal) widgetTree() widget.Widget {
 	return Win(
 		Title(m.Title()),
 		CloseButton(false),
-		Size(teleportModalWidth, float32(m.windowHeight())),
+		Size(float32(teleportModalWidth), float32(m.windowHeight())),
 		Content(
 			primitives.Box(
 				rotheme.Text("Choose destination."),
 				m.destinationList(),
 				m.statusText(),
 			).
-				Padding(teleportModalPad).
-				Gap(teleportModalGap),
+				Padding(float32(teleportModalPad)).
+				Gap(float32(teleportModalGap)),
 		),
 		Footer(
 			primitives.Expanded(primitives.Box()),
@@ -249,7 +250,7 @@ func (m *TeleportModal) destinationList() widget.Widget {
 	}
 	lv := listview.New(
 		listview.ItemCount(len(destinations)),
-		listview.FixedItemHeight(teleportModalRowH),
+		listview.FixedItemHeight(float32(teleportModalRowH)),
 		listview.ScrollYSignal(m.ensureScrollSignal()),
 		listview.SelectionModeOpt(listview.SelectionSingle),
 		listview.SelectedIndex(m.row),
@@ -259,10 +260,10 @@ func (m *TeleportModal) destinationList() widget.Widget {
 		listview.PainterOpt(rotheme.SelectListPainter{EmptyText: "No destinations."}),
 		listview.BuildItem(func(item listview.ItemContext) widget.Widget {
 			if item.Index < 0 || item.Index >= len(destinations) {
-				return rotheme.SelectListRow("", false, teleportModalRowH)
+				return rotheme.SelectListRow("", false, float32(teleportModalRowH))
 			}
 			destination := destinations[item.Index]
-			return rotheme.SelectListRow(trimRunes(destination.label, 32), destination.enabled, teleportModalRowH)
+			return rotheme.SelectListRow(trimRunes(destination.label, 32), destination.enabled, float32(teleportModalRowH))
 		}),
 	)
 	lv.SetFocused(true)
@@ -298,7 +299,7 @@ func (m *TeleportModal) statusText() widget.Widget {
 	if m.status == "" {
 		return primitives.Box().Height(0)
 	}
-	return rotheme.Text(trimRunes(m.status, 34)).Color(widget.RGBA8(204, 48, 48, 255))
+	return rotheme.Text(trimRunes(m.status, 34)).Color(teleportStatusColor)
 }
 
 func (m *TeleportModal) destinationListHeight() int {

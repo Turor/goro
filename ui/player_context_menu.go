@@ -8,8 +8,6 @@ import (
 	"github.com/kivutar/goro/input"
 )
 
-const playerContextMenuWidth = 118
-
 type PlayerContextActionKind uint8
 
 const (
@@ -67,6 +65,10 @@ func (m *PlayerContextMenu) Open(ctx Context, x, y int, actorID uint32, name str
 	x = clampWindowInt(x, windowScreenMargin, maxInt(windowScreenMargin, screenW-playerContextMenuWidth-windowScreenMargin))
 	y = clampWindowInt(y, windowScreenMargin, maxInt(windowScreenMargin, screenH-height-windowScreenMargin))
 	m.OpenAt(x, y, m.widgetTree(ctx))
+	m.claimLayoutReload(func() {
+		m.SetSize(playerContextMenuWidth, m.height())
+		m.SetContent(m.widgetTree(m.ctx))
+	})
 	m.Publish(ctx)
 }
 

@@ -1,5 +1,5 @@
-github.com/Turor/gogpu v0.0.0-20261118053133-52fdd689b54c h1:7TYlY6N6RuTzQxhSqKEswCNJ287qf7qd8LS0e+YSg2o=
-github.com/Turor/gogpu v0.0.0-20261118053133-52fdd689b54c/go.mod h1:V6+0B+iXxgiQkdlRJvUyjiYrGRDoooxYNgw9qTCZN8w=
+github.com/Turor/gogpu v0.0.0-20261118072835-2cbb91a22b86 h1:0uTv7n18/hHZz5MvzlGJoaY8CEXJW40bEENy1q7m6mU=
+github.com/Turor/gogpu v0.0.0-20261118072835-2cbb91a22b86/go.mod h1:V6+0B+iXxgiQkdlRJvUyjiYrGRDoooxYNgw9qTCZN8w=
 github.com/aymanbagabas/go-osc52/v2 v2.0.1 h1:HwpRHbFMcZLEVr42D4p7XBqjyuxQH5SMiErDT4WkJ2k=
 github.com/aymanbagabas/go-osc52/v2 v2.0.1/go.mod h1:uYgXzlJ7ZpABp8OJ+exZzJJhRNQ2ASbcXHWsFqH8hp8=
 github.com/charmbracelet/colorprofile v0.2.3-0.20250311203215-f60798e515dc h1:4pZI35227imm7yK2bGPcfpFEmuY1gc2YSTShr4iJBfs=

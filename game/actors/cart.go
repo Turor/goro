@@ -122,21 +122,21 @@ func cartSpriteDirection(actor worldstate.Actor, cameraYaw float64) int {
 func cartSpriteOffset(direction int) (float64, float64) {
 	switch scene.NormalizeDirectionIndex(direction) {
 	case 0:
-		return 0, -30
+		return 0, -30 // theme:ok cart sprite anchor from the original client
 	case 1:
-		return 30, -10
+		return 30, -10 // theme:ok cart sprite anchor from the original client
 	case 2:
-		return 40, 0
+		return 40, 0 // theme:ok cart sprite anchor from the original client
 	case 3:
-		return 30, 10
+		return 30, 10 // theme:ok cart sprite anchor from the original client
 	case 4:
-		return 0, 20
+		return 0, 20 // theme:ok cart sprite anchor from the original client
 	case 5:
-		return -30, 10
+		return -30, 10 // theme:ok cart sprite anchor from the original client
 	case 6:
-		return -40, 0
+		return -40, 0 // theme:ok cart sprite anchor from the original client
 	default:
-		return -30, -10
+		return -30, -10 // theme:ok cart sprite anchor from the original client
 	}
 }
 
@@ -227,7 +227,7 @@ func (m *System) DrawActorCart3D(screen *render.Frame, ctx client.Context, proje
 		return false
 	}
 	billboard = cartDirectionOffsetBillboard(billboard, cartSpriteDirection(actor, cameraYaw))
-	m.DrawActorSpriteBillboardTintAlpha3D(screen, projection, billboard, entry.WorldX, entry.WorldY, entry.WorldZ, entry.Scale, alpha, shadow, color.RGBA{R: 255, G: 255, B: 255, A: 255}, render.BlendSourceOver)
+	m.DrawActorSpriteBillboardTintAlpha3D(screen, projection, billboard, entry.WorldX, entry.WorldY, entry.WorldZ, entry.Scale, alpha, shadow, color.RGBA{R: 255, G: 255, B: 255, A: 255}, render.BlendSourceOver) // theme:ok untinted sprite
 	return true
 }
 

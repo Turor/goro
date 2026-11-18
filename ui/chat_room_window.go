@@ -13,15 +13,6 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	chatRoomWindowW        = 480
-	chatRoomMembersW       = 160
-	chatRoomWindowContentH = 152
-	chatRoomMessagePadX    = 8
-	chatRoomMessagePadY    = 6
-	chatRoomMessageGap     = 1
-)
-
 type ChatRoomWindowAction struct {
 	Message   string
 	Leave     bool
@@ -59,8 +50,9 @@ func (w *ChatRoomWindow) Open(ctx Context, title string, limit uint16, public bo
 	if title == "" {
 		return
 	}
-	w.EnsureWindow(chatRoomWindowW, ROWindowTitleHeight+chatRoomWindowContentH+ROWindowFooterHeight)
-	w.SetBackground(widget.RGBA8(0, 0, 0, 0))
+	w.EnsureWindow(chatRoomWindowW, chatRoomWindowH())
+	w.SetSize(chatRoomWindowW, chatRoomWindowH())
+	w.SetBackground(chatRoomWindowBg)
 	w.SetFullRedraw(true)
 	w.ctx = ctx
 	w.RoomID = 0
@@ -83,12 +75,23 @@ func (w *ChatRoomWindow) Open(ctx Context, title string, limit uint16, public bo
 	w.action = ChatRoomWindowAction{}
 	w.Window.Open(ctx, nil)
 	w.SetContent(w.widgetTree(ctx))
+	w.OnLayoutReload(w.reloadLayout)
 	w.Publish(ctx)
 	w.focusInput()
 }
 
+func (w *ChatRoomWindow) reloadLayout() {
+	focused := w.inputField != nil && w.inputField.IsFocused()
+	w.SetSize(chatRoomWindowW, chatRoomWindowH())
+	w.SetBackground(chatRoomWindowBg)
+	w.SetContent(w.widgetTree(w.ctx))
+	if focused {
+		w.focusInput()
+	}
+}
+
 func (w *ChatRoomWindow) Update(ctx Context) bool {
-	w.EnsureWindow(chatRoomWindowW, ROWindowTitleHeight+chatRoomWindowContentH+ROWindowFooterHeight)
+	w.EnsureWindow(chatRoomWindowW, chatRoomWindowH())
 	w.SetFullRedraw(true)
 	w.ctx = ctx
 	if !w.IsOpen() {
@@ -104,8 +107,8 @@ func (w *ChatRoomWindow) Update(ctx Context) bool {
 }
 
 func (w *ChatRoomWindow) Rebind(ctx Context) {
-	w.EnsureWindow(chatRoomWindowW, ROWindowTitleHeight+chatRoomWindowContentH+ROWindowFooterHeight)
-	w.SetBackground(widget.RGBA8(0, 0, 0, 0))
+	w.EnsureWindow(chatRoomWindowW, chatRoomWindowH())
+	w.SetBackground(chatRoomWindowBg)
 	w.SetFullRedraw(true)
 	if !w.IsOpen() {
 		return
@@ -136,11 +139,11 @@ func (w *ChatRoomWindow) OpenSettings(ctx Context, form *ChatRoomCreateWindow) {
 }
 
 func (w *ChatRoomWindow) AddMessage(ctx Context, text string) {
-	w.addLine(ctx, strings.TrimSpace(text), widget.RGBA8(232, 238, 245, 255))
+	w.addLine(ctx, strings.TrimSpace(text), chatRoomMessageText)
 }
 
 func (w *ChatRoomWindow) AddSystem(ctx Context, text string) {
-	w.addLine(ctx, strings.TrimSpace(text), widget.RGBA8(160, 190, 230, 255))
+	w.addLine(ctx, strings.TrimSpace(text), chatRoomSystemText)
 }
 
 func (w *ChatRoomWindow) AddError(ctx Context, text string) {
@@ -237,7 +240,7 @@ func (w *ChatRoomWindow) addLine(ctx Context, text string, color widget.Color) {
 	}
 	w.lines = append(w.lines, chatRoomLine{text: text, color: color})
 	if len(w.lines) > 80 {
-		copy(w.lines, w.lines[len(w.lines)-80:])
+		copy(w.lines, w.lines[len(w.lines)-80:]) // theme:ok message history cap
 		w.lines = w.lines[:80]
 	}
 	if w.IsOpen() {
@@ -250,8 +253,8 @@ func (w *ChatRoomWindow) widgetTree(ctx Context) widget.Widget {
 		Title(w.windowTitle()),
 		CloseButton(true),
 		OnClose(func() { w.requestLeave(ctx) }),
-		Size(chatRoomWindowW, ROWindowTitleHeight+chatRoomWindowContentH+ROWindowFooterHeight),
-		Background(widget.RGBA8(0, 0, 0, 0)),
+		Size(float32(chatRoomWindowW), float32(chatRoomWindowH())),
+		Background(chatRoomWindowBg),
 		Content(primitives.HBox(
 			primitives.Expanded(w.contentTree()),
 			w.memberList(),
@@ -261,8 +264,8 @@ func (w *ChatRoomWindow) widgetTree(ctx Context) widget.Widget {
 }
 
 func (w *ChatRoomWindow) contentTree() widget.Widget {
-	messageHeight := chatRoomWindowContentH - 24 - chatRoomMessagePadY*2
-	textWidth := maxInt(1, scrollbarSafeIntWidth(chatRoomWindowW-chatRoomMembersW-2*chatRoomMessagePadX)-6)
+	messageHeight := chatRoomWindowContentH - chatRoomSummaryReserve - chatRoomMessagePadY*2
+	textWidth := maxInt(1, scrollbarSafeIntWidth(chatRoomWindowW-chatRoomMembersW-2*chatRoomMessagePadX)-chatRoomTextInset)
 	lines := wrapChatRoomLines(w.visibleLines(), textWidth)
 	contentHeight := whisperMessageContentHeight(len(lines))
 	rows := make([]widget.Widget, 0, len(lines)+1)
@@ -275,33 +278,33 @@ func (w *ChatRoomWindow) contentTree() widget.Widget {
 				rotheme.Text(line.text).
 					Color(line.color).
 					MaxLines(1),
-			).Height(consoleLineH),
+			).Height(float32(consoleLineH)),
 		)
 	}
 	messageList := primitives.Box(rows...).
-		Gap(chatRoomMessageGap).
+		Gap(float32(chatRoomMessageGap)).
 		CrossAlign(primitives.CrossAxisStretch)
 	w.ensureScrollSignal().Set(consoleBottomScrollY(len(lines), messageHeight))
 	return primitives.Box(
 		primitives.Box(w.memberSummary()).
-			Height(20).
-			PaddingXY(chatRoomMessagePadX, 3).
+			Height(float32(chatRoomSummaryH)).
+			PaddingXY(float32(chatRoomMessagePadX), float32(chatRoomSummaryPadY)).
 			CrossAlign(primitives.CrossAxisStretch),
 		primitives.Box(
 			scrollview.New(
 				primitives.Box(messageList).
-					PaddingRight(ROScrollbarGutter),
+					PaddingRight(float32(ROScrollbarGutter)),
 				scrollview.ScrollbarOpt(scrollview.ScrollbarAuto),
 				scrollview.ScrollYSignal(w.ensureScrollSignal()),
 				scrollview.ScrollStep(float32(consoleLineH*3)),
 			),
 		).
 			Height(float32(messageHeight+chatRoomMessagePadY*2)).
-			PaddingXY(chatRoomMessagePadX, chatRoomMessagePadY).
+			PaddingXY(float32(chatRoomMessagePadX), float32(chatRoomMessagePadY)).
 			CrossAlign(primitives.CrossAxisStretch),
 	).
-		Background(widget.RGBA8(14, 18, 24, 188)).
-		BorderStyle(1, widget.RGBA8(180, 198, 218, 95)).
+		Background(chatRoomPanelBg).
+		BorderStyle(1, chatRoomPanelBorder).
 		CrossAlign(primitives.CrossAxisStretch)
 }
 
@@ -320,7 +323,7 @@ func (w *ChatRoomWindow) memberSummary() widget.Widget {
 	}
 	text := fmt.Sprintf("%d/%d  %s", count, limit, names)
 	return rotheme.Text(trimRunes(text, 58)).
-		Color(widget.RGBA8(181, 222, 239, 255)).
+		Color(chatRoomSummaryText).
 		MaxLines(1).
 		Ellipsis()
 }
@@ -329,7 +332,7 @@ func (w *ChatRoomWindow) footerTree(ctx Context) []widget.Widget {
 	buttons := []widget.Widget{
 		primitives.Expanded(
 			primitives.Box(w.inputWidget(ctx)).
-				Height(24).
+				Height(float32(chatRoomInputH)).
 				CrossAlign(primitives.CrossAxisStretch),
 		),
 		rotheme.Button("Send", func() {
@@ -361,7 +364,7 @@ func (w *ChatRoomWindow) memberList() widget.Widget {
 			selected = i
 		}
 	}
-	list := itemTableView(rows, "Members", 22, 24, "No members", w.memberScroll, selected, func(row int) {
+	list := itemTableView(rows, "Members", float32(chatRoomMemberRowH), float32(chatRoomMemberHeaderH), "No members", w.memberScroll, selected, func(row int) {
 		w.selectedMember = members[row]
 	})
 	children := []widget.Widget{primitives.Expanded(list)}
@@ -377,9 +380,9 @@ func (w *ChatRoomWindow) memberList() widget.Widget {
 					w.action = ChatRoomWindowAction{Kick: w.selectedMember}
 				}
 			}),
-		).Gap(4).Padding(4).Height(34).CrossAlign(primitives.CrossAxisCenter))
+		).Gap(float32(chatRoomOwnerGap)).Padding(float32(chatRoomOwnerPad)).Height(float32(chatRoomOwnerH)).CrossAlign(primitives.CrossAxisCenter))
 	}
-	return primitives.Box(children...).Width(chatRoomMembersW).
+	return primitives.Box(children...).Width(float32(chatRoomMembersW)).
 		Background(rotheme.Default.Colors.PanelBody).CrossAlign(primitives.CrossAxisStretch)
 }
 
@@ -476,7 +479,7 @@ func (w *ChatRoomWindow) windowTitle() string {
 
 func (w *ChatRoomWindow) visibleLines() []chatRoomLine {
 	if len(w.lines) == 0 {
-		return []chatRoomLine{{text: "No messages", color: widget.RGBA8(150, 165, 182, 255)}}
+		return []chatRoomLine{{text: "No messages", color: chatRoomEmptyText}}
 	}
 	return w.lines
 }

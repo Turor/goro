@@ -23,40 +23,7 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	inventoryBagTabW    = 32
-	inventoryBagTabH    = 44
-	inventoryBagTabOver = 1
-	inventoryBagTabRail = inventoryBagTabW + inventoryBagTabOver*2
-	inventoryBagWidth   = characterWindowWidth
-	inventoryBagViewW   = inventoryBagWidth - inventoryBagTabRail - verticalTabDividerW
-)
-
-// The cell size, columns and visible rows are layout tokens (see
-// layout_tokens.go); the rest are derived by recomputeInventoryBagMetrics.
-var (
-	inventoryBagCell   = 32
-	inventoryBagCols   = 8
-	inventoryBagRows   = 5
-	inventoryBagGridW  int
-	inventoryBagViewH  int
-	inventoryBagHeight int
-)
-
-func recomputeInventoryBagMetrics() {
-	inventoryBagGridW = inventoryBagCols * inventoryBagCell
-	inventoryBagViewH = inventoryBagRows * inventoryBagCell
-	inventoryBagHeight = ROWindowTitleHeight + inventoryBagViewH
-}
-
-func init() { recomputeInventoryBagMetrics() }
-
-const (
-	inventoryBagCellShadowInset  float32 = 3
-	inventoryBagCellShadowRadius float32 = 3
-	inventoryBagCellShadowAlpha  float32 = 0.4
-	inventoryBagCellHoverAlpha   float32 = 0.75
-)
+const inventoryBagTabOver = 1
 
 const (
 	inventoryBagTabItem = iota
@@ -64,6 +31,7 @@ const (
 	inventoryBagTabEtc
 )
 
+// theme:ok packet option bits
 const inventoryBagCartOptionMask uint32 = 0x00000008 | 0x00000080 | 0x00000100 | 0x00000200 | 0x00000400
 
 var inventoryBagTabs = []struct {
@@ -116,6 +84,7 @@ func (w *InventoryBagWindow) Toggle(ctx Context) {
 	w.layoutGen = rotheme.Generation()
 	w.SetSize(inventoryBagWidth, inventoryBagHeight)
 	w.Open(ctx, w.widgetTree(ctx, nil))
+	w.bindLayoutReload()
 	w.Publish(ctx)
 }
 
@@ -266,7 +235,21 @@ func (w *InventoryBagWindow) Rebind(ctx Context, itemInfo *ItemWindows) {
 	if !w.IsOpen() {
 		return
 	}
+	w.layoutGen = rotheme.Generation()
+	w.SetSize(inventoryBagWidth, inventoryBagHeight)
 	w.refresh(ctx, itemInfo)
+	w.bindLayoutReload()
+}
+
+func (w *InventoryBagWindow) bindLayoutReload() {
+	w.OnLayoutReload(func() {
+		if !w.IsOpen() {
+			return
+		}
+		w.layoutGen = rotheme.Generation()
+		w.SetSize(inventoryBagWidth, inventoryBagHeight)
+		w.refresh(w.ctx, w.itemInfo)
+	})
 }
 
 func (w *InventoryBagWindow) PendingCardIndex() uint16 {
@@ -307,12 +290,12 @@ func (w *InventoryBagWindow) widgetTree(ctx Context, itemInfo *ItemWindows) widg
 			w.Window.Close()
 			w.Publish(ctx)
 		}),
-		Size(inventoryBagWidth, float32(inventoryBagHeight)),
+		Size(float32(inventoryBagWidth), float32(inventoryBagHeight)),
 		Content(
 			verticalTabFrame(
 				w.tabColumn(ctx),
 				primitives.Box(scroll).
-					Width(inventoryBagViewW).
+					Width(float32(inventoryBagViewW)).
 					Height(float32(inventoryBagViewH)),
 			),
 		),
@@ -339,7 +322,7 @@ func (w *InventoryBagWindow) tabColumn(ctx Context) widget.Widget {
 		}))
 	}
 	return primitives.Box(tabs...).
-		Width(inventoryBagTabRail).
+		Width(float32(inventoryBagTabRail)).
 		Height(float32(inventoryBagViewH)).
 		Gap(-inventoryBagTabOver)
 }
@@ -387,7 +370,7 @@ func (w *InventoryBagWindow) showTooltip(ctx Context, item session.InventoryItem
 		return
 	}
 	text := inventoryItemDisplayName(ctx.Resources, item)
-	w.tooltip.Show(ctx, text, ctx.Input.MouseX, ctx.Input.MouseY+18, ctx.Input.MouseY-6)
+	w.tooltip.Show(ctx, text, ctx.Input.MouseX, ctx.Input.MouseY+inventoryBagTooltipBelow, ctx.Input.MouseY-inventoryBagTooltipAbove)
 }
 
 func (w *InventoryBagWindow) hideTooltip() {
@@ -407,7 +390,7 @@ func inventoryBagDefaultPosition(ctx Context) (int, int) {
 	width, height := ctx.ScreenSize()
 	menuX, menuY, _, menuH := basicMenuBounds()
 	x := clampWindowInt(menuX, windowScreenMargin, maxInt(windowScreenMargin, width-inventoryBagWidth-windowScreenMargin))
-	y := clampWindowInt(menuY+menuH+8, windowScreenMargin, maxInt(windowScreenMargin, height-inventoryBagHeight-windowScreenMargin))
+	y := clampWindowInt(menuY+menuH+inventoryBagMenuGap, windowScreenMargin, maxInt(windowScreenMargin, height-inventoryBagHeight-windowScreenMargin))
 	return x, y
 }
 
@@ -632,7 +615,7 @@ func (w *inventoryGridWidget) Draw(ctx widget.Context, canvas widget.Canvas) {
 		item := w.cfg.items[i]
 		cell := w.cellBounds(i)
 		if i < len(w.cfg.icons) && w.cfg.icons[i] != nil {
-			canvas.DrawImage(w.cfg.icons[i], geometry.Pt(cell.Min.X+4, cell.Min.Y+4))
+			canvas.DrawImage(w.cfg.icons[i], geometry.Pt(cell.Min.X+inventoryBagIconPad, cell.Min.Y+inventoryBagIconPad))
 		}
 		if item.Amount > 1 {
 			amount := ""
@@ -642,10 +625,10 @@ func (w *inventoryGridWidget) Draw(ctx widget.Context, canvas widget.Canvas) {
 			if amount == "" {
 				amount = strconv.Itoa(item.Amount)
 			}
-			rotheme.DrawText(canvas, amount, geometry.NewRect(cell.Max.X-18, cell.Max.Y-15, 16, 12), rotheme.Default.Typography.TextSize, rotheme.Default.Colors.Text, false, widget.TextAlignRight)
+			rotheme.DrawText(canvas, amount, geometry.NewRect(cell.Max.X-inventoryBagAmountInsetX, cell.Max.Y-inventoryBagAmountInsetY, inventoryBagAmountW, inventoryBagAmountH), rotheme.Default.Typography.TextSize, rotheme.Default.Colors.Text, false, widget.TextAlignRight)
 		}
 		if item.Equipped {
-			rotheme.DrawText(canvas, "E", geometry.NewRect(cell.Min.X+2, cell.Min.Y+2, 12, 12), rotheme.Default.Typography.TextSize, widget.RGBA8(54, 128, 76, 255), false, widget.TextAlignLeft)
+			rotheme.DrawText(canvas, "E", geometry.NewRect(cell.Min.X+inventoryBagEquipInset, cell.Min.Y+inventoryBagEquipInset, inventoryBagEquipSize, inventoryBagEquipSize), rotheme.Default.Typography.TextSize, inventoryBagEquippedColor, false, widget.TextAlignLeft)
 		}
 	}
 }

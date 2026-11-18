@@ -14,8 +14,6 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const skillGridSlotSize = 28
-
 type skillGridEntry struct {
 	position int
 	skill    session.Skill
@@ -74,7 +72,7 @@ func newSkillGridWidget(cfg skillGridConfig) *skillGridWidget {
 }
 
 func (w *skillGridWidget) Layout(_ widget.Context, constraints geometry.Constraints) geometry.Size {
-	size := constraints.Constrain(geometry.Sz(skillGridViewW, float32(w.totalRows()*skillGridCellH)))
+	size := constraints.Constrain(geometry.Sz(float32(skillGridViewW), float32(w.totalRows()*skillGridCellH)))
 	w.SetBounds(geometry.FromPointSize(w.Position(), size))
 	return size
 }
@@ -103,10 +101,10 @@ func (w *skillGridWidget) drawCell(canvas widget.Canvas, cell geometry.Rect, ent
 	if occupied && highlighted {
 		slotColor = rotheme.Default.Colors.SkillRequired
 	}
-	canvas.DrawRoundRect(slot, slotColor, 3)
+	canvas.DrawRoundRect(slot, slotColor, skillGridSlotRadius)
 	outline := rotheme.Default.Colors.FooterLine
-	outline.A *= 0.25
-	canvas.StrokeRoundRect(slot, outline, 3, 1)
+	outline.A *= skillGridOutlineAlpha
+	canvas.StrokeRoundRect(slot, outline, skillGridSlotRadius, 1)
 	if !occupied {
 		return
 	}
@@ -118,20 +116,20 @@ func (w *skillGridWidget) drawCell(canvas widget.Canvas, cell geometry.Rect, ent
 	rotheme.DrawText(
 		canvas,
 		trimRunes(entry.name, 10),
-		geometry.NewRect(cell.Min.X+1, cell.Min.Y, cell.Width()-2, 14),
+		geometry.NewRect(cell.Min.X+1, cell.Min.Y, cell.Width()-skillGridNameInsetX*2, skillGridNameH),
 		rotheme.Default.Typography.TextSize,
 		textColor,
 		false,
 		widget.TextAlignCenter,
 	)
 	if entry.icon != nil {
-		iconBounds := geometry.NewRect(slot.Min.X+2, slot.Min.Y+2, skillIconSize, skillIconSize)
+		iconBounds := geometry.NewRect(slot.Min.X+skillGridIconInset, slot.Min.Y+skillGridIconInset, float32(skillIconSize), float32(skillIconSize))
 		canvas.DrawImage(entry.icon, iconBounds.Min)
 	}
 
 	w.drawLevel(canvas, cell, entry, textColor, hovered)
 	if requiredLevel > 0 {
-		badge := geometry.NewRect(slot.Max.X, slot.Max.Y-14, 16, 14)
+		badge := geometry.NewRect(slot.Max.X, slot.Max.Y-skillGridBadgeInsetY, skillGridBadgeW, skillGridBadgeH)
 		rotheme.DrawText(canvas, fmt.Sprint(requiredLevel), badge,
 			rotheme.Default.Typography.TextSize, rotheme.Default.Colors.Text, true, widget.TextAlignCenter)
 	}
@@ -143,7 +141,7 @@ func (w *skillGridWidget) drawLevel(canvas widget.Canvas, cell geometry.Rect, en
 		rotheme.DrawText(
 			canvas,
 			fmt.Sprintf("Lv %d", entry.display.Level),
-			geometry.NewRect(cell.Min.X+1, cell.Max.Y-15, cell.Width()-2, 14),
+			geometry.NewRect(cell.Min.X+1, cell.Max.Y-skillGridLevelInsetY, cell.Width()-skillGridNameInsetX*2, skillGridLevelH),
 			rotheme.Default.Typography.TextSize,
 			color,
 			false,
@@ -162,7 +160,7 @@ func (w *skillGridWidget) drawLevel(canvas widget.Canvas, cell geometry.Rect, en
 	rotheme.DrawText(
 		canvas,
 		fmt.Sprintf("%d/%d", level, entry.skill.Level),
-		geometry.NewRect(down.Max.X, cell.Max.Y-15, up.Min.X-down.Max.X, 14),
+		geometry.NewRect(down.Max.X, cell.Max.Y-skillGridLevelInsetY, up.Min.X-down.Max.X, skillGridLevelH),
 		rotheme.Default.Typography.TextSize,
 		color,
 		false,
@@ -301,7 +299,7 @@ func skillGridHitPart(entry skillGridEntry, cell geometry.Rect, point geometry.P
 func skillGridSlotBounds(cell geometry.Rect) geometry.Rect {
 	return geometry.NewRect(
 		cell.Min.X+(cell.Width()-skillGridSlotSize)/2,
-		cell.Min.Y+14,
+		cell.Min.Y+skillGridSlotTop,
 		skillGridSlotSize,
 		skillGridSlotSize,
 	)
@@ -325,14 +323,14 @@ func (w *skillGridWidget) cellBounds(position int) geometry.Rect {
 	return geometry.NewRect(
 		bounds.Min.X+float32(col*skillGridCellW),
 		bounds.Min.Y+float32(row*skillGridCellH),
-		skillGridCellW,
-		skillGridCellH,
+		float32(skillGridCellW),
+		float32(skillGridCellH),
 	)
 }
 
 func (w *skillGridWidget) positionAt(point geometry.Point) int {
 	local := point.Sub(w.Bounds().Min)
-	if local.X < 0 || local.Y < 0 || local.X >= skillGridColumns*skillGridCellW || local.Y >= float32(w.totalRows()*skillGridCellH) {
+	if local.X < 0 || local.Y < 0 || local.X >= float32(skillGridColumns*skillGridCellW) || local.Y >= float32(w.totalRows()*skillGridCellH) {
 		return -1
 	}
 	return int(local.Y)/skillGridCellH*skillGridColumns + int(local.X)/skillGridCellW
@@ -444,7 +442,7 @@ func (w *SkillWindow) skillGridAtMouse(mouseX, mouseY int) (session.Skill, bool)
 		return session.Skill{}, false
 	}
 	col := (mouseX - x) / skillGridCellW
-	row := int((float32(mouseY-y) + w.ensureScrollSignal().Get()) / skillGridCellH)
+	row := int((float32(mouseY-y) + w.ensureScrollSignal().Get()) / float32(skillGridCellH))
 	entry, ok := w.grid.entryAtPosition(row*skillGridColumns + col)
 	return entry.skill, ok
 }

@@ -21,12 +21,6 @@ import (
 )
 
 const (
-	vendingWindowW      = 420
-	vendingSetupRows    = 7
-	vendingBuyRows      = 7
-	vendingCartRows     = 4
-	vendingNameH        = 30
-	vendingWindowGap    = 20
 	vendingDefaultPrice = 1
 )
 
@@ -228,6 +222,13 @@ func (w *VendingWindow) ensureWindows() {
 
 func (w *VendingWindow) refresh(ctx Context) {
 	w.ensureWindows()
+	w.openModeTrees(ctx)
+	w.bindVendingLayout(ctx)
+	w.leftWindow.Publish(ctx)
+	w.rightWindow.Publish(ctx)
+}
+
+func (w *VendingWindow) openModeTrees(ctx Context) {
 	switch w.mode {
 	case vendingModeSetup:
 		w.leftWindow.OpenAt(w.leftWindow.x, w.leftWindow.y, w.availableCartTree(ctx))
@@ -239,8 +240,30 @@ func (w *VendingWindow) refresh(ctx Context) {
 		w.leftWindow.OpenAt(w.leftWindow.x, w.leftWindow.y, w.ownShopTree(ctx))
 		w.closeRight(ctx)
 	}
-	w.leftWindow.Publish(ctx)
-	w.rightWindow.Publish(ctx)
+}
+
+func (w *VendingWindow) bindVendingLayout(ctx Context) {
+	w.leftWindow.OnLayoutReload(func() { w.relayout(ctx) })
+	if w.rightWindow.IsOpen() {
+		w.rightWindow.OnLayoutReload(func() { w.relayout(ctx) })
+	}
+}
+
+func (w *VendingWindow) relayout(ctx Context) {
+	if w.mode == vendingModeNone {
+		return
+	}
+	w.ensureWindows()
+	switch w.mode {
+	case vendingModeSetup:
+		w.leftWindow.SetContent(w.availableCartTree(ctx))
+		w.rightWindow.SetContent(w.setupTree(ctx))
+	case vendingModeBuy:
+		w.leftWindow.SetContent(w.vendorItemsTree(ctx))
+		w.rightWindow.SetContent(w.buyCartTree(ctx))
+	case vendingModeOwn:
+		w.leftWindow.SetContent(w.ownShopTree(ctx))
+	}
 }
 
 func (w *VendingWindow) closeBoth(ctx Context) {
@@ -263,7 +286,7 @@ func (w *VendingWindow) availableCartTree(ctx Context) widget.Widget {
 		Title("Available Items for Vending"),
 		CloseButton(true),
 		OnClose(func() { w.cancel(ctx) }),
-		Size(vendingWindowW, float32(w.leftHeight())),
+		Size(float32(vendingWindowW), float32(w.leftHeight())),
 		Content(primitives.Box(w.cartItemsTable(ctx)).Height(float32(shopTableHeight(vendingSetupRows)))),
 		Footer(primitives.Box()),
 	)
@@ -288,19 +311,19 @@ func (w *VendingWindow) setupTree(ctx Context) widget.Widget {
 		Title("Vending"),
 		CloseButton(true),
 		OnClose(func() { w.cancel(ctx) }),
-		Size(vendingWindowW, float32(w.rightHeight())),
+		Size(float32(vendingWindowW), float32(w.rightHeight())),
 		Content(
 			primitives.Box(
 				primitives.HBox(
-					primitives.Box(rotheme.Text("Name")).Width(54).Height(vendingNameH),
-					primitives.Box(name).Height(22).Width(vendingWindowW-72),
+					primitives.Box(rotheme.Text("Name")).Width(float32(vendingNameLabelW)).Height(float32(vendingNameH)),
+					primitives.Box(name).Height(float32(vendingFieldH)).Width(float32(vendingWindowW-vendingNameFieldInset)),
 				).CrossAlign(primitives.CrossAxisCenter),
 				primitives.Box(w.setupItemsTable(ctx)).Height(float32(shopTableHeight(w.setupRows()))),
-			).PaddingXY(8, 4).Gap(4),
+			).PaddingXY(float32(vendingPadX), float32(vendingPadY)).Gap(float32(vendingContentGap)),
 		),
 		Footer(
 			rotheme.Text("Price"),
-			primitives.Box(price).Width(90).Height(22),
+			primitives.Box(price).Width(float32(vendingPriceW)).Height(float32(vendingFieldH)),
 			primitives.Expanded(primitives.Box()),
 			rotheme.ButtonDisabledFn("OK", func() bool {
 				return len(w.setupItems) == 0 || w.currentShopName() == ""
@@ -315,7 +338,7 @@ func (w *VendingWindow) vendorItemsTree(ctx Context) widget.Widget {
 		Title("Vending Items"),
 		CloseButton(true),
 		OnClose(func() { w.cancel(ctx) }),
-		Size(vendingWindowW, float32(w.leftHeight())),
+		Size(float32(vendingWindowW), float32(w.leftHeight())),
 		Content(primitives.Box(w.vendorItemsTable(ctx)).Height(float32(shopTableHeight(vendingBuyRows)))),
 		Footer(primitives.Box()),
 	)
@@ -326,7 +349,7 @@ func (w *VendingWindow) buyCartTree(ctx Context) widget.Widget {
 		Title("Buying Items"),
 		CloseButton(true),
 		OnClose(func() { w.cancel(ctx) }),
-		Size(vendingWindowW, float32(w.rightHeight())),
+		Size(float32(vendingWindowW), float32(w.rightHeight())),
 		Content(primitives.Box(w.buyCartTable(ctx)).Height(float32(shopTableHeight(vendingCartRows)))),
 		Footer(
 			rotheme.Text(fmt.Sprintf("Total: %s Zeny", formatHUDNumber(w.buyTotal()))),
@@ -342,7 +365,7 @@ func (w *VendingWindow) ownShopTree(ctx Context) widget.Widget {
 		Title("Vending"),
 		CloseButton(true),
 		OnClose(func() { w.closeOwnStore(ctx) }),
-		Size(vendingWindowW, float32(w.leftHeight())),
+		Size(float32(vendingWindowW), float32(w.leftHeight())),
 		Content(primitives.Box(w.ownItemsTable(ctx)).Height(float32(shopTableHeight(vendingBuyRows)))),
 		Footer(
 			rotheme.Text(fmt.Sprintf("Items: %d", len(w.ownItems))),
@@ -725,7 +748,7 @@ func (w *VendingWindow) rightTableBounds() (int, int, int, int) {
 	y := w.rightWindow.y + ROWindowTitleHeight
 	h := shopTableHeight(w.setupRows())
 	if w.mode == vendingModeSetup {
-		y += vendingNameH + 8
+		y += vendingNameH + vendingNameGap
 	}
 	return w.rightWindow.x, y, vendingWindowW, h
 }
@@ -740,7 +763,7 @@ func (w *VendingWindow) rightHeight() int {
 
 func (w *VendingWindow) setupContentHeight() int {
 	if w.mode == vendingModeSetup {
-		return vendingNameH + 8 + shopTableHeight(w.setupRows())
+		return vendingNameH + vendingNameGap + shopTableHeight(w.setupRows())
 	}
 	return shopTableHeight(vendingCartRows)
 }
