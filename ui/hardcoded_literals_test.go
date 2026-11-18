@@ -214,6 +214,9 @@ func scanUILiteralDirs(t *testing.T, dirs []string) (violations, annotated, unre
 		if err != nil {
 			t.Fatal(err)
 		}
+		if len(files) == 0 {
+			t.Fatalf("literal guard: %s matches no Go files", pattern)
+		}
 		sort.Strings(files)
 		fset := token.NewFileSet()
 		registered := map[string]bool{}
