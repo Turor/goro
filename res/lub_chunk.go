@@ -62,8 +62,6 @@ func executeLuaSource(data []byte, globals map[string]luaValue, setup func(*glua
 	if setup != nil {
 		setup(state)
 	}
-	cancel := attachLuaVMBudget(state)
-	defer cancel()
 	for key, value := range globals {
 		if value.kind != luaNil {
 			state.SetGlobal(key, luaValueToGopherLua(state, value))
@@ -74,7 +72,7 @@ func executeLuaSource(data []byte, globals map[string]luaValue, setup func(*glua
 		return err
 	}
 	fn := state.NewFunctionFromProto(proto)
-	if err := state.CallByParam(glua.P{Fn: fn, NRet: 0, Protect: true}); err != nil {
+	if err := luaCallByParam(state, fn); err != nil {
 		return err
 	}
 	state.G.Global.ForEach(func(key glua.LValue, value glua.LValue) {
