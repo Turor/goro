@@ -120,6 +120,7 @@ func (w *SkillWindow) Update(ctx Context, shortcuts *ShortcutBar, actions GameAc
 	if w.UpdateDrag(ctx, shortcuts) {
 		return true
 	}
+	ensureSkillTreeData(ctx)
 	snapshot := w.skillSnapshot(ctx.Session)
 	w.ensureSkillViewForSnapshot(ctx, snapshot)
 	if snapshot != w.snapshot {
@@ -197,6 +198,7 @@ func (w *SkillWindow) openAtDefault(ctx Context) {
 	width, height := w.windowSize()
 	w.SetSize(width, height)
 	x, y := skillWindowDefaultPosition(ctx, width, height)
+	ensureSkillTreeData(ctx)
 	w.snapshot = w.skillSnapshot(ctx.Session)
 	w.ensureSkillViewForSnapshot(ctx, w.snapshot)
 	w.ensureScrollSignal().Set(0)
@@ -812,7 +814,16 @@ func (w *SkillWindow) skillSnapshot(s *session.Session) string {
 	if s == nil {
 		return ""
 	}
-	return fmt.Sprintf("job=%d;points=%d;pending=%v;skills=%v", s.Selected.Job, s.Skills.Points, w.pending, s.Skills.List)
+	// The tree generation changes when the client skill tables reload.
+	return fmt.Sprintf("job=%d;points=%d;pending=%v;skills=%v;tree=%d", s.Selected.Job, s.Skills.Points, w.pending, s.Skills.List, db.SkillTreeGeneration())
+}
+
+// ensureSkillTreeData loads the skill tree from the client Lua tables the
+// first time a skill window needs it; the built-in trees are the fallback.
+func ensureSkillTreeData(ctx Context) {
+	if ctx.Resources != nil {
+		ctx.Resources.EnsureSkillTree()
+	}
 }
 
 func (w *SkillWindow) ensureSkillView(ctx Context) {

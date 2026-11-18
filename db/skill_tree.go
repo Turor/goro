@@ -1671,7 +1671,15 @@ var skillTreeGroupsByJob = map[int][][]uint16{
 }
 
 // SkillTreeSkillGroups returns the inherited skill tree split by class level.
+// Data loaded from the client Lua tables wins; the Go tables are the fallback.
 func SkillTreeSkillGroups(job int) []SkillTreeGroup {
+	if groups, ok := ActiveSkillTreeData().Groups(job); ok {
+		return groups
+	}
+	return builtinSkillTreeSkillGroups(job)
+}
+
+func builtinSkillTreeSkillGroups(job int) []SkillTreeGroup {
 	jobGroups := skillTreeGroupsByJob[job]
 	if job == JobNovice {
 		jobGroups = nil
@@ -1691,6 +1699,16 @@ func SkillTreeSkillGroups(job int) []SkillTreeGroup {
 		}
 	}
 	return groups
+}
+
+// SkillTreeLayout returns the merged client grid positions for one tab
+// (1-based) of job from the installed client data.
+func SkillTreeLayout(job, classLevel int) (map[uint16]int, bool) {
+	data := ActiveSkillTreeData()
+	if !data.Covers(job) {
+		return nil, false
+	}
+	return data.TabLayout(job, classLevel), true
 }
 
 // SkillTreeLayoutJobs returns the client skill-tree tables which contribute
@@ -1803,11 +1821,19 @@ func skillTreeLineage(job int) (first, second, advanced int) {
 }
 
 func SkillMaxLevel(skillID uint16) (int, bool) {
+	if data := ActiveSkillTreeData(); data != nil {
+		if level := data.MaxLevels[skillID]; level > 0 {
+			return level, true
+		}
+	}
 	level, ok := SkillMaxLevels[skillID]
 	return level, ok && level > 0
 }
 
 func SkillRequirementsForJob(job int, skillID uint16) []SkillRequirement {
+	if requirements, ok := ActiveSkillTreeData().RequirementsFor(job, skillID); ok {
+		return requirements
+	}
 	if bySkill, ok := SkillRequirementsByJob[job]; ok {
 		if requirements, ok := bySkill[skillID]; ok {
 			return requirements

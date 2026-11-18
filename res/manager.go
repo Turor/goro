@@ -9,6 +9,9 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
+
+	"github.com/kivutar/goro/db"
 )
 
 var errResourceNotFound = errors.New("resource not found")
@@ -19,6 +22,8 @@ type Manager struct {
 	FoundFiles []string
 	Archives   []*GRF
 	files      fs.FS
+	// remote streams files missing locally from an asset server (EnableRemote).
+	remote *remoteSource
 
 	sprites                  spriteResourceCache
 	looseDirectories         sync.Map
@@ -40,6 +45,7 @@ type Manager struct {
 	fogParametersLoaded      bool
 	skillResourceNames       map[int]string
 	skillResourceNamesLoaded bool
+	skillIDNames             map[string]int
 	skillMaxLevels           map[int]int
 	skillMaxLevelsLoaded     bool
 	skillInfoListLoaded      bool
@@ -53,6 +59,16 @@ type Manager struct {
 	skillTreePositions       map[int]map[int]int
 	skillTreeTextPositions   map[string]map[int]int
 	skillTreePositionsLoaded bool
+	skillTreeViewSource      []byte
+	skillInfoSource          []byte
+	skillInfoReqs            map[int][]db.SkillRequirement
+	skillInfoJobReqs         map[int]map[int][]db.SkillRequirement
+	skillInfoWarnings        []string
+	skillTreeDataLoaded      bool
+	skillTreeData            *db.SkillTreeData
+	skillTreeWarnings        []string
+	skillTreeRetryAt         time.Time
+	invalidations            dataInvalidationQueue
 	songTalks                map[SongTalkKind][]string
 	songTalksLoaded          map[SongTalkKind]bool
 	petTalks                 map[string]map[string]map[string][]string
@@ -243,6 +259,13 @@ func (m *Manager) readFileDirect(name string, exact bool) ([]byte, error) {
 		}
 		return nil, err
 	}
+	// Streamed files come last: a loose file or a local archive is an explicit
+	// override. The server applies its own overlay priority (System/ and the
+	// text overlays, then slot-0 translation.grf, then the other archives).
+	// Ask once, on the exact pass, so suffix fallbacks never multiply requests.
+	if m.remote != nil && exact {
+		return m.remote.read(name)
+	}
 	return nil, fmt.Errorf("%w: %s", errResourceNotFound, name)
 }
 
@@ -268,7 +291,7 @@ func (m *Manager) hasFileDirect(name string) bool {
 			return true
 		}
 	}
-	return false
+	return m.remote != nil && m.remote.has(name)
 }
 
 func (m *Manager) FindFirst(names []string) (string, bool) {

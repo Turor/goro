@@ -36,13 +36,20 @@ var (
 	Channel = ""
 	Version = "dev"
 	Build   = "0"
+
+	// DefaultCatalogURL is the main-channel catalog (an https URL that answers
+	// with short-lived presigned manifest and file URLs). ReleaseURLPrefix is
+	// the https prefix those presigned objects live under. Neither is in the
+	// source: release builds link them in from operator config outside the
+	// repository (scripts/release/build-release.sh), e.g.
+	//   -X github.com/kivutar/goro/updater.DefaultCatalogURL=https://.../latest
+	//   -X github.com/kivutar/goro/updater.ReleaseURLPrefix=https://.../goro/main/
+	// Empty values allow only file:// and loopback URLs.
+	DefaultCatalogURL = ""
+	ReleaseURLPrefix  = ""
 )
 
 const (
-	// DefaultCatalogURL is the public main-channel catalog. remoteclient2
-	// answers it with short-lived presigned Garage URLs.
-	DefaultCatalogURL = "https://ro.turoran.com/client/goro/main/latest"
-
 	// EnvSkip set to 1 disables the launch check.
 	EnvSkip = "GORO_SKIP_UPDATE"
 	// EnvURL overrides the catalog or manifest URL (still allowlisted).
@@ -569,7 +576,8 @@ func artifactURL(manifestURL string, f File, cat *catalog) (string, error) {
 }
 
 // allowedURL accepts file:// (tests and offline installs), loopback http,
-// the public catalog, and presigned objects under the goro release prefix.
+// the linked catalog URL, and presigned objects under the linked release
+// prefix.
 func allowedURL(raw string) bool {
 	u, err := url.Parse(raw)
 	if err != nil || u.User != nil {
@@ -585,15 +593,28 @@ func allowedURL(raw string) bool {
 		if u.Port() != "" && u.Port() != "443" {
 			return false
 		}
-		switch u.Hostname() {
-		case "ro.turoran.com":
-			return u.Path == "/client/goro/main/latest"
-		case "garage.turoran.com":
-			name, ok := strings.CutPrefix(u.Path, "/korangar-releases/goro/main/")
+		if c, ok := linkedHTTPS(DefaultCatalogURL); ok && u.Hostname() == c.Hostname() && u.Path == c.Path {
+			return true
+		}
+		if p, ok := linkedHTTPS(ReleaseURLPrefix); ok && u.Hostname() == p.Hostname() {
+			name, ok := strings.CutPrefix(u.Path, strings.TrimSuffix(p.Path, "/")+"/")
 			return ok && (name == "manifest.goroup" || releaseName.MatchString(name))
 		}
 	}
 	return false
+}
+
+// linkedHTTPS parses a link-time URL; only a plain https URL on the default
+// port counts, so an empty or malformed value allowlists nothing.
+func linkedHTTPS(raw string) (*url.URL, bool) {
+	if strings.TrimSpace(raw) == "" {
+		return nil, false
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme != "https" || u.User != nil || u.Hostname() == "" || (u.Port() != "" && u.Port() != "443") {
+		return nil, false
+	}
+	return u, true
 }
 
 func fileURLPath(u *url.URL) string {

@@ -388,7 +388,13 @@ func skillGridPositions(manager *res.Manager, job, tab int, skills []session.Ski
 		desired[skill.ID] = true
 	}
 	positions := make(map[uint16]int, len(skills))
-	if manager != nil && tab != skillTabEtc {
+	if layout, ok := db.SkillTreeLayout(job, tab+1); ok && tab != skillTabEtc {
+		for id, position := range layout {
+			if desired[id] && position >= 0 {
+				positions[id] = position
+			}
+		}
+	} else if manager != nil && tab != skillTabEtc {
 		for _, layoutJob := range db.SkillTreeLayoutJobs(job, tab+1) {
 			layout, ok := manager.SkillTreePositions(layoutJob)
 			if !ok {
