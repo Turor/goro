@@ -10,17 +10,6 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	smallPromptWidth        = 286
-	smallPromptHeight       = 128
-	smallPromptContentH     = 42
-	smallPromptSidePad      = 12
-	smallPromptLineH        = 14
-	smallPromptDefaultLines = 2
-	smallPromptMaxLines     = 4
-	smallPromptLineMaxRunes = 42
-)
-
 type ConfirmModal struct {
 	Window
 	title       string
@@ -58,7 +47,13 @@ func (m *ConfirmModal) openPrompt(ctx client.Context) {
 	m.CloseOnEsc = false // Escape is handled here, including opening-frame suppression.
 	m.SetSize(smallPromptWidth, m.promptHeight())
 	m.Window.Open(ctx, m.widgetTree(ctx))
+	m.OnLayoutReload(m.reloadForLayout)
 	m.Publish(ctx)
+}
+
+func (m *ConfirmModal) reloadForLayout() {
+	m.SetSize(smallPromptWidth, m.promptHeight())
+	m.SetContent(m.widgetTree(m.ctx))
 }
 
 func (m *ConfirmModal) Update(ctx client.Context) bool {
@@ -156,7 +151,7 @@ func (m *ConfirmModal) widgetTree(ctx client.Context) widget.Widget {
 	return Win(
 		Title(m.title),
 		CloseButton(false),
-		Size(smallPromptWidth, float32(m.promptHeight())),
+		Size(float32(smallPromptWidth), float32(m.promptHeight())),
 		Content(smallPromptContent(m.message, m.messageMaxLines())),
 		Footer(footer...),
 	)
@@ -168,8 +163,8 @@ func smallPromptContent(message string, maxLines int) widget.Widget {
 		smallPromptMessage(message, maxLines),
 		primitives.Expanded(primitives.Box()),
 	).
-		PaddingLeft(smallPromptSidePad).
-		PaddingRight(smallPromptSidePad)
+		PaddingLeft(float32(smallPromptSidePad)).
+		PaddingRight(float32(smallPromptSidePad))
 }
 
 func smallPromptMessage(message string, maxLines int) widget.Widget {
@@ -238,11 +233,11 @@ func wrapSmallPromptLine(line string) []string {
 
 func smallPromptLine(line string) widget.Widget {
 	if line == "" {
-		return primitives.Box().Height(smallPromptLineH)
+		return primitives.Box().Height(float32(smallPromptLineH))
 	}
 	return primitives.Box(
 		rotheme.Text(line).
 			MaxLines(1),
 	).
-		Height(smallPromptLineH)
+		Height(float32(smallPromptLineH))
 }

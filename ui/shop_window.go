@@ -25,9 +25,6 @@ const (
 	shopListRows       = 7
 	shopBuyCartRows    = 4
 	shopSellCartRows   = 10
-
-	shopDealWidth  = smallPromptWidth
-	shopDealHeight = smallPromptHeight
 )
 
 const (
@@ -223,15 +220,15 @@ func (w *ShopWindow) DrawDragGhost(screen *render.Frame, ctx Context, assets Ass
 
 func (w *ShopWindow) ensureDealWindow() {
 	if w.dealWindow.width == 0 {
-		w.dealWindow = NewWindow(shopDealWidth, shopDealHeight)
+		w.dealWindow = NewWindow(smallPromptWidth, smallPromptHeight)
 	}
 }
 
 func (w *ShopWindow) openDealWindow(ctx Context) {
 	w.ensureDealWindow()
 	width, height := ctx.ScreenSize()
-	x := (width - shopDealWidth) / 2
-	y := (height - shopDealHeight) * 2 / 3
+	x := (width - smallPromptWidth) / 2
+	y := (height - smallPromptHeight) * 2 / 3
 	w.dealWindow.OpenAt(x, y, w.dealWidgetTree(ctx))
 	w.dealWindow.Publish(ctx)
 }
@@ -248,7 +245,7 @@ func (w *ShopWindow) dealWidgetTree(ctx Context) widget.Widget {
 	return Win(
 		Title("Shop"),
 		CloseButton(false),
-		Size(shopDealWidth, shopDealHeight),
+		Size(float32(smallPromptWidth), float32(smallPromptHeight)),
 		Content(smallPromptContent("Select a transaction type", smallPromptDefaultLines)),
 		Footer(
 			primitives.Expanded(primitives.Box()),

@@ -14,6 +14,7 @@ import (
 	gameui "github.com/kivutar/goro/ui"
 )
 
+// theme:ok protocol name length and hair style range
 const (
 	charCreateNameMinBytes = 4
 	charCreateNameMaxBytes = 23
@@ -188,7 +189,7 @@ func (m *Screen) updateCharacterCreateWindow(ctx client.Context) {
 }
 
 func (m *Screen) characterCreatePreviewImage(ctx client.Context) image.Image {
-	const previewW, previewH = 142, 166
+	previewW, previewH := gameui.CharacterCreatePreviewSize()
 	key := charCreatePreviewKey{sex: ctx.Session.Sex, hairStyle: m.create.hairStyle, hairColor: m.create.hairColor}
 	if m.create.previewImage != nil && m.create.previewImageKey == key {
 		return m.create.previewImage
@@ -204,7 +205,7 @@ func (m *Screen) characterCreatePreviewImage(ctx client.Context) image.Image {
 		m.create.previewImageKey = key
 		return m.create.previewImage
 	}
-	const scale = 1.08
+	scale := float64(charCreatePreviewScale)
 	bounds := billboard.Image.Bounds()
 	var opts render.DrawImageOptions
 	opts.GeoM.Scale(scale, scale)
