@@ -9,12 +9,6 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	vitalsLabelWidth   float32 = 22
-	vitalsPercentWidth float32 = 34
-	vitalsGap          float32 = 6
-)
-
 // vitalsRow is shared by the player, homunculus and mercenary info windows.
 func vitalsRow(label string, current, maxValue int, width float32) widget.Widget {
 	ratio := ratioInt(current, maxValue)

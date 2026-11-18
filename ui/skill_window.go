@@ -22,29 +22,7 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	skillTabW         = 32
-	skillTabH         = 44
-	skillTabOver      = 1
-	skillTabRailW     = skillTabW + skillTabOver*2
-	skillTableViewW   = 396
-	skillWindowWidth  = skillTabRailW + verticalTabDividerW + skillTableViewW
-	skillWindowHeight = 388
-	skillRowH         = 32
-	skillIconSize     = 24
-	skillHeaderH      = 24
-	skillTableViewH   = skillWindowHeight - ROWindowTitleHeight - ROWindowFooterHeight
-	skillTableBodyH   = skillTableViewH - skillHeaderH
-
-	skillGridColumns      = 7
-	skillGridCellW        = 62
-	skillGridCellH        = 58
-	skillGridMinRows      = 6
-	skillGridViewW        = skillGridColumns*skillGridCellW + ROScrollbarGutter
-	skillGridViewH        = skillGridMinRows * skillGridCellH
-	skillGridWindowWidth  = skillTabRailW + verticalTabDividerW + skillGridViewW
-	skillGridWindowHeight = ROWindowTitleHeight + skillGridViewH + ROWindowFooterHeight
-)
+const skillTabOver = 1
 
 const (
 	skillTabFirst = iota
@@ -203,6 +181,16 @@ func (w *SkillWindow) Rebind(ctx Context, actions GameActions) {
 		return
 	}
 	w.refresh(ctx, actions)
+	w.bindLayoutReload()
+}
+
+func (w *SkillWindow) bindLayoutReload() {
+	w.OnLayoutReload(func() {
+		if !w.IsOpen() {
+			return
+		}
+		w.refresh(w.ctx, w.actions)
+	})
 }
 
 func (w *SkillWindow) openAtDefault(ctx Context) {
@@ -214,6 +202,7 @@ func (w *SkillWindow) openAtDefault(ctx Context) {
 	w.ensureScrollSignal().Set(0)
 	w.SetAutoPosition(x, y)
 	w.Open(ctx, w.widgetTree(ctx, w.actions))
+	w.bindLayoutReload()
 	w.Publish(ctx)
 }
 
@@ -289,8 +278,8 @@ func (w *SkillWindow) skillTableWidget(ctx Context, assets AssetProvider, action
 	table := rotheme.TableView(
 		rotheme.TableViewColumns(skillTableColumns),
 		rotheme.TableViewRowCount(len(skills)),
-		rotheme.TableViewRowHeight(skillRowH),
-		rotheme.TableViewHeaderHeight(skillHeaderH),
+		rotheme.TableViewRowHeight(float32(skillRowH)),
+		rotheme.TableViewHeaderHeight(float32(skillHeaderH)),
 		rotheme.TableViewEmptyText("No skills in this tab."),
 		rotheme.TableViewScrollYSignal(w.ensureScrollSignal()),
 		rotheme.TableViewDispatchHoverToCells(false),
@@ -347,7 +336,7 @@ func (w *SkillWindow) skillGridWidget(ctx Context, assets AssetProvider, actions
 		scrollview.DirectionOpt(scrollview.Vertical),
 		scrollview.ScrollbarOpt(scrollview.ScrollbarAuto),
 		scrollview.ScrollYSignal(w.ensureScrollSignal()),
-		scrollview.ScrollStep(skillGridCellH),
+		scrollview.ScrollStep(float32(skillGridCellH)),
 	)
 }
 
@@ -376,7 +365,7 @@ func (w *SkillWindow) skillTabColumn(ctx Context, assets AssetProvider, actions 
 		}))
 	}
 	return primitives.Box(tabs...).
-		Width(skillTabRailW).
+		Width(float32(skillTabRailW)).
 		Height(float32(w.contentHeight())).
 		Gap(-skillTabOver)
 }
@@ -503,6 +492,8 @@ func (w *SkillWindow) refresh(ctx Context, actions GameActions) {
 	if actions != nil {
 		w.actions = actions
 	}
+	width, height := w.windowSize()
+	w.SetSize(width, height)
 	w.snapshot = w.skillSnapshot(ctx.Session)
 	w.ensureSkillViewForSnapshot(ctx, w.snapshot)
 	w.SetContent(w.widgetTreeWithAssets(ctx, w.assets, w.actions))
@@ -577,9 +568,8 @@ func (w *SkillWindow) showTooltip(ctx Context, skill session.Skill, mx, my int) 
 		w.hideTooltip()
 		return
 	}
-	const tooltipW = 292
 	text := skillTooltipText(ctx, skill)
-	w.tooltip.ShowColoredBox(ctx, text, mx+16+tooltipW/2, my+18, tooltipW, 0)
+	w.tooltip.ShowColoredBox(ctx, text, mx+skillTooltipDX+skillTooltipW/2, my+skillTooltipDY, float64(skillTooltipW), 0)
 }
 
 func (w *SkillWindow) updateTooltipHover(ctx Context) {
@@ -601,7 +591,7 @@ func (w *SkillWindow) skillAtMouse(ctx Context, mouseX, mouseY int) (session.Ski
 	if !pointInRect(mouseX, mouseY, x, y, scrollbarSafeIntWidth(skillTableViewW), skillTableBodyH) {
 		return session.Skill{}, false
 	}
-	row := int((float32(mouseY-y) + w.ensureScrollSignal().Get()) / skillRowH)
+	row := int((float32(mouseY-y) + w.ensureScrollSignal().Get()) / float32(skillRowH))
 	w.ensureSkillView(ctx)
 	skills := w.activeSkills()
 	if row < 0 || row >= len(skills) {
@@ -659,7 +649,12 @@ func grayscaleSkillIcon(img image.Image) image.Image {
 			pixel := img.At(x, y)
 			gray := color.GrayModel.Convert(pixel).(color.Gray).Y
 			_, _, _, alpha := pixel.RGBA()
-			out.SetRGBA(x, y, color.RGBA{R: gray, G: gray, B: gray, A: uint8(alpha >> 8)})
+			var grayPixel color.RGBA
+			grayPixel.R = gray
+			grayPixel.G = gray
+			grayPixel.B = gray
+			grayPixel.A = uint8(alpha >> 8)
+			out.SetRGBA(x, y, grayPixel)
 		}
 	}
 	return out
@@ -962,19 +957,6 @@ func (w *SkillWindow) contentHeight() int {
 	return height - ROWindowTitleHeight - ROWindowFooterHeight
 }
 
-var skillTableColumns = []rotheme.TableViewColumn{
-	{Key: "icon", Width: 34},
-	{Key: "type", Width: 16},
-	{Key: "name", Title: "Name", Width: 142},
-	{Key: "leveldown", Width: 18},
-	{Key: "level", Title: "Lv", Width: 40, Align: widget.TextAlignCenter},
-	{Key: "levelupselect", Width: 18},
-	{Key: "sp", Title: "SP", Width: 38},
-	{Key: "range", Title: "Range", Width: 56},
-	{Key: "levelup", Width: 22},
-	{Key: "fill", Flex: 1},
-}
-
 func skillTableButtonBounds(row int, key string) geometry.Rect {
 	return skillTableButtonBoundsForColumns(skillTableColumns, row, key)
 }
@@ -985,7 +967,7 @@ func skillTableButtonBoundsForColumns(columns []rotheme.TableViewColumn, row int
 		if col.Key == key {
 			return geometry.NewRect(
 				x+(col.Width-rotheme.IconButtonSize)/2,
-				float32(row)*skillRowH+(skillRowH-rotheme.IconButtonSize)/2,
+				float32(row)*float32(skillRowH)+(float32(skillRowH)-rotheme.IconButtonSize)/2,
 				rotheme.IconButtonSize,
 				rotheme.IconButtonSize,
 			)
@@ -1004,9 +986,9 @@ func skillTypeLabel(skill session.Skill) string {
 
 func skillTypeColor(skill session.Skill) widget.Color {
 	if skill.Type == 0 {
-		return widget.RGBA8(34, 142, 158, 255)
+		return skillPassiveColor
 	}
-	return widget.RGBA8(44, 92, 184, 255)
+	return skillActiveColor
 }
 
 func sessionSkills(s *session.Session) []session.Skill {
