@@ -350,6 +350,7 @@ func (w *SettingsWindow) saveSettings(ctx client.Context) {
 	settings := config.UserSettings{
 		Fullscreen:       settingsRuntimeFullscreen(ctx),
 		VSync:            settingsRuntimeVSync(ctx),
+		MaxFPS:           max(ctx.Config.Render.MaxFPS, 0),
 		FPS:              settingsRuntimeFPS(ctx),
 		Anisotropy:       settingsAnisotropy(ctx),
 		TextureUpscaling: settingsTextureUpscaling(ctx),

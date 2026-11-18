@@ -157,6 +157,7 @@ bgm_volume = 0.55
 [render]
 graphics_api = vulkan
 vsync = true
+max_fps = 144 # 0 = unlimited; with vsync, a cap uses low-latency mailbox presentation
 anisotropy = 8
 texture_upscaling = false
 smooth_sprites = true
@@ -226,7 +227,8 @@ Useful options:
 --bgm-volume 0.35
 --no-audio # disable BGM and SFX output entirely (useful for profiling)
 --graphics-api gles # fallback if Vulkan is unavailable
---vsync=false # unlock fps
+--vsync=false # present immediately (still capped by --max-fps)
+--max-fps 60 # frame cap, default 144; 0 = unlimited (vsync then falls back to FIFO pacing)
 --username <username> # prefill the username in login window
 --password <password> # same for password
 --autologin=true # perform server connection and login on startup
