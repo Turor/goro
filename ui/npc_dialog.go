@@ -21,23 +21,26 @@ import (
 )
 
 const (
-	npcDialogWidth       = 360
-	npcDialogHeight      = 260
-	npcDialogPad         = 12
-	npcDialogButtonW     = 78
-	npcDialogLineH       = 14
 	npcDialogMaxMessages = 32
-	npcMenuWidth         = 260
 	npcMenuMinRows       = 4
 	npcMenuMaxRows       = 5
-	npcMenuRowH          = 20
-	npcMenuPad           = 8
-	npcMenuMinHeight     = ROWindowTitleHeight + npcMenuPad*2 + npcMenuMinRows*npcMenuRowH + ROWindowFooterHeight
 	npcInputNumberWidth  = 174
 	npcInputTextWidth    = 274
 	npcInputTextHeight   = 32
 	npcInputNumberHeight = 52
 	npcInputMaxLength    = 80
+)
+
+// NPC dialog and menu geometry are layout tokens (see layout_tokens.go).
+var (
+	npcDialogWidth   = 360
+	npcDialogHeight  = 260
+	npcDialogPad     = 12
+	npcDialogButtonW = 78
+	npcDialogLineH   = 14
+	npcMenuWidth     = 260
+	npcMenuRowH      = 20
+	npcMenuPad       = 8
 )
 
 var (
@@ -267,10 +270,11 @@ func (d *NPCDialog) Control(ctx Context, action string) bool {
 			d.menuRow = max(0, min(len(d.options)-1, d.menuRow+delta))
 			scroll := d.ensureMenuScrollSignal()
 			top := float32(d.menuRow * npcMenuRowH)
+			rowH := float32(npcMenuRowH)
 			if top < scroll.Get() {
 				scroll.Set(top)
-			} else if bottom := top + npcMenuRowH; bottom > scroll.Get()+npcMenuMaxRows*npcMenuRowH {
-				scroll.Set(bottom - npcMenuMaxRows*npcMenuRowH)
+			} else if bottom := top + rowH; bottom > scroll.Get()+npcMenuMaxRows*rowH {
+				scroll.Set(bottom - npcMenuMaxRows*rowH)
 			}
 			d.dirty = true
 			d.refresh(ctx)
@@ -555,7 +559,7 @@ func (d *NPCDialog) dialogTree(ctx Context, width, height int) widget.Widget {
 			primitives.Expanded(primitives.Box()),
 			rotheme.Button(label, func() {
 				action(ctx)
-			}).Width(npcDialogButtonW),
+			}).Width(float32(npcDialogButtonW)),
 		}
 	}
 	lines := d.dialogLineWidgets(width, contentHeight)
@@ -578,7 +582,7 @@ func (d *NPCDialog) dialogTree(ctx Context, width, height int) widget.Widget {
 		Size(float32(width), float32(height)),
 		Content(
 			primitives.Box(lines...).
-				Padding(npcDialogPad).
+				Padding(float32(npcDialogPad)).
 				Gap(2),
 		),
 	}
@@ -680,7 +684,7 @@ func (d *NPCDialog) menuTree(ctx Context, width, height int) widget.Widget {
 		Size(float32(width), float32(height)),
 		Content(
 			primitives.Box(d.menuList(ctx)).
-				Padding(npcMenuPad),
+				Padding(float32(npcMenuPad)),
 		),
 		Footer(
 			primitives.Expanded(primitives.Box()),
@@ -701,7 +705,7 @@ func (d *NPCDialog) menuList(ctx Context) widget.Widget {
 	var lastClickAt time.Time
 	lv := listview.New(
 		listview.ItemCount(len(d.options)),
-		listview.FixedItemHeight(npcMenuRowH),
+		listview.FixedItemHeight(float32(npcMenuRowH)),
 		listview.ScrollYSignal(d.ensureMenuScrollSignal()),
 		listview.SelectionModeOpt(listview.SelectionSingle),
 		listview.SelectedIndex(d.menuRow),
@@ -723,10 +727,10 @@ func (d *NPCDialog) menuList(ctx Context) widget.Widget {
 		listview.PainterOpt(rotheme.SelectListPainter{EmptyText: "No options."}),
 		listview.BuildItem(func(item listview.ItemContext) widget.Widget {
 			if item.Index < 0 || item.Index >= len(d.options) {
-				return rotheme.SelectListRow("", true, npcMenuRowH)
+				return rotheme.SelectListRow("", true, float32(npcMenuRowH))
 			}
 			label := fmt.Sprintf("%d. %s", item.Index+1, npcDialogRunsPlainText(npcDialogTextRuns(d.options[item.Index], npcDialogTextColor)))
-			return rotheme.SelectListRow(trimRunes(label, 34), true, npcMenuRowH)
+			return rotheme.SelectListRow(trimRunes(label, 34), true, float32(npcMenuRowH))
 		}),
 	)
 	lv.SetFocused(true)
@@ -775,7 +779,7 @@ type npcDialogTextLineWidget struct {
 
 func (w *npcDialogTextLineWidget) Layout(_ widget.Context, constraints geometry.Constraints) geometry.Size {
 	width := npcDialogEstimatedTextWidth(npcDialogRunsPlainText(w.runs))
-	size := constraints.Constrain(geometry.Sz(width, npcDialogLineH))
+	size := constraints.Constrain(geometry.Sz(width, float32(npcDialogLineH)))
 	w.SetBounds(geometry.FromPointSize(w.Position(), size))
 	return size
 }
@@ -852,7 +856,7 @@ func npcDialogBounds(width, height int) (int, int, int, int) {
 func (d *NPCDialog) menuBounds(width, height, dialogX, dialogY, dialogW, dialogH int) (int, int, int, int) {
 	w := minInt(npcMenuWidth, maxInt(220, width-2*windowScreenMargin))
 	rows := maxInt(npcMenuMinRows, minInt(len(d.options), npcMenuMaxRows))
-	h := maxInt(npcMenuMinHeight, ROWindowTitleHeight+npcMenuPad*2+rows*npcMenuRowH+ROWindowFooterHeight)
+	h := ROWindowTitleHeight + npcMenuPad*2 + maxInt(npcMenuMinRows, rows)*npcMenuRowH + ROWindowFooterHeight
 	x := dialogX + (dialogW-w)/2
 	y := dialogY + dialogH + 8
 	x = clampWindowInt(x, windowScreenMargin, maxInt(windowScreenMargin, width-w-windowScreenMargin))
