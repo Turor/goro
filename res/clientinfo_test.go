@@ -43,3 +43,67 @@ func TestParseClientInfo(t *testing.T) {
 		}
 	}
 }
+
+func TestParseClientInfoPacketVersion(t *testing.T) {
+	info, err := ParseClientInfo([]byte(`
+<clientinfo>
+  <connection>
+    <display>TEST</display>
+    <address>192.0.2.10</address>
+    <port>6910</port>
+    <version>55</version>
+    <packet_version>20250716</packet_version>
+  </connection>
+  <connection>
+    <display>Classic</display>
+    <address>192.0.2.11</address>
+    <port>6900</port>
+    <version>55</version>
+    <packet_version>20080910</packet_version>
+  </connection>
+  <connection>
+    <display>NoDate</display>
+    <address>192.0.2.12</address>
+    <port>6900</port>
+    <version>55</version>
+    <packet_version>not-a-date</packet_version>
+  </connection>
+</clientinfo>`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(info.Connections) != 3 {
+		t.Fatalf("connections = %d", len(info.Connections))
+	}
+	if info.Connections[0].Version != 55 || info.Connections[0].PacketVersion != 20250716 {
+		t.Fatalf("slot 0 = %+v", info.Connections[0])
+	}
+	if info.Connections[1].PacketVersion != 20080910 {
+		t.Fatalf("slot 1 packet version = %d", info.Connections[1].PacketVersion)
+	}
+	if info.Connections[2].PacketVersion != 0 {
+		t.Fatalf("invalid packet_version should be ignored, got %d", info.Connections[2].PacketVersion)
+	}
+	if info.PacketVersionForSlot(0) != 20250716 || info.PacketVersionForSlot(1) != 20080910 {
+		t.Fatalf("PacketVersionForSlot = %d, %d", info.PacketVersionForSlot(0), info.PacketVersionForSlot(1))
+	}
+	if info.PacketVersionForSlot(-1) != 0 || info.PacketVersionForSlot(3) != 0 {
+		t.Fatal("out-of-range slots should return 0")
+	}
+}
+
+func TestParseClientInfoPacketVersionOptional(t *testing.T) {
+	info, err := ParseClientInfo([]byte(`
+<clientinfo>
+  <connection>
+    <display>Local</display>
+    <address>127.0.0.1</address>
+  </connection>
+</clientinfo>`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Connections[0].PacketVersion != 0 || info.PacketVersionForSlot(0) != 0 {
+		t.Fatalf("missing packet_version = %d", info.Connections[0].PacketVersion)
+	}
+}
