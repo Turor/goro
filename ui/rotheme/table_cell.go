@@ -81,15 +81,15 @@ func (c tableViewSimpleCell) draw(canvas widget.Canvas, bounds geometry.Rect) {
 		iconW := float32(iconBounds.Dx())
 		iconH := float32(iconBounds.Dy())
 		iconY := bounds.Min.Y + (bounds.Height()-iconH)/2
-		canvas.DrawImage(c.icon, geometry.Pt(bounds.Min.X+6, iconY))
-		textBounds.Min.X += iconW + 12
+		canvas.DrawImage(c.icon, geometry.Pt(bounds.Min.X+tableIconInset, iconY))
+		textBounds.Min.X += iconW + tableIconTextGap
 	}
 	textBounds.Min.X += TableCellPadX
 	textBounds.Max.X -= TableCellPadX
 	if textBounds.Width() < 0 {
 		textBounds.Max.X = textBounds.Min.X
 	}
-	textHeight := Default.Typography.TextSize * 1.2
+	textHeight := Default.Typography.TextSize * tableCellLineScale
 	if textHeight > textBounds.Height() {
 		textHeight = textBounds.Height()
 	}

@@ -14,14 +14,13 @@ import (
 
 // Row height, padding, column widths and the section gap are layout tokens;
 // the window size follows them (recomputeStatsWindowMetrics).
-const statsRowGap = rotheme.TableGap
 
 func statsWindowWidthFor(pad, sectionGap float32) int {
 	return int(2*pad + statsPrimaryColumnWidth + sectionGap + statsDerivedColumnWidth)
 }
 
 func statsWindowHeightFor(rowH int, pad float32) int {
-	return ROWindowTitleHeight + int(2*pad) + statsPrimaryRows*rowH + int(float32(statsPrimaryRows-1)*statsRowGap)
+	return ROWindowTitleHeight + int(2*pad) + statsPrimaryRows*rowH + int(float32(statsPrimaryRows-1)*rotheme.TableGap)
 }
 
 func recomputeStatsWindowMetrics() {
@@ -188,7 +187,7 @@ func (w *StatsWindow) statRowsWidget(ctx Context) widget.Widget {
 				Background(rotheme.Default.Colors.WindowFooter),
 		)
 	}
-	return primitives.Box(children...).Gap(statsRowGap)
+	return primitives.Box(children...).Gap(rotheme.TableGap)
 }
 
 func (w *StatsWindow) requestStatIncrease(ctx Context, row statRow) {
