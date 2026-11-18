@@ -131,11 +131,13 @@ func (t *LayoutTuner) report(err error, ok string) {
 	t.status = ok
 }
 
-// applyPending applies typed values; the first invalid one stops it.
+// applyPending applies typed values in token order; the first invalid one
+// stops it, and the values before it stay applied.
 func (t *LayoutTuner) applyPending() error {
-	for id, raw := range t.pending {
-		info, found := tunerToken(id)
-		if !found {
+	for _, info := range rotheme.Tokens() {
+		id := info.Section + "." + info.Key
+		raw, ok := t.pending[id]
+		if !ok {
 			continue
 		}
 		if err := rotheme.SetToken(info.Section, info.Key, raw); err != nil {
@@ -143,6 +145,8 @@ func (t *LayoutTuner) applyPending() error {
 		}
 		delete(t.pending, id)
 	}
+	// Keys that no longer exist are dropped.
+	clear(t.pending)
 	return nil
 }
 

@@ -127,5 +127,23 @@ func SaveOverrides(path string) error {
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	return os.Rename(name, path)
+	return replaceFile(name, path)
+}
+
+// replaceFile renames src over dst. Go's os.Rename already replaces an
+// existing file on Windows (MoveFileEx with MOVEFILE_REPLACE_EXISTING), but it
+// can still fail there while another process holds dst open without
+// FILE_SHARE_DELETE; then remove dst and retry once.
+func replaceFile(src, dst string) error {
+	err := os.Rename(src, dst)
+	if err == nil {
+		return nil
+	}
+	if _, statErr := os.Stat(dst); statErr != nil {
+		return err
+	}
+	if removeErr := os.Remove(dst); removeErr != nil {
+		return err
+	}
+	return os.Rename(src, dst)
 }

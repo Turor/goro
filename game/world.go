@@ -2,7 +2,6 @@ package game
 
 import (
 	"context"
-	"github.com/kivutar/goro/ui/rotheme"
 	"image"
 	"math"
 	"sort"
@@ -31,6 +30,7 @@ import (
 	"github.com/kivutar/goro/render"
 	"github.com/kivutar/goro/session"
 	gameui "github.com/kivutar/goro/ui"
+	"github.com/kivutar/goro/ui/rotheme"
 	worldstate "github.com/kivutar/goro/world"
 )
 
