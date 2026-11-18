@@ -12,6 +12,10 @@ var (
 	settingsGap           = 8
 	settingsOptionButtonW = 48
 	settingsDividerH      = 1
+	// Theme dropdown on the Gameplay tab.
+	settingsThemeDropdownW = 132
+	settingsThemeItemH     = 20
+	settingsThemeMenuRows  = 8
 )
 
 func init() {
@@ -25,4 +29,7 @@ func init() {
 	s.Int("gap", &settingsGap, 0, 32, "gap between settings rows")
 	s.Int("option_button_width", &settingsOptionButtonW, 24, 160, "option cycle button width")
 	s.Int("divider_height", &settingsDividerH, 0, 8, "line under the tabs")
+	s.Int("theme_dropdown_width", &settingsThemeDropdownW, 60, 400, "Theme dropdown width")
+	s.Int("theme_item_height", &settingsThemeItemH, 12, 48, "Theme menu row height")
+	s.Int("theme_menu_rows", &settingsThemeMenuRows, 1, 24, "Theme menu visible rows before it scrolls")
 }

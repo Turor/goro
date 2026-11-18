@@ -102,6 +102,51 @@ type UILayoutConfig struct {
 	Watch bool
 	// DumpPath, when set, writes the full default layout there and exits.
 	DumpPath string
+	// Theme names the palette theme under ui-layout.ini: a built-in theme
+	// (default, dark, complementary, analogous, triadic) or <name>.ini in the
+	// themes folder. Empty means the default theme. The settings window saves
+	// it as [ui_layout] theme.
+	Theme string
+}
+
+// ThemesDirName is the folder next to goro.ini that holds user theme files.
+const ThemesDirName = "themes"
+
+// maxThemeNameLen bounds a saved theme name.
+const maxThemeNameLen = 40
+
+// ThemesDir returns the folder searched for user theme files.
+func (cfg Config) ThemesDir() string {
+	dir := "."
+	if cfg.ConfigPath != "" {
+		dir = filepath.Dir(cfg.ConfigPath)
+	}
+	return filepath.Join(dir, ThemesDirName)
+}
+
+// validateThemeName accepts the names a theme file may have: lower-case
+// letters, digits, '_' and '-'. Empty means the default theme.
+func validateThemeName(name string) error {
+	if len(name) > maxThemeNameLen {
+		return fmt.Errorf("ui_layout theme is longer than %d characters", maxThemeNameLen)
+	}
+	for _, r := range name {
+		if !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '_' || r == '-') {
+			return fmt.Errorf("ui_layout theme %q may use only a-z, 0-9, '_' and '-'", name)
+		}
+	}
+	return nil
+}
+
+// SaveUITheme remembers the selected theme in goro.ini ([ui_layout] theme).
+func (cfg Config) SaveUITheme(name string) (string, error) {
+	name = strings.ToLower(strings.TrimSpace(name))
+	if err := validateThemeName(name); err != nil {
+		return "", err
+	}
+	return cfg.saveConfigValues(map[string]map[string]string{
+		"uilayout": {"theme": name},
+	})
 }
 
 // DefaultUILayoutFile is the override file name looked up next to goro.ini.
@@ -799,6 +844,12 @@ func applyConfigValue(cfg *Config, section, key, value string) error {
 		cfg.UILayout.Path = value
 	case "uilayout.watch":
 		return setBool(value, &cfg.UILayout.Watch)
+	case "uilayout.theme":
+		name := strings.ToLower(strings.TrimSpace(value))
+		if err := validateThemeName(name); err != nil {
+			return err
+		}
+		cfg.UILayout.Theme = name
 	default:
 		return fmt.Errorf("unknown key %q in section %q", key, section)
 	}
@@ -895,7 +946,7 @@ func validateMaxFPS(fps int) error {
 }
 
 func upsertINIValues(src string, values map[string]map[string]string) string {
-	sectionOrder := []string{"window", "render", "audio", "fog", "gameplay", "login", "chatshortcuts", "script", "ui"}
+	sectionOrder := []string{"window", "render", "audio", "fog", "gameplay", "login", "chatshortcuts", "script", "ui", "uilayout"}
 	seenSections := make(map[string]bool)
 	written := make(map[string]map[string]bool)
 	for section := range values {
@@ -959,10 +1010,19 @@ func upsertINIValues(src string, values map[string]map[string]string) string {
 		if len(out) > 0 && strings.TrimSpace(out[len(out)-1]) != "" {
 			out = append(out, "")
 		}
-		out = append(out, "["+section+"]")
+		out = append(out, "["+iniSectionHeader(section)+"]")
 		flushMissing(section)
 	}
 	return strings.Join(out, "\n") + "\n"
+}
+
+// iniSectionHeader is how a new section is written: the documented name for
+// sections whose normalized key drops an underscore.
+func iniSectionHeader(section string) string {
+	if section == "uilayout" {
+		return "ui_layout"
+	}
+	return section
 }
 
 func sortedINIKeys(values map[string]string) []string {

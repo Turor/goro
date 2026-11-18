@@ -64,7 +64,47 @@ as written; after a palette change, Save writes only the palette lines.
 
 [`ui-palette-dark.example.ini`](ui-palette-dark.example.ini) is a complete
 dark theme: a palette plus a few overrides for colors the light theme derives
-as pale fills (title bars, hovers, highlights).
+as pale fills (title bars, hovers, highlights). It is the same as the built-in
+Dark theme below.
+
+## Themes (Settings > Gameplay > Theme)
+
+A theme is a palette file that sits under `ui-layout.ini`. Pick one from the
+Theme dropdown at the top of the settings window's Gameplay tab: it applies at
+once, and the choice is saved in `goro.ini`:
+
+```ini
+[ui_layout]
+theme = dark
+```
+
+The order, lowest first, is: compiled default, then the theme, then
+`ui-layout.ini` (and the F11 tuner). So anything set in `ui-layout.ini` still
+wins over the theme key by key, and the tuner saves only your own changes,
+never the theme's values.
+
+Built in (embedded in the executable, in `ui/rotheme/themes/`):
+
+| Theme | Look |
+|---|---|
+| Default | The light blue Ragnarok look; sets nothing. |
+| Dark | Charcoal panels with a gold accent. |
+| Complementary | Blue base hue and its orange complement on dark blue panels. |
+| Analogous | Neighbouring red, orange, yellow and yellow-green hues on light warm panels. |
+| Triadic | Violet, rose and green, 120 degrees apart, on dark violet panels. |
+
+Each color-theory theme builds its accent, highlight, good, bad, warning and
+panel colors from its scheme's hues. Every built-in theme keeps body text at
+WCAG AA contrast (at least 4.5:1) on the background and panel colors, and the
+window text, title and label colors on what they are drawn on;
+`TestBuiltinThemeTextContrast` checks it.
+
+Your own themes: put `<name>.ini` in a `themes` folder next to `goro.ini`
+(names use `a-z`, `0-9`, `_` and `-`). It is an ordinary layout file, usually
+just a `[palette]` section and a few `[theme]` lines; keys it leaves out keep
+the compiled defaults. A `# name: My Theme` comment at the top sets the label
+shown in the dropdown. A file with a built-in theme's name is ignored, and a
+file with an error is not applied (the current theme stays).
 
 ## Live editing (--ui-dev)
 

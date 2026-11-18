@@ -398,9 +398,13 @@ func ParseLayout(r io.Reader, path string) (Layout, []string, error) {
 func (l Layout) Len() int { return len(l.values) }
 
 // Apply replaces every token: overridden ones take the file value and the rest
-// return to their compiled defaults. The palette is applied first, then every
-// palette reference is resolved against it. It must run on the UI thread.
+// return to the active theme's value, or their compiled default when the theme
+// does not set them (see themes.go). The palette is applied first, then every
+// palette reference is resolved against it. The layout is remembered as the
+// user layout, so switching theme later re-applies it on top of the new theme.
+// It must run on the UI thread.
 func (l Layout) Apply() {
+	userLayout = l
 	for _, palette := range []bool{true, false} {
 		for _, t := range tokens {
 			if (t.section == paletteSection) != palette {
@@ -408,7 +412,7 @@ func (l Layout) Apply() {
 			}
 			src, ok := l.values[t]
 			if !ok {
-				src = t.def
+				src = t.base()
 			}
 			v := t.resolve(src)
 			t.set(v)
@@ -467,7 +471,8 @@ func sameSource(a, b tokenValue) bool {
 	return a == b
 }
 
-// ResetLayout restores every compiled default.
+// ResetLayout drops every user override: the active theme and, below it, the
+// compiled defaults apply.
 func ResetLayout() {
 	Layout{}.Apply()
 }
@@ -477,35 +482,45 @@ func ResetLayout() {
 // Only regular files up to MaxLayoutFileSize are read, so a FIFO or device at
 // the path cannot block startup and a huge file cannot exhaust memory.
 func LoadLayoutFile(path string) (applied bool, warnings []string, err error) {
+	layout, exists, warnings, err := readLayoutFile(path)
+	if err != nil || !exists {
+		return false, warnings, err
+	}
+	layout.Apply()
+	return true, warnings, nil
+}
+
+// readLayoutFile parses path without applying it. A missing file reports
+// exists=false and no error.
+func readLayoutFile(path string) (layout Layout, exists bool, warnings []string, err error) {
 	info, err := os.Stat(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return false, nil, nil
+			return Layout{}, false, nil, nil
 		}
-		return false, nil, &LayoutError{Path: path, Msg: err.Error()}
+		return Layout{}, false, nil, &LayoutError{Path: path, Msg: err.Error()}
 	}
 	if !info.Mode().IsRegular() {
-		return false, nil, &LayoutError{Path: path, Msg: "not a regular file"}
+		return Layout{}, false, nil, &LayoutError{Path: path, Msg: "not a regular file"}
 	}
 	if info.Size() > MaxLayoutFileSize {
-		return false, nil, &LayoutError{Path: path, Msg: fmt.Sprintf("file is %d bytes; the limit is %d", info.Size(), MaxLayoutFileSize)}
+		return Layout{}, false, nil, &LayoutError{Path: path, Msg: fmt.Sprintf("file is %d bytes; the limit is %d", info.Size(), MaxLayoutFileSize)}
 	}
 	file, err := os.Open(path)
 	if err != nil {
-		return false, nil, &LayoutError{Path: path, Msg: err.Error()}
+		return Layout{}, false, nil, &LayoutError{Path: path, Msg: err.Error()}
 	}
 	defer file.Close()
 	// The file may grow between Stat and Open: never read past the limit.
 	limited := &io.LimitedReader{R: file, N: MaxLayoutFileSize + 1}
-	layout, warnings, err := ParseLayout(limited, path)
+	layout, warnings, err = ParseLayout(limited, path)
 	if err != nil {
-		return false, warnings, err
+		return Layout{}, false, warnings, err
 	}
 	if limited.N <= 0 {
-		return false, nil, &LayoutError{Path: path, Msg: fmt.Sprintf("file is over the %d byte limit", MaxLayoutFileSize)}
+		return Layout{}, false, nil, &LayoutError{Path: path, Msg: fmt.Sprintf("file is over the %d byte limit", MaxLayoutFileSize)}
 	}
-	layout.Apply()
-	return true, warnings, nil
+	return layout, true, warnings, nil
 }
 
 // WriteLayout writes every token with its current value and documentation, so

@@ -31,7 +31,7 @@ func Tokens() []TokenInfo {
 			Numeric: t.kind == tokenInt || t.kind == tokenFloat || t.kind == tokenFloat64,
 			Integer: t.kind == tokenInt,
 			Min:     t.min, Max: t.max,
-			Value: t.format(t.value()), Default: t.format(t.def),
+			Value: t.format(t.value()), Default: t.format(t.base()),
 		}
 		if isColorToken(t) {
 			info.Color = t.format(t.current())
@@ -41,13 +41,15 @@ func Tokens() []TokenInfo {
 	return out
 }
 
-// currentLayout captures every value that differs from its default. A color
+// currentLayout captures every value that differs from its default (the
+// active theme's value, else the compiled one), so tuner edits never copy the
+// theme into the user layout. A color
 // that follows a palette reference is kept as the reference, so saving after
 // a palette change does not freeze the derived colors.
 func currentLayout() Layout {
 	layout := Layout{values: map[*token]tokenValue{}}
 	for _, t := range tokens {
-		if v := t.value(); !sameSource(v, t.def) {
+		if v := t.value(); !sameSource(v, t.base()) {
 			layout.values[t] = v
 		}
 	}
