@@ -18,6 +18,7 @@ type UISettings struct {
 	GuildOpen                bool
 	CartOpen                 bool
 	WorldMapOpen             bool
+	WarpraOpen               bool
 	EmotesOpen               bool
 	ChatShortcutsOpen        bool
 	SettingsOpen             bool
@@ -42,6 +43,7 @@ type UISettings struct {
 	GuildPosition            WindowPosition
 	CartPosition             WindowPosition
 	WorldMapPosition         WindowPosition
+	WarpraPosition           WindowPosition
 	EmotesPosition           WindowPosition
 	ChatShortcutsPosition    WindowPosition
 	SettingsPosition         WindowPosition
@@ -94,6 +96,7 @@ func (s *UISettings) boolFields() map[string]*bool {
 		"guild_open":             &s.GuildOpen,
 		"cart_open":              &s.CartOpen,
 		"world_map_open":         &s.WorldMapOpen,
+		"warpra_open":            &s.WarpraOpen,
 		"emotes_open":            &s.EmotesOpen,
 		"chat_shortcuts_open":    &s.ChatShortcutsOpen,
 		"settings_open":          &s.SettingsOpen,
@@ -122,6 +125,7 @@ func (s *UISettings) positionFields() map[string]*WindowPosition {
 		"guild_position":             &s.GuildPosition,
 		"cart_position":              &s.CartPosition,
 		"world_map_position":         &s.WorldMapPosition,
+		"warpra_position":            &s.WarpraPosition,
 		"emotes_position":            &s.EmotesPosition,
 		"chat_shortcuts_position":    &s.ChatShortcutsPosition,
 		"settings_position":          &s.SettingsPosition,
