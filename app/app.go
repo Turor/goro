@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/gogpu/gpucontext"
@@ -15,6 +16,7 @@ import (
 	"github.com/kivutar/goro/render"
 	"github.com/kivutar/goro/res"
 	"github.com/kivutar/goro/session"
+	"github.com/kivutar/goro/sim"
 	gameui "github.com/kivutar/goro/ui"
 	"github.com/kivutar/goro/ui/rotheme"
 	"github.com/kivutar/goro/world"
@@ -43,6 +45,7 @@ type Game struct {
 	effectData        *effectDataWatcher
 	uiTuner           *gameui.LayoutTuner
 	uiGen             uint64
+	capture           *sim.FileRecorder
 }
 
 func New(cfg config.Config) (*Game, error) {
@@ -115,6 +118,11 @@ func NewWithResources(cfg config.Config, resource *res.Manager) *Game {
 		g.uiTuner = gameui.NewLayoutTuner(g.uiLayout.path)
 	}
 	g.uiGen = rotheme.Generation()
+	if path := strings.TrimSpace(cfg.Network.Capture); path != "" {
+		g.capture = sim.NewFileRecorder(path, clientDate)
+		g.network.SetObserver(g.capture)
+		glog.Infof("packet capture %s", path)
+	}
 	g.session.KeepLoginID = cfg.Login.KeepID
 	g.session.SavedUsername = cfg.Login.SavedUsername
 	g.session.NoShift = cfg.Gameplay.NoShift
@@ -275,6 +283,12 @@ func (g *Game) Close() {
 			_ = archive.Close()
 		}
 		g.resource.Archives = nil
+	}
+	if g.capture != nil {
+		if err := g.capture.Close(); err != nil {
+			glog.Warnf("packet capture: %v", err)
+		}
+		g.capture = nil
 	}
 }
 

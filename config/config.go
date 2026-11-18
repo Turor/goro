@@ -188,6 +188,9 @@ type RenderConfig struct {
 
 type NetworkConfig struct {
 	Trace bool
+	// Capture is a JSON path for framed s2c packets (Phase 5 golden replay).
+	// Empty disables recording. Set with --capture or GORO_CAPTURE.
+	Capture string
 }
 
 type FogConfig struct {
@@ -577,6 +580,7 @@ func parseCLI(cfg *Config, args []string) error {
 	fs.BoolVar(&cfg.Render.Stats, "render-stats", cfg.Render.Stats, "show render stats")
 	fs.BoolVar(&cfg.Render.WorldDebugStats, "world-debug-stats", cfg.Render.WorldDebugStats, "show world renderer debug stats")
 	fs.BoolVar(&cfg.Network.Trace, "net-trace", cfg.Network.Trace, "log network reads and writes")
+	fs.StringVar(&cfg.Network.Capture, "capture", cfg.Network.Capture, "write framed server packets to this JSON capture (golden replay)")
 	fs.BoolVar(&cfg.Fog.Enabled, "fog", cfg.Fog.Enabled, "enable map fog")
 	fs.BoolVar(&cfg.Gameplay.NoShift, "no-shift", cfg.Gameplay.NoShift, "allow support skills to target enemies without holding Shift")
 	fs.BoolVar(&cfg.Gameplay.NoCtrl, "no-ctrl", cfg.Gameplay.NoCtrl, "keep attacking with one click without holding Ctrl")
@@ -610,6 +614,9 @@ func parseCLI(cfg *Config, args []string) error {
 	}
 	if windowed {
 		cfg.Window.Fullscreen = false
+	}
+	if cfg.Network.Capture == "" {
+		cfg.Network.Capture = strings.TrimSpace(os.Getenv("GORO_CAPTURE"))
 	}
 	return nil
 }
@@ -762,6 +769,8 @@ func applyConfigValue(cfg *Config, section, key, value string) error {
 		return setBool(value, &cfg.Render.WorldDebugStats)
 	case "network.trace":
 		return setBool(value, &cfg.Network.Trace)
+	case "network.capture":
+		cfg.Network.Capture = value
 	case "fog.enabled":
 		return setBool(value, &cfg.Fog.Enabled)
 	case "gameplay.noshift":

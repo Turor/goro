@@ -303,6 +303,16 @@ func (b *Script) registerAPI(api *lua.LTable) {
 			L.Push(player)
 			return 1
 		},
+		"quit": func(L *lua.LState) int {
+			ctx := b.Context
+			if ctx.RequestQuit != nil {
+				ctx.RequestQuit()
+				L.Push(lua.LTrue)
+				return 1
+			}
+			L.Push(lua.LFalse)
+			return 1
+		},
 	})
 	b.registerControlsAPI(api)
 }
