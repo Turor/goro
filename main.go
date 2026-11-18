@@ -28,6 +28,14 @@ func main() {
 	}
 	defer closeLog()
 
+	if cfg.UILayout.DumpPath != "" {
+		if err := app.DumpUILayout(cfg.UILayout.DumpPath); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	if updater.Enabled(os.Args[1:]) {
 		res, err := updater.CheckOnLaunch(os.Args[1:], glog.Infof)
 		switch {

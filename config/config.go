@@ -34,6 +34,34 @@ type Config struct {
 	Log           glog.LogConfig
 	ChatShortcuts ChatShortcuts
 	UI            UISettings
+	UILayout      UILayoutConfig
+}
+
+// UILayoutConfig selects the UI layout and theme override file
+// (ui-layout.ini). Players need none of it: without the file the built-in
+// layout is used and nothing is watched.
+type UILayoutConfig struct {
+	// Path is the override file. Empty means ui-layout.ini next to goro.ini.
+	Path string
+	// Watch polls the file and applies edits while the game runs (--ui-dev).
+	Watch bool
+	// DumpPath, when set, writes the full default layout there and exits.
+	DumpPath string
+}
+
+// DefaultUILayoutFile is the override file name looked up next to goro.ini.
+const DefaultUILayoutFile = "ui-layout.ini"
+
+// UILayoutPath returns the override file to read.
+func (cfg Config) UILayoutPath() string {
+	if cfg.UILayout.Path != "" {
+		return cfg.UILayout.Path
+	}
+	dir := "."
+	if cfg.ConfigPath != "" {
+		dir = filepath.Dir(cfg.ConfigPath)
+	}
+	return filepath.Join(dir, DefaultUILayoutFile)
 }
 
 type WindowConfig struct {
@@ -363,8 +391,14 @@ func applyINIFile(cfg *Config, path string, explicit bool) error {
 	}
 	defer file.Close()
 
+	layoutBefore := cfg.UILayout.Path
 	if err := applyINI(cfg, file); err != nil {
 		return fmt.Errorf("read config %s: %w", path, err)
+	}
+	// A relative [ui_layout] file is relative to the INI that names it, not
+	// to the working directory. --ui-layout stays relative to the CWD.
+	if layout := cfg.UILayout.Path; layout != layoutBefore && layout != "" && !filepath.IsAbs(layout) {
+		cfg.UILayout.Path = filepath.Join(filepath.Dir(path), layout)
 	}
 	return nil
 }
@@ -425,6 +459,9 @@ func parseCLI(cfg *Config, args []string) error {
 	fs.StringVar(&cfg.Script.Path, "script", cfg.Script.Path, "Lua script to run while in game")
 	fs.StringVar(&cfg.Log.Level, "log-level", cfg.Log.Level, "minimum log level: debug, info, warn, error, fatal")
 	fs.StringVar(&cfg.Log.File, "log-file", cfg.Log.File, "append logs to this file")
+	fs.StringVar(&cfg.UILayout.Path, "ui-layout", cfg.UILayout.Path, "UI layout and theme override file (default ui-layout.ini next to goro.ini)")
+	fs.BoolVar(&cfg.UILayout.Watch, "ui-dev", cfg.UILayout.Watch, "apply UI layout file edits while running; F10 reloads")
+	fs.StringVar(&cfg.UILayout.DumpPath, "dump-ui-layout", cfg.UILayout.DumpPath, "write every UI layout key with its default to this path (- for stdout) and exit")
 
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -613,6 +650,10 @@ func applyConfigValue(cfg *Config, section, key, value string) error {
 		cfg.Log.Level = strings.ToLower(value)
 	case "log.file":
 		cfg.Log.File = value
+	case "uilayout.file":
+		cfg.UILayout.Path = value
+	case "uilayout.watch":
+		return setBool(value, &cfg.UILayout.Watch)
 	default:
 		return fmt.Errorf("unknown key %q in section %q", key, section)
 	}

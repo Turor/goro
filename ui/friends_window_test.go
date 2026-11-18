@@ -15,7 +15,7 @@ import (
 func TestPartyFooterAlignsButtonsRight(t *testing.T) {
 	var window FriendsWindow
 	footer := primitives.HBox(window.partyFooter(session.Party{Name: "Party"})...).
-		Gap(ROWindowFooterGap).
+		Gap(float32(ROWindowFooterGap)).
 		CrossAlign(primitives.CrossAxisCenter)
 
 	footer.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(180, 24)))

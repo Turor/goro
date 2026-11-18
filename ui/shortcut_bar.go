@@ -25,14 +25,18 @@ const (
 	shortcutMaxRows    = network.HotkeyListSlots2008 / shortcutCols
 	shortcutTotalSlots = network.HotkeyListSlots2008
 	shortcutMinRows    = 1
-	shortcutSlot       = 34
-	shortcutGap        = 2
-	shortcutRowGap     = 2
-	shortcutPad        = 3
 	shortcutControlGap = 0
 	shortcutControlPad = 2
 	shortcutControlW   = int(rotheme.IconButtonSize)
 	shortcutGripWidth  = 10
+)
+
+// Hotbar geometry is a layout token (see layout_tokens.go).
+var (
+	shortcutSlot   = 34
+	shortcutGap    = 2
+	shortcutRowGap = 2
+	shortcutPad    = 3
 )
 
 var shortcutFunctionKeys = [...]input.Key{
@@ -416,7 +420,7 @@ func (b *ShortcutBar) widgetTree() widget.Widget {
 			columns = append(columns, b.slotColumn(slot))
 		}
 		rows = append(rows, primitives.HBox(columns...).
-			Gap(shortcutGap).
+			Gap(float32(shortcutGap)).
 			CrossAlign(primitives.CrossAxisStart))
 	}
 	return Win(
@@ -435,8 +439,8 @@ func (b *ShortcutBar) widgetTree() widget.Widget {
 					CrossAlign(primitives.CrossAxisCenter),
 				primitives.Box(rows...).
 					Width(float32(shortcutGridWidth())).
-					Gap(shortcutRowGap).
-					Padding(shortcutPad).
+					Gap(float32(shortcutRowGap)).
+					Padding(float32(shortcutPad)).
 					CrossAlign(primitives.CrossAxisStretch),
 				b.rowControls(visibleRows),
 			).
@@ -457,7 +461,7 @@ func (b *ShortcutBar) rowControls(visibleRows int) widget.Widget {
 	).
 		Width(float32(shortcutControlW)).
 		Gap(shortcutControlGap).
-		PaddingTop(shortcutPad)
+		PaddingTop(float32(shortcutPad))
 }
 
 func (b *ShortcutBar) slotColumn(slot int) widget.Widget {
@@ -479,7 +483,7 @@ func newShortcutSlotButton(bar *ShortcutBar, slot int) *shortcutSlotButton {
 }
 
 func (w *shortcutSlotButton) Layout(ctx widget.Context, constraints geometry.Constraints) geometry.Size {
-	size := constraints.Constrain(geometry.Sz(shortcutSlot, shortcutSlot))
+	size := constraints.Constrain(geometry.Sz(float32(shortcutSlot), float32(shortcutSlot)))
 	w.SetBounds(geometry.FromPointSize(w.Position(), size))
 	return size
 }
@@ -513,7 +517,7 @@ func (w *shortcutSlotButton) drawContent(canvas widget.Canvas, bounds geometry.R
 			rotheme.DrawText(
 				canvas,
 				fmt.Sprintf("%d", item.Amount),
-				geometry.NewRect(bounds.Min.X+1, bounds.Max.Y-15, shortcutSlot-3, 12),
+				geometry.NewRect(bounds.Min.X+1, bounds.Max.Y-15, float32(shortcutSlot-3), 12),
 				rotheme.Default.Typography.TextSize,
 				rotheme.Default.Colors.Text,
 				false,
@@ -534,7 +538,7 @@ func (w *shortcutSlotButton) drawContent(canvas widget.Canvas, bounds geometry.R
 			rotheme.DrawText(
 				canvas,
 				fmt.Sprintf("Lv%d", maxInt(1, skill.Level)),
-				geometry.NewRect(bounds.Min.X+3, bounds.Min.Y+1, shortcutSlot-6, 12),
+				geometry.NewRect(bounds.Min.X+3, bounds.Min.Y+1, float32(shortcutSlot-6), 12),
 				rotheme.Default.Typography.TextSize,
 				Color(TitleTextColor),
 				false,

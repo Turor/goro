@@ -41,16 +41,24 @@ type windowFrame struct {
 	onClose func()
 }
 
+// Title and footer heights stay compile-time: about 90 window sizes are
+// constant sums of them, so changing them needs those sizes to move first.
 const (
 	ROWindowTitleHeight   = 28
 	ROWindowFooterHeight  = 42
-	ROWindowFooterPadding = 10
-	ROWindowFooterGap     = 8
 	windowScreenMargin    = 8
 	windowDirtyPadding    = 2
 	windowTitleButtonSize = 17
-	windowTitleButtonGap  = 2
-	windowTitleButtonPadR = 7
+)
+
+// Window frame spacing is a layout token (see layout_tokens.go).
+var (
+	ROWindowFooterPadding         = 10
+	ROWindowFooterGap             = 8
+	windowTitleButtonGap          = 2
+	windowTitleButtonPadR         = 7
+	windowTitlePadL       float32 = 12
+	windowBorderWidth     float32 = 1
 )
 
 func Win(options ...WindowOption) widget.Widget {
@@ -79,8 +87,8 @@ func Win(options ...WindowOption) widget.Widget {
 			windowTitleButtons(cfg.titleButtons, cfg.closeButton, cfg.onClose),
 		).
 			CrossAlign(primitives.CrossAxisCenter).
-			PaddingLeft(12).
-			PaddingRight(7).
+			PaddingLeft(windowTitlePadL).
+			PaddingRight(float32(windowTitleButtonPadR)).
 			Height(ROWindowTitleHeight)
 		children = append(children, roTitleBar(titleContent))
 	}
@@ -94,7 +102,7 @@ func Win(options ...WindowOption) widget.Widget {
 			primitives.Expanded(primitives.Box()),
 		).
 			CrossAlign(primitives.CrossAxisStretch).
-			PaddingXY(ROWindowFooterPadding, 0).
+			PaddingXY(float32(ROWindowFooterPadding), 0).
 			Height(ROWindowFooterHeight - 1)
 		footer := primitives.Box(
 			primitives.HBox(
@@ -122,7 +130,7 @@ func Win(options ...WindowOption) widget.Widget {
 		Width(cfg.width).
 		Height(cfg.height).
 		Background(background).
-		BorderStyle(1, rotheme.Default.Colors.WindowBorder).
+		BorderStyle(windowBorderWidth, rotheme.Default.Colors.WindowBorder).
 		Rounded(cfg.radius)
 	if cfg.onClose == nil {
 		return box
@@ -195,7 +203,7 @@ func Footer(children ...widget.Widget) WindowOption {
 			return
 		}
 		cfg.footer = primitives.HBox(children...).
-			Gap(ROWindowFooterGap).
+			Gap(float32(ROWindowFooterGap)).
 			CrossAlign(primitives.CrossAxisCenter)
 	}
 }
@@ -242,7 +250,7 @@ func windowTitleButtons(buttons []windowTitleButton, closeButton bool, onClose f
 		children = append(children, windowCloseButton(closeButton, onClose))
 	}
 	return primitives.HBox(children...).
-		Gap(windowTitleButtonGap).
+		Gap(float32(windowTitleButtonGap)).
 		CrossAlign(primitives.CrossAxisCenter)
 }
 
