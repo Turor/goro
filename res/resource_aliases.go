@@ -47,6 +47,11 @@ func (m *Manager) loadResourceAliases() {
 			}
 		}
 	}
+	if m.remote != nil {
+		if data, err := m.remote.read(names[0]); err == nil {
+			m.resourceAliases = parseResourceAliases(data)
+		}
+	}
 }
 
 func parseResourceAliases(data []byte) map[string]string {

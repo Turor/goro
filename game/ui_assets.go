@@ -1,6 +1,7 @@
 package game
 
 import (
+	"errors"
 	"fmt"
 	"image"
 	"math"
@@ -52,9 +53,11 @@ func (m *WorldMode) SkillIconImage(manager *res.Manager, skill session.Skill) im
 	if _, ok := m.imageMiss[key]; ok {
 		return nil
 	}
-	img, _, err := res.LoadImage(manager, res.SkillIconTextureCandidates(resourceName, int(skill.ID)))
+	img, _, err := res.LoadImageWithin(manager, res.SkillIconTextureCandidates(resourceName, int(skill.ID)), scene.FrameRemoteBudget)
 	if err != nil {
-		m.imageMiss[key] = struct{}{}
+		if !errors.Is(err, res.ErrRemotePending) {
+			m.imageMiss[key] = struct{}{}
+		}
 		return nil
 	}
 	m.imageCache[key] = img

@@ -19,6 +19,8 @@ type Manager struct {
 	FoundFiles []string
 	Archives   []*GRF
 	files      fs.FS
+	// remote streams files missing locally from an asset server (EnableRemote).
+	remote *remoteSource
 
 	sprites                  spriteResourceCache
 	looseDirectories         sync.Map
@@ -243,6 +245,13 @@ func (m *Manager) readFileDirect(name string, exact bool) ([]byte, error) {
 		}
 		return nil, err
 	}
+	// Streamed files come last: a loose file or a local archive is an explicit
+	// override. The server applies its own overlay priority (System/ and the
+	// text overlays, then slot-0 translation.grf, then the other archives).
+	// Ask once, on the exact pass, so suffix fallbacks never multiply requests.
+	if m.remote != nil && exact {
+		return m.remote.read(name)
+	}
 	return nil, fmt.Errorf("%w: %s", errResourceNotFound, name)
 }
 
@@ -268,7 +277,7 @@ func (m *Manager) hasFileDirect(name string) bool {
 			return true
 		}
 	}
-	return false
+	return m.remote != nil && m.remote.has(name)
 }
 
 func (m *Manager) FindFirst(names []string) (string, bool) {

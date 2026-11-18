@@ -10,3 +10,5 @@ run.sh
 *.keystore
 *.jks
 *.p12
+# Operator asset-server URL: never commit it (see data-server.example.ini).
+data-server.ini
