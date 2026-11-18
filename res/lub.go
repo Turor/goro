@@ -195,15 +195,13 @@ func executeLuaFunctionWithGopherLua(fn luaFunction, globals map[string]luaValue
 	if setup != nil {
 		setup(state)
 	}
-	cancel := attachLuaVMBudget(state)
-	defer cancel()
 	for key, value := range globals {
 		if value.kind != luaNil {
 			state.SetGlobal(key, luaValueToGopherLua(state, value))
 		}
 	}
 	lfn := state.NewFunctionFromProto(proto)
-	if err := state.CallByParam(glua.P{Fn: lfn, NRet: 0, Protect: true}); err != nil {
+	if err := luaCallByParam(state, lfn); err != nil {
 		return err
 	}
 	state.G.Global.ForEach(func(key glua.LValue, value glua.LValue) {
@@ -241,10 +239,26 @@ func openLuaResourceLibs(state *glua.LState) {
 // Tests may lower it. Pure data tables use the AST path and do not consume this.
 var luaVMBudget = 2 * time.Second
 
-func attachLuaVMBudget(state *glua.LState) context.CancelFunc {
+func attachLuaVMBudget(state *glua.LState) (context.Context, context.CancelFunc) {
 	ctx, cancel := context.WithTimeout(context.Background(), luaVMBudget)
 	state.SetContext(ctx)
-	return cancel
+	return ctx, cancel
+}
+
+// luaCallByParam runs fn under the VM budget. The budget starts here, after
+// compile and global seeding, so compile time does not count against it.
+// A timed-out call returns ctx.Err() so luaBudgetExceeded can see it:
+// gopher-lua wraps the context error as a string inside *ApiError with no Unwrap.
+func luaCallByParam(state *glua.LState, fn *glua.LFunction) error {
+	ctx, cancel := attachLuaVMBudget(state)
+	defer cancel()
+	if err := state.CallByParam(glua.P{Fn: fn, NRet: 0, Protect: true}); err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
+		}
+		return err
+	}
+	return nil
 }
 
 func luaBudgetExceeded(err error) bool {

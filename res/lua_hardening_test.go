@@ -1,9 +1,6 @@
 package res
 
 import (
-	"context"
-	"errors"
-	"strings"
 	"testing"
 	"time"
 
@@ -63,7 +60,7 @@ func TestExecuteLuaSourceBudgetOnInfiniteLoop(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected a VM budget error")
 	}
-	if !luaBudgetExceeded(err) && !errors.Is(err, context.DeadlineExceeded) && !strings.Contains(err.Error(), "context") {
+	if !luaBudgetExceeded(err) {
 		t.Fatalf("err = %v", err)
 	}
 	if elapsed > 2*time.Second {
