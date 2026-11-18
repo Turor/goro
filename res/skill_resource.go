@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/kivutar/goro/db"
+	glua "github.com/yuin/gopher-lua"
 )
 
 var skillIDLuaCandidates = []string{
@@ -24,6 +25,19 @@ var skillTreeViewLuaCandidates = []string{
 	"data\\luafiles514\\lua files\\skillinfo\\skilltreeview.lub",
 	"data\\lua files\\skillinfo\\skilltreeview.lub",
 	"lua files\\skillinfo\\skilltreeview.lub",
+}
+
+var skillInfoListLuaCandidates = []string{
+	"data\\luafiles514\\lua files\\skillinfoz\\skillinfolist.lub",
+	"data\\lua files\\skillinfoz\\skillinfolist.lub",
+	"lua files\\skillinfoz\\skillinfolist.lub",
+}
+
+var skillDescriptLuaCandidates = []string{
+	"data\\luafiles514\\lua files\\skillinfoz\\skilldescript.lub",
+	"data\\lua files\\skillinfoz\\skilldescript.lub",
+	"lua files\\skillinfoz\\skilldescript.lub",
+	"System\\skilldescript.lub",
 }
 
 var jobIdentityLuaCandidates = []string{
@@ -116,7 +130,7 @@ func (m *Manager) loadSkillResourceNames() {
 	if !ok {
 		return
 	}
-	if err := executeLua51Bytecode(data, globals); err != nil {
+	if err := executeLuaChunk(data, globals); err != nil {
 		return
 	}
 	table := globals["SKID"]
@@ -160,6 +174,116 @@ func (m *Manager) loadSkillMetadata() {
 			m.skillDescriptions[id] = lines
 		}
 	}
+	// Renewal clients replaced the text tables with SKILL_INFO_LIST and
+	// SKILL_DESCRIPT; when present they are newer, so they win.
+	m.loadSkillInfoList()
+	for id, name := range m.skillInfoNames {
+		m.skillDisplayNames[id] = name
+	}
+	if _, data, ok := m.ReadFirst(skillDescriptLuaCandidates); ok {
+		globals := m.skillIDGlobals()
+		if executeLuaChunk(data, globals) == nil {
+			if table := globals["SKILL_DESCRIPT"]; table.kind == luaTable {
+				for rawID, value := range table.table {
+					id, ok := rawID.(int)
+					if !ok || id <= 0 {
+						continue
+					}
+					lines := luaStringList(value)
+					for i, line := range lines {
+						lines[i] = decodeROText([]byte(line))
+					}
+					if len(lines) == 0 {
+						continue
+					}
+					m.skillDescriptions[id] = lines
+					if m.skillDisplayNames[id] == "" {
+						m.skillDisplayNames[id] = lines[0]
+					}
+				}
+			}
+		}
+	}
+}
+
+// loadSkillInfoList reads SKILL_INFO_LIST (skillinfolist.lub): display name
+// and max level per skill, keyed by SKID.
+func (m *Manager) loadSkillInfoList() {
+	if m.skillInfoListLoaded {
+		return
+	}
+	m.skillInfoListLoaded = true
+	m.skillInfoNames = make(map[int]string)
+	m.skillInfoMaxLevels = make(map[int]int)
+	_, data, ok := m.ReadFirst(skillInfoListLuaCandidates)
+	if !ok {
+		return
+	}
+	globals := m.skillIDGlobals()
+	if executeLuaChunk(data, globals) != nil {
+		return
+	}
+	table := globals["SKILL_INFO_LIST"]
+	if table.kind != luaTable {
+		return
+	}
+	for rawID, entry := range table.table {
+		id, ok := rawID.(int)
+		if !ok || id <= 0 || entry.kind != luaTable {
+			continue
+		}
+		if name := luaField(entry, "SkillName"); name.kind == luaString && name.str != "" {
+			m.skillInfoNames[id] = decodeROText([]byte(name.str))
+		}
+		if level := luaField(entry, "MaxLv"); level.kind == luaNumber && level.num > 0 {
+			m.skillInfoMaxLevels[id] = int(level.num)
+		}
+	}
+}
+
+// skillIDGlobals seeds a Lua environment with SKID from the loaded skill IDs
+// and JOBID from jobidentity.lub, which skillinfolist and skilltreeview key on.
+func (m *Manager) skillIDGlobals() map[string]luaValue {
+	m.loadSkillResourceNames()
+	skillIDs := make(map[interface{}]luaValue, len(m.skillResourceNames))
+	for id, name := range m.skillResourceNames {
+		if id > 0 && name != "" {
+			skillIDs[name] = luaValue{kind: luaNumber, num: float64(id)}
+		}
+	}
+	globals := map[string]luaValue{"SKID": {kind: luaTable, table: skillIDs}}
+	if jobs := m.jobIDTable(); jobs.kind == luaTable {
+		globals["JOBID"] = jobs
+	}
+	return globals
+}
+
+// jobIDTable returns the job constants from jobidentity.lub. Older clients
+// name the table JTtbl; skill tables expect JOBID.
+func (m *Manager) jobIDTable() luaValue {
+	if m.jobIDLoaded {
+		return m.jobIDs
+	}
+	m.jobIDLoaded = true
+	globals := make(map[string]luaValue)
+	_, jobData, ok := m.ReadFirst(jobIdentityLuaCandidates)
+	if !ok || executeLuaChunk(jobData, globals) != nil {
+		return m.jobIDs
+	}
+	m.jobIDs = globals["JOBID"]
+	if m.jobIDs.kind != luaTable {
+		m.jobIDs = globals["JTtbl"]
+	}
+	return m.jobIDs
+}
+
+// installJobSkillTab stubs the client's JobSkillTab API: renewal
+// skilltreeview.lub calls JobSkillTab.ChangeSkillTabName after the table to
+// label the 1st/2nd/3rd/4th tabs, which goro does not use yet.
+func installJobSkillTab(state *glua.LState) {
+	tab := state.NewTable()
+	tab.RawSetString("ChangeSkillTabName", state.NewFunction(func(*glua.LState) int { return 0 }))
+	state.SetGlobal("JobSkillTab", tab)
 }
 
 func (m *Manager) loadSkillMaxLevels() {
@@ -175,6 +299,10 @@ func (m *Manager) loadSkillMaxLevels() {
 			m.skillMaxLevels[id] = level
 		}
 	}
+	m.loadSkillInfoList()
+	for id, level := range m.skillInfoMaxLevels {
+		m.skillMaxLevels[id] = level
+	}
 }
 
 func (m *Manager) loadSkillTreePositions() {
@@ -188,30 +316,12 @@ func (m *Manager) loadSkillTreePositions() {
 		m.skillTreeTextPositions = parseSkillTreeTextPositions(data, m.skillNameToID())
 	}
 
-	globals := make(map[string]luaValue)
-	_, jobData, ok := m.ReadFirst(jobIdentityLuaCandidates)
-	if !ok || executeLua51Bytecode(jobData, globals) != nil {
+	globals := m.skillIDGlobals()
+	if globals["JOBID"].kind != luaTable {
 		return
 	}
-	// Older clients expose job constants as JTtbl while SkillTreeView expects
-	// the same table under JOBID.
-	jobs := globals["JOBID"]
-	if jobs.kind != luaTable {
-		jobs = globals["JTtbl"]
-		if jobs.kind != luaTable {
-			return
-		}
-		globals["JOBID"] = jobs
-	}
-	skillIDs := make(map[interface{}]luaValue, len(m.skillResourceNames))
-	for id, name := range m.skillResourceNames {
-		if id > 0 && name != "" {
-			skillIDs[name] = luaValue{kind: luaNumber, num: float64(id)}
-		}
-	}
-	globals["SKID"] = luaValue{kind: luaTable, table: skillIDs}
 	_, treeData, ok := m.ReadFirst(skillTreeViewLuaCandidates)
-	if !ok || executeLua51Bytecode(treeData, globals) != nil {
+	if !ok || executeLuaChunkWithSetup(treeData, globals, installJobSkillTab) != nil {
 		return
 	}
 	m.skillTreePositions = parseSkillTreePositions(globals["SKILL_TREEVIEW_FOR_JOB"])

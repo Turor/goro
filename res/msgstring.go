@@ -113,7 +113,7 @@ func parseMsgStringCSV(data []byte) map[int]string {
 
 func parseMsgStringLua(data []byte) map[int]string {
 	globals := make(map[string]luaValue)
-	if err := executeLua51Bytecode(data, globals); err != nil {
+	if err := executeLuaChunk(data, globals); err != nil {
 		return nil
 	}
 	for _, name := range []string{"MsgStringTable", "MsgStrID", "MsgString"} {
