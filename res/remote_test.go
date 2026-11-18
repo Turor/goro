@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -34,6 +35,12 @@ type fakeAssetServer struct {
 	indexFull int // list-files answered with a body
 	active    int
 	maxActive int
+
+	dataVersion uint64
+	changes     func(since uint64) []byte
+	manifest    []byte
+	versionHits int
+	changesHits int
 }
 
 func newFakeAssetServer(t *testing.T) *fakeAssetServer {
@@ -47,6 +54,43 @@ func newFakeAssetServer(t *testing.T) *fakeAssetServer {
 
 func (f *fakeAssetServer) serve(w http.ResponseWriter, r *http.Request) {
 	p := strings.TrimPrefix(r.URL.Path, "/client/")
+	f.mu.Lock()
+	version := f.dataVersion
+	f.mu.Unlock()
+	if version > 0 {
+		w.Header().Set("X-Data-Version", strconv.FormatUint(version, 10))
+	}
+	if p == "version" {
+		f.mu.Lock()
+		f.versionHits++
+		f.mu.Unlock()
+		_ = json.NewEncoder(w).Encode(map[string]uint64{"version": version})
+		return
+	}
+	if p == "changes" {
+		f.mu.Lock()
+		f.changesHits++
+		handler := f.changes
+		f.mu.Unlock()
+		since, _ := strconv.ParseUint(r.URL.Query().Get("since"), 10, 64)
+		if handler != nil {
+			_, _ = w.Write(handler(since))
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"version": version, "paths": []string{}})
+		return
+	}
+	if p == "data-manifest" {
+		f.mu.Lock()
+		body := f.manifest
+		f.mu.Unlock()
+		if len(body) == 0 {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write(body)
+		return
+	}
 	if p == "list-files" {
 		f.mu.Lock()
 		gate := f.gate
@@ -141,6 +185,7 @@ func streamingManager(t *testing.T, root, cache, url string, aliases map[string]
 	if err := m.EnableRemote(RemoteOptions{BaseURL: url, CacheDir: cache, Aliases: aliases}); err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(m.StopRemote)
 	return m
 }
 

@@ -3,6 +3,7 @@ package res
 import (
 	"bytes"
 	"context"
+	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -21,6 +22,7 @@ import (
 	"time"
 
 	"github.com/kivutar/goro/glog"
+	"github.com/kivutar/goro/updater"
 )
 
 // Size caps for one streamed file and for the archive index (vars for tests).
@@ -55,6 +57,14 @@ type RemoteOptions struct {
 	Aliases map[string]string
 	// Client overrides the HTTP client (tests).
 	Client *http.Client
+	// TrustedKeys is the list of public keys that may sign a data manifest.
+	// Empty uses updater.TrustedPublicKeys. Tests pass throwaway keys.
+	TrustedKeys []ed25519.PublicKey
+	// PollMin and PollMax bound the idle version poll (default 60–120s).
+	PollMin, PollMax time.Duration
+	// DeltaDebounce waits after a newer X-Data-Version before calling changes
+	// (default 2s). Tests lower this.
+	DeltaDebounce time.Duration
 }
 
 // TuroranRemoteAliases are the canonical names of the tables roBrowser's
@@ -104,6 +114,21 @@ type remoteSource struct {
 	// updated is called with the server path when a background refresh
 	// stored a changed file, so loaded tables can be rebuilt live.
 	updated func(string)
+
+	seenVersion      atomic.Uint64
+	cacheGen         atomic.Uint64
+	headerSeen       atomic.Bool
+	dataManifest     atomic.Pointer[updater.DataManifest]
+	keyRing          *updater.KeyRing
+	cachedVersion    uint64
+	haveCached       bool
+	acceptedManifest uint64
+	pollMin, pollMax time.Duration
+	deltaDebounce    time.Duration
+	jitter           func() float64
+	deltaWake        chan struct{}
+	stopCh           chan struct{}
+	stopOnce         sync.Once
 }
 
 type remoteIndex struct {
@@ -135,6 +160,7 @@ type remoteMeta struct {
 	Path       string `json:"path"`
 	ETag       string `json:"etag,omitempty"`
 	Generation string `json:"generation,omitempty"`
+	CacheGen   uint64 `json:"cache_gen,omitempty"`
 }
 
 func newRemoteSource(opts RemoteOptions) (*remoteSource, error) {
@@ -172,21 +198,37 @@ func newRemoteSource(opts RemoteOptions) (*remoteSource, error) {
 			aliases[key] = target
 		}
 	}
-	return &remoteSource{
-		base:       base,
-		host:       strings.ToLower(base.Host),
-		cacheDir:   opts.CacheDir,
-		background: make(chan struct{}, remoteBackground),
-		pending:    make(map[string]*remotePending),
-		aliases:    aliases,
-		client:     client,
-		indexReady: make(chan struct{}),
-		missing:    make(map[string]struct{}),
-		validated:  make(map[string]struct{}),
-		inflight:   make(map[string]*remoteCall),
-		logged:     make(map[string]struct{}),
-		stale:      make(map[string]struct{}),
-	}, nil
+	embedded := opts.TrustedKeys
+	if len(embedded) == 0 {
+		embedded = updater.TrustedPublicKeys
+	}
+	src := &remoteSource{
+		base:          base,
+		host:          strings.ToLower(base.Host),
+		cacheDir:      opts.CacheDir,
+		background:    make(chan struct{}, remoteBackground),
+		pending:       make(map[string]*remotePending),
+		aliases:       aliases,
+		client:        client,
+		indexReady:    make(chan struct{}),
+		missing:       make(map[string]struct{}),
+		validated:     make(map[string]struct{}),
+		inflight:      make(map[string]*remoteCall),
+		logged:        make(map[string]struct{}),
+		stale:         make(map[string]struct{}),
+		keyRing:       updater.NewKeyRing(filepath.Join(opts.CacheDir, "trusted-keys.json"), embedded),
+		pollMin:       opts.PollMin,
+		pollMax:       opts.PollMax,
+		deltaDebounce: opts.DeltaDebounce,
+		jitter:        defaultJitter,
+		deltaWake:     make(chan struct{}, 1),
+		stopCh:        make(chan struct{}),
+	}
+	if src.deltaDebounce <= 0 {
+		src.deltaDebounce = deltaDebounceDefault
+	}
+	src.loadCachedVersion()
+	return src, nil
 }
 
 // EnableRemote streams files that are not in the data directory or its local
@@ -208,6 +250,7 @@ func (m *Manager) EnableRemote(opts RemoteOptions) error {
 	m.resourceAliasesOnce = sync.Once{}
 	m.resourceAliases = nil
 	go source.loadIndex()
+	source.startVersionWorkers()
 	glog.Infof("remote data: streaming from %s (cache %s)", source.base.Redacted(), opts.CacheDir)
 	return nil
 }
@@ -428,8 +471,12 @@ func (r *remoteSource) fetch(p string) ([]byte, error) {
 		}
 		return cached, nil
 	case status == http.StatusOK:
+		if err := r.verifyDigest(p, body); err != nil {
+			r.logOnce("digest:"+p, "remote data: discarding %s: %v", p, err)
+			return nil, err
+		}
 		r.markValidated(p)
-		if err := r.store(dataPath, metaPath, body, remoteMeta{Path: p, ETag: newETag, Generation: generation}); err != nil {
+		if err := r.store(dataPath, metaPath, body, remoteMeta{Path: p, ETag: newETag, Generation: generation, CacheGen: r.cacheGen.Load()}); err != nil {
 			r.logOnce("cache", "remote data: cannot write cache %s: %v", r.cacheDir, err)
 		}
 		return body, nil
@@ -469,6 +516,9 @@ func (r *remoteSource) revalidation(p string, meta remoteMeta, generation string
 	if stale {
 		return revalidateNow
 	}
+	if meta.CacheGen < r.cacheGen.Load() {
+		return revalidateNow
+	}
 	if done {
 		return revalidateNever
 	}
@@ -490,8 +540,12 @@ func (r *remoteSource) refresh(p, dataPath, metaPath string, meta remoteMeta, ge
 	case err != nil:
 		r.logOnce("refresh", "remote data: cannot refresh cached files: %v", err)
 	case status == http.StatusOK:
+		if err := r.verifyDigest(p, body); err != nil {
+			r.logOnce("digest:"+p, "remote data: discarding refresh of %s: %v", p, err)
+			break
+		}
 		old, _ := os.ReadFile(dataPath)
-		if err := r.store(dataPath, metaPath, body, remoteMeta{Path: p, ETag: etag, Generation: generation}); err != nil {
+		if err := r.store(dataPath, metaPath, body, remoteMeta{Path: p, ETag: etag, Generation: generation, CacheGen: r.cacheGen.Load()}); err != nil {
 			r.logOnce("cache", "remote data: cannot write cache %s: %v", r.cacheDir, err)
 		} else if r.updated != nil && !bytes.Equal(old, body) {
 			r.updated(p)
@@ -555,6 +609,7 @@ func (r *remoteSource) get(p, etag string) ([]byte, string, int, error) {
 		return nil, "", 0, connError{err}
 	}
 	defer resp.Body.Close()
+	r.noteVersionHeader(resp.Header)
 	if resp.StatusCode != http.StatusOK {
 		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
 		return nil, "", resp.StatusCode, nil
@@ -628,6 +683,10 @@ func (r *remoteSource) logOnce(key, format string, args ...any) {
 // again. Either way indexReady closes, so waiters never hang.
 func (r *remoteSource) loadIndex() {
 	defer close(r.indexReady)
+	r.refreshIndex()
+}
+
+func (r *remoteSource) refreshIndex() {
 	indexPath, etagPath := r.indexPaths()
 	cachedETag := ""
 	if cached, err := os.ReadFile(indexPath); err == nil {
@@ -692,6 +751,7 @@ func (r *remoteSource) getIndex(etag string) ([]byte, string, int, error) {
 		return nil, "", 0, err
 	}
 	defer resp.Body.Close()
+	r.noteVersionHeader(resp.Header)
 	if resp.StatusCode != http.StatusOK {
 		return nil, "", resp.StatusCode, nil
 	}
