@@ -2,6 +2,7 @@ package game
 
 import (
 	"context"
+	"github.com/kivutar/goro/ui/rotheme"
 	"image"
 	"math"
 	"sort"
@@ -90,6 +91,9 @@ type WorldMode struct {
 }
 
 type worldUI struct {
+	// layoutGen is the UI layout token generation the windows were built with.
+	layoutGen            uint64
+	layoutBound          bool
 	preferences          windowPreferences
 	pet                  pet.Windows
 	battle               battle.Windows
@@ -382,6 +386,8 @@ func (m *WorldMode) Enter(ctx client.Context) Mode {
 }
 
 func (m *WorldMode) rebindPersistentUI(ctx client.Context) {
+	m.ui.layoutGen = rotheme.Generation()
+	m.ui.layoutBound = true
 	m.ui.console.Rebind(ctx)
 	m.ui.console.OnGuildWindow = func() { m.social().ToggleGuildWindow(ctx) }
 	m.ui.console.OnInstanceWindow = func() {
@@ -496,6 +502,7 @@ func (m *WorldMode) Update(ctx client.Context) (Mode, error) {
 	}
 	if !ctx.Config.Headless {
 		m.restoreUISettings(ctx)
+		m.rebuildUIAfterLayoutReload(ctx)
 	}
 	// Status presentation must follow server updates even when a window or
 	// modal consumes input for the rest of the frame.
@@ -1616,4 +1623,20 @@ func (m *WorldMode) startMapFadeOut(change network.MapChange, now time.Time) {
 func (m *WorldMode) startCharacterSelectFadeOut(now time.Time) {
 	m.ui.npc.Cutin.Clear()
 	m.mapFade.StartCharacterSelectOut(now)
+}
+
+// rebuildUIAfterLayoutReload rebuilds every open persistent window when a
+// reloaded ui-layout.ini changed the layout tokens, so padding, row heights,
+// labels and button heights follow the file without reopening anything. It
+// only runs after a reload (--ui-dev); players never change the generation.
+func (m *WorldMode) rebuildUIAfterLayoutReload(ctx client.Context) {
+	gen := rotheme.Generation()
+	if m.ui.layoutGen == gen {
+		return
+	}
+	if !m.ui.layoutBound {
+		// Windows not bound to this mode yet are built fresh on map entry.
+		return
+	}
+	m.rebindPersistentUI(ctx)
 }
