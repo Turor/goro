@@ -101,24 +101,10 @@ func (f *windowFrame) Layout(ctx widget.Context, constraints geometry.Constraint
 // window sizes are written against. The live heights are the layout tokens
 // windowTitleHeight and windowFooterHeight; Win grows or shrinks a window by
 // the difference, so the content area keeps its size.
+// theme:ok compiled baselines other window heights add as consts; live sizes are title_height and footer_height
 const (
-	ROWindowTitleHeight   = 28
-	ROWindowFooterHeight  = 42
-	windowScreenMargin    = 8
-	windowDirtyPadding    = 2
-	windowTitleButtonSize = 17
-)
-
-// Window frame spacing is a layout token (see layout_tokens.go).
-var (
-	ROWindowFooterPadding         = 10
-	ROWindowFooterGap             = 8
-	windowTitleButtonGap          = 2
-	windowTitleButtonPadR         = 7
-	windowTitlePadL       float32 = 12
-	windowBorderWidth     float32 = 1
-	windowTitleHeight             = ROWindowTitleHeight
-	windowFooterHeight            = ROWindowFooterHeight
+	ROWindowTitleHeight  = 28
+	ROWindowFooterHeight = 42
 )
 
 func Win(options ...WindowOption) widget.Widget {
@@ -336,7 +322,7 @@ func windowTitleButtons(buttons []windowTitleButton, closeButton bool, onClose f
 
 func windowCloseButton(enabled bool, onClose func()) widget.Widget {
 	if !enabled {
-		return primitives.Box().Width(windowTitleButtonSize).Height(float32(windowTitleHeight))
+		return primitives.Box().Width(float32(windowTitleButtonSize)).Height(float32(windowTitleHeight))
 	}
 	return windowTitleIconButton(rotheme.IconButtonClose, onClose)
 }
@@ -347,7 +333,7 @@ func windowTitleIconButton(kind rotheme.IconButtonKind, onClick func()) widget.W
 		rotheme.IconButton(kind, onClick),
 		primitives.Expanded(primitives.Box()),
 	).
-		Width(windowTitleButtonSize).
+		Width(float32(windowTitleButtonSize)).
 		Height(float32(windowTitleHeight))
 }
 

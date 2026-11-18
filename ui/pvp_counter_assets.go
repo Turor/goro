@@ -181,7 +181,7 @@ func (s *pvpRankSpriteSet) drawAction(target *render.Image, actionIndex, x, y in
 		if frame == nil {
 			continue
 		}
-		drawUISpriteLayer(target, frame, layer, float64(x), float64(y)-uiSpriteRendererMidCellY)
+		drawUISpriteLayer(target, frame, layer, float64(x), float64(y)-float64(uiSpriteRendererMidCellY))
 		drawn = true
 	}
 	return drawn

@@ -16,7 +16,8 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
+// Follow window.screen_margin; recomputeWindowScreenMargins updates them on reload.
+var (
 	characterWindowX = windowScreenMargin
 	characterWindowY = windowScreenMargin
 )

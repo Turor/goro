@@ -54,7 +54,7 @@ func trimRunes(text string, maxRunes int) string {
 	if maxRunes <= 3 {
 		return string(runes[:maxRunes])
 	}
-	return string(runes[:maxRunes-3]) + "..."
+	return string(runes[:maxRunes-3]) + "..." // theme:ok ellipsis rune count
 }
 
 func selectedCharacter(s *session.Session) session.Character {
