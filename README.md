@@ -157,7 +157,8 @@ bgm_volume = 0.55
 [render]
 graphics_api = vulkan
 vsync = true
-max_fps = 144 # 0 = unlimited; with vsync, a cap uses low-latency mailbox presentation
+# 0 = unlimited; with vsync, a cap uses low-latency mailbox presentation
+max_fps = 144
 anisotropy = 8
 texture_upscaling = false
 smooth_sprites = true
