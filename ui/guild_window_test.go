@@ -54,14 +54,14 @@ func TestGuildSkillTooltipAreaUsesInputCursorPosition(t *testing.T) {
 	}
 	tree := window.skillsTab(ctx)
 	uiCtx := widget.NewContext()
-	tree.Layout(uiCtx, geometry.Tight(geometry.Sz(guildTableViewportW, 100)))
-	tree.(interface{ SetBounds(geometry.Rect) }).SetBounds(geometry.NewRect(0, 0, guildTableViewportW, 100))
+	tree.Layout(uiCtx, geometry.Tight(geometry.Sz(float32(guildWindowWidth), 100)))
+	tree.(interface{ SetBounds(geometry.Rect) }).SetBounds(geometry.NewRect(0, 0, float32(guildWindowWidth), 100))
 
 	tree.Event(uiCtx, event.NewMouseEvent(
 		event.MouseMove,
 		event.ButtonNone,
 		0,
-		geometry.Pt(10, guildTableHeaderH+6),
+		geometry.Pt(10, float32(guildTableHeaderH+6)),
 		geometry.Pt(300, 120),
 		0,
 	))
@@ -180,8 +180,8 @@ func TestGuildMemberTableRightClickOpensClassicLifecycleMenu(t *testing.T) {
 	window := &GuildWindow{}
 	root := window.membersTab(ctx)
 	widgetCtx := widget.NewContext()
-	root.Layout(widgetCtx, geometry.Tight(geometry.Sz(guildWindowWidth, 200)))
-	position := geometry.Pt(180, guildTableHeaderH+guildTableRowH/2)
+	root.Layout(widgetCtx, geometry.Tight(geometry.Sz(float32(guildWindowWidth), 200)))
+	position := geometry.Pt(180, float32(guildTableHeaderH+guildTableRowH/2))
 
 	if !root.Event(widgetCtx, event.NewMouseEvent(event.MousePress, event.ButtonRight, event.ButtonStateRight, position, position, 0)) {
 		t.Fatal("guild member table did not consume right click")
@@ -215,7 +215,7 @@ func TestPublishedGuildMemberTableRightClickOpensClassicLifecycleMenu(t *testing
 	manager.root.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(800, 600)))
 	position := geometry.Pt(
 		float32(window.x+8),
-		float32(window.y+ROWindowTitleHeight+guildWindowTabHeight+2)+guildTableHeaderH+guildTableRowH/2,
+		float32(window.y+ROWindowTitleHeight+guildWindowTabHeight+guildContentGap+guildTableHeaderH)+float32(guildTableRowH)/2,
 	)
 	inputState.SetMousePosition(int(position.X), int(position.Y))
 	inputState.SetMouseButton(input.MouseButtonRight, true)
@@ -419,7 +419,7 @@ func TestGuildNoticeUsesLargeMultilineEditor(t *testing.T) {
 			if master {
 				bottom -= ROWindowFooterHeight
 			}
-			if bounds.Height() < 100 || bounds.Max.Y != bottom || bounds.Width() != guildWindowWidth-18 {
+			if bounds.Height() < 100 || bounds.Max.Y != bottom || bounds.Width() != float32(guildWindowWidth-18) {
 				t.Fatalf("notice bounds = %v, want full-width multiline contents ending at %g", bounds, bottom)
 			}
 			field.SetFocused(true)
@@ -561,7 +561,7 @@ func TestGuildEmblemControlHidesEditorForMembers(t *testing.T) {
 		MaxWidth:  300,
 		MaxHeight: 40,
 	})
-	if memberSize.Width != guildEmblemSize {
+	if memberSize.Width != float32(guildEmblemSize) {
 		t.Fatalf("member emblem control width = %.1f, want preview width %.1f", memberSize.Width, float32(guildEmblemSize))
 	}
 
@@ -570,7 +570,7 @@ func TestGuildEmblemControlHidesEditorForMembers(t *testing.T) {
 		MaxWidth:  300,
 		MaxHeight: 40,
 	})
-	if masterSize.Width <= guildEmblemSize {
+	if masterSize.Width <= float32(guildEmblemSize) {
 		t.Fatalf("master emblem control width = %.1f, want editor wider than preview %.1f", masterSize.Width, float32(guildEmblemSize))
 	}
 }
@@ -635,9 +635,9 @@ func TestGuildTableControlCellsKeepControlHeight(t *testing.T) {
 	for _, tc := range cells {
 		size := tc.cell.Layout(widget.NewContext(), geometry.Constraints{
 			MaxWidth:  160,
-			MaxHeight: guildTableRowH,
+			MaxHeight: float32(guildTableRowH),
 		})
-		if size.Height != guildTableControlH {
+		if size.Height != float32(guildTableControlH) {
 			t.Fatalf("%s height = %.1f, want %.1f", tc.name, size.Height, float32(guildTableControlH))
 		}
 	}
@@ -658,7 +658,7 @@ func TestGuildPositionCheckboxCellCentersCheckboxHorizontally(t *testing.T) {
 	cell := window.guildPositionRightCell(ctx, 1, 0x01, true, cellW)
 	size := cell.Layout(widget.NewContext(), geometry.Constraints{
 		MaxWidth:  160,
-		MaxHeight: guildTableRowH,
+		MaxHeight: float32(guildTableRowH),
 	})
 	if size.Width != cellW {
 		t.Fatalf("cell width = %.1f, want %.1f", size.Width, cellW)
@@ -673,7 +673,7 @@ func TestGuildPositionCheckboxCellCentersCheckboxHorizontally(t *testing.T) {
 	if got < want-0.01 || got > want+0.01 {
 		t.Fatalf("checkbox center x = %.1f, want %.1f", got, want)
 	}
-	if size.Height >= guildTableRowH {
+	if size.Height >= float32(guildTableRowH) {
 		t.Fatalf("checkbox cell height = %.1f, want less than row height %.1f", size.Height, float32(guildTableRowH))
 	}
 }
@@ -892,7 +892,7 @@ func TestGuildMemberContextWhisperNeedsNoManagementRights(t *testing.T) {
 		app.Frame()
 		app.Window().DrawTo(&uitest.MockCanvas{})
 		x := float32(w.memberContext.x + 30)
-		y := float32(w.memberContext.y + contextMenuPadding + contextMenuRowH/2)
+		y := float32(w.memberContext.y + contextMenuPadding + contextMenuRowH()/2)
 		app.Window().HandleEvent(uitest.Click(x, y))
 		app.Window().HandleEvent(uitest.Release(x, y))
 		w.drainMemberContextAction()
