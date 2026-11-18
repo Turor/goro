@@ -1490,6 +1490,8 @@ func (m *WorldMode) handleNetworkPacket(ctx client.Context, pkt network.Packet, 
 		m.actors().ClearActorVanish(entry.ID)
 		m.upsertNetworkActor(ctx, entry)
 		m.actors().ApplyWarpPortalEntry(ctx, entry)
+	} else {
+		glog.Debugf("world packet 0x%04X len=%d not handled by the generic parsers", pkt.ID, len(pkt.Data))
 	}
 
 	return nil, false

@@ -230,7 +230,7 @@ func (m *Screen) Update(ctx client.Context) (bool, error) {
 			m.charSelectPending = false
 			continue
 		}
-		if pkt.ID == 0x006A {
+		if network.IsAccountRefuseLogin(pkt.ID) {
 			refusal, err := network.ParseAccountRefuseLogin(pkt)
 			if err != nil {
 				m.loginPending = false
@@ -255,7 +255,7 @@ func (m *Screen) Update(ctx client.Context) (bool, error) {
 			m.applyLoginMapChange(ctx, change)
 			continue
 		}
-		if pkt.ID == 0x0069 {
+		if network.IsAccountAcceptLogin(pkt.ID) {
 			login, err := network.ParseAccountAcceptLogin(pkt)
 			if err != nil {
 				m.packets = append(m.packets, "parse AC_ACCEPT_LOGIN: "+err.Error())
@@ -265,8 +265,13 @@ func (m *Screen) Update(ctx client.Context) (bool, error) {
 				}
 			}
 		}
-		if pkt.ID == 0x006B {
+		if network.IsCharList(pkt.ID) {
 			list, err := network.ParseCharList(pkt)
+			if err == nil && pkt.ID == network.PacketHCAckCharInfoPerPage && len(list.Characters) == 0 {
+				// Hercules ends paged lists with an empty page; it is not a
+				// new (empty) character list.
+				continue
+			}
 			if err != nil {
 				m.packets = append(m.packets, "parse HC_ACCEPT_ENTER: "+err.Error())
 			} else {
@@ -301,7 +306,7 @@ func (m *Screen) Update(ctx client.Context) (bool, error) {
 				}
 			}
 		}
-		if pkt.ID == 0x006D {
+		if network.IsMakeCharacterAccept(pkt.ID) {
 			character, err := network.ParseMakeCharacterAccept(pkt)
 			if err != nil {
 				m.packets = append(m.packets, "parse HC_ACCEPT_MAKECHAR: "+err.Error())
@@ -345,7 +350,7 @@ func (m *Screen) Update(ctx client.Context) (bool, error) {
 			}
 			continue
 		}
-		if pkt.ID == 0x0071 {
+		if network.IsZoneServerNotify(pkt.ID) {
 			zone, err := network.ParseZoneServerNotify(pkt)
 			if err != nil {
 				m.packets = append(m.packets, "parse HC_NOTIFY_ZONESVR: "+err.Error())
@@ -362,7 +367,7 @@ func (m *Screen) Update(ctx client.Context) (bool, error) {
 				m.connectMapServer(ctx, zone)
 			}
 		}
-		if pkt.ID == 0x0073 || pkt.ID == 0x02EB {
+		if network.IsMapAcceptEnter(pkt.ID) {
 			enter, err := network.ParseMapAcceptEnter(pkt)
 			if err != nil {
 				m.packets = append(m.packets, "parse ZC_ACCEPT_ENTER: "+err.Error())

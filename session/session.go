@@ -212,10 +212,10 @@ type Character struct {
 	Level     int16
 	JobLevel  int16
 	Job       int16
-	HP        int16
-	MaxHP     int16
-	SP        int16
-	MaxSP     int16
+	HP        int
+	MaxHP     int
+	SP        int
+	MaxSP     int
 	Str       uint8
 	Agi       uint8
 	Vit       uint8

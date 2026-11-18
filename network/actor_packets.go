@@ -180,8 +180,22 @@ func ParseActorHPUpdate(packet Packet) (ActorHPUpdate, bool, error) {
 	}
 }
 
+// 20250716 unit packets (Hercules packet_idle_unit, packet_spawn_unit and
+// packet_unit_walking with AID, 32-bit shield, robe, HP and name).
+const (
+	PacketZCNotifyStandEntry2025 uint16 = 0x09FF
+	PacketZCNotifyNewEntry2025   uint16 = 0x09FE
+	PacketZCNotifyMoveEntry2025  uint16 = 0x09FD
+)
+
 func ParseActorEntry(packet Packet) (ActorEntry, bool, error) {
 	switch packet.ID {
+	case PacketZCNotifyStandEntry2025, PacketZCNotifyNewEntry2025, PacketZCNotifyMoveEntry2025:
+		entry, err := parseActorEntry2025(packet)
+		if err != nil {
+			return ActorEntry{}, false, err
+		}
+		return entry, true, nil
 	case 0x0078:
 		if len(packet.Data) < 55 {
 			return ActorEntry{}, false, fmt.Errorf("ZC_NOTIFY_STANDENTRY too short: %d", len(packet.Data))
@@ -515,6 +529,77 @@ func ParseActorEntry(packet Packet) (ActorEntry, bool, error) {
 	default:
 		return ActorEntry{}, false, nil
 	}
+}
+
+// parseActorEntry2025 decodes 0x09FF (idle), 0x09FE (spawn) and 0x09FD
+// (walking). The three share a prefix up to the accessory field; walking then
+// inserts moveStartTime, and idle adds a state byte after xSize/ySize.
+func parseActorEntry2025(packet Packet) (ActorEntry, error) {
+	minLength := map[uint16]int{
+		PacketZCNotifyStandEntry2025: 84,
+		PacketZCNotifyNewEntry2025:   83,
+		PacketZCNotifyMoveEntry2025:  90,
+	}[packet.ID]
+	if len(packet.Data) < minLength {
+		return ActorEntry{}, fmt.Errorf("unit entry 0x%04X too short: %d", packet.ID, len(packet.Data))
+	}
+	data := packet.Data
+	u16 := func(off int) uint16 { return binary.LittleEndian.Uint16(data[off : off+2]) }
+	u32 := func(off int) uint32 { return binary.LittleEndian.Uint32(data[off : off+4]) }
+
+	entry := ActorEntry{
+		ObjectType:    data[4],
+		HasObjectType: true,
+		ID:            u32(5),
+		Speed:         int(u16(13)),
+		BodyState:     u16(15),
+		HealthState:   u16(17),
+		EffectState:   u32(19),
+		HasState:      true,
+		Job:           int16(u16(23)),
+		Head:          int16(u16(25)),
+		Weapon:        int16(u32(27)),
+		Shield:        int16(u32(31)),
+		HeadLow:       int16(u16(35)),
+		Appearance:    true,
+		HasOpt3State:  true,
+		HasLevel:      true,
+	}
+	// Offset of accessory2 (head top); walking packs moveStartTime before it.
+	base := 37
+	if packet.ID == PacketZCNotifyMoveEntry2025 {
+		entry.MoveStartTick = u32(37)
+		entry.HasMoveStartTick = true
+		base = 41
+	}
+	entry.HeadTop = int16(u16(base))
+	entry.HeadMid = int16(u16(base + 2))
+	entry.HeadPal = int16(u16(base + 4))
+	entry.BodyPal = int16(u16(base + 6))
+	entry.HeadDir = uint8(u16(base + 8))
+	// base+10 is the robe (garment) sprite.
+	entry.GuildID = u32(base + 12)
+	entry.EmblemVersion = uint32(u16(base + 16))
+	// base+18 honor, base+20 virtue (opt3), base+24 PK mode.
+	entry.Opt3State = u32(base + 20)
+	entry.Sex = data[base+25]
+	pos := base + 26
+	switch packet.ID {
+	case PacketZCNotifyMoveEntry2025:
+		fromX, fromY, toX, toY := unpackMovePos(data[pos : pos+6])
+		entry.FromX, entry.FromY, entry.ToX, entry.ToY = fromX, fromY, toX, toY
+		entry.X, entry.Y = toX, toY
+		entry.Moving = true
+		entry.Level = int(int16(u16(pos + 8)))
+	case PacketZCNotifyStandEntry2025:
+		entry.X, entry.Y, entry.Dir = unpackPos(data[pos : pos+3])
+		// pos+3 xSize, pos+4 ySize, pos+5 dead/sit state.
+		entry.Level = int(int16(u16(pos + 6)))
+	default:
+		entry.X, entry.Y, entry.Dir = unpackPos(data[pos : pos+3])
+		entry.Level = int(int16(u16(pos + 5)))
+	}
+	return entry, nil
 }
 
 func legacyGuildFlagIdentity(job, shield, headTop, headMid int16, guildID, emblemVersion uint32) (uint32, uint32) {
