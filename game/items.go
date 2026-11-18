@@ -1,6 +1,7 @@
 package game
 
 import (
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
@@ -607,9 +608,11 @@ func (m *WorldMode) itemIconTexture(manager *res.Manager, itemID uint32, identif
 	if _, ok := m.mapScene.TextureMiss[key]; ok {
 		return nil
 	}
-	img, _, err := res.LoadImage(manager, res.ItemIconTextureCandidates(resourceName))
+	img, _, err := res.LoadImageWithin(manager, res.ItemIconTextureCandidates(resourceName), scene.FrameRemoteBudget)
 	if err != nil {
-		m.mapScene.TextureMiss[key] = struct{}{}
+		if !errors.Is(err, res.ErrRemotePending) {
+			m.mapScene.TextureMiss[key] = struct{}{}
+		}
 		return nil
 	}
 	texture := render.NewImageFromImage(img)
@@ -638,9 +641,11 @@ func (m *WorldMode) itemCollectionTexture(manager *res.Manager, itemID uint32, i
 	if _, ok := m.mapScene.TextureMiss[key]; ok {
 		return nil
 	}
-	img, _, err := res.LoadImage(manager, res.ItemCollectionTextureCandidates(resourceName))
+	img, _, err := res.LoadImageWithin(manager, res.ItemCollectionTextureCandidates(resourceName), scene.FrameRemoteBudget)
 	if err != nil {
-		m.mapScene.TextureMiss[key] = struct{}{}
+		if !errors.Is(err, res.ErrRemotePending) {
+			m.mapScene.TextureMiss[key] = struct{}{}
+		}
 		return nil
 	}
 	texture := render.NewImageFromImage(img)
@@ -689,9 +694,11 @@ func (m *WorldMode) skillIconTexture(manager *res.Manager, skill session.Skill) 
 	if _, ok := m.mapScene.TextureMiss[key]; ok {
 		return nil
 	}
-	img, _, err := res.LoadImage(manager, res.SkillIconTextureCandidates(resourceName, int(skill.ID)))
+	img, _, err := res.LoadImageWithin(manager, res.SkillIconTextureCandidates(resourceName, int(skill.ID)), scene.FrameRemoteBudget)
 	if err != nil {
-		m.mapScene.TextureMiss[key] = struct{}{}
+		if !errors.Is(err, res.ErrRemotePending) {
+			m.mapScene.TextureMiss[key] = struct{}{}
+		}
 		return nil
 	}
 	texture := render.NewImageFromImage(img)

@@ -20,7 +20,13 @@ func main() {
 	only := flag.String("only", "", "comma-separated extensions to check (e.g. rsw,gnd,lub)")
 	workers := flag.Int("workers", 8, "parallel readers")
 	maxExamples := flag.Int("examples", 5, "failure examples printed per kind and error")
+	dataURL := flag.String("data-url", "", "stream files missing from --data-dir from this asset server (e.g. https://assets.example.invalid/client/)")
+	dataCache := flag.String("data-cache", "", "cache directory for streamed files (default: a temporary directory)")
+	streamMap := flag.String("stream-map", "", "with --data-url: load this map (rsw, gnd, gat and its ground textures) and exit")
 	flag.Parse()
+	if *streamMap != "" {
+		os.Exit(runStreamMap(*dataDir, *dataURL, *dataCache, *streamMap))
+	}
 	if *dataDir == "" {
 		fmt.Fprintln(os.Stderr, "--data-dir is required")
 		os.Exit(2)
