@@ -23,7 +23,7 @@ func TestShopBuyAndSellTotalsAlignWithFooterButtons(t *testing.T) {
 	for _, mode := range []int{shopModeBuy, shopModeSell} {
 		window := ShopWindow{mode: mode}
 		root := window.buyCartWidgetTree(Context{})
-		root.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(shopBuyCartWindowW, float32(window.cartWindowHeight()))))
+		root.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(float32(shopBuyCartWindowW), float32(window.cartWindowHeight()))))
 
 		var total widget.Widget
 		var walk func(widget.Widget)
@@ -403,7 +403,7 @@ func TestPushcartGridUsesBottomCellShadows(t *testing.T) {
 		cellSize:  cartGridCell,
 		viewWidth: cartGridViewW,
 	})
-	grid.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(cartGridViewW, cartGridViewH)))
+	grid.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(float32(cartGridViewW), float32(cartGridViewH))))
 	canvas := &uitest.MockCanvas{}
 	grid.Draw(widget.NewContext(), canvas)
 
