@@ -28,12 +28,25 @@ import (
 // translation.grf, then the other DATA.INI archives.
 const DefaultRemoteDataURL = "https://ro.turoran.com/client/"
 
+// Size caps for one streamed file and for the archive index (vars for tests).
+var (
+	remoteMaxFile  int64 = 128 << 20
+	remoteMaxIndex int64 = 64 << 20
+)
+
 const (
-	remoteMaxFile        = 128 << 20
-	remoteMaxIndex       = 64 << 20
 	remoteOfflineBackoff = 30 * time.Second
 	remoteRequestTimeout = 2 * time.Minute
+	// remoteMaxConns caps connections to the asset server; remoteBackground
+	// caps concurrent background work (refreshes and prefetches).
+	remoteMaxConns   = 6
+	remoteBackground = 4
 )
+
+// ErrRemotePending reports a streamed file that is still downloading after
+// the caller's wait budget. It is a not-found error, so lookups fall through;
+// ask again on a later frame.
+var ErrRemotePending = fmt.Errorf("%w: still downloading", errResourceNotFound)
 
 // RemoteOptions configures streaming of client data from an asset server.
 type RemoteOptions struct {
@@ -69,6 +82,7 @@ var TuroranRemoteAliases = map[string]string{
 // candidate instead of aborting.
 type remoteSource struct {
 	base     *url.URL
+	host     string // cache key prefix, so one cache_dir can serve several hosts
 	cacheDir string
 	aliases  map[string]string
 	client   *http.Client
@@ -85,6 +99,8 @@ type remoteSource struct {
 	logged       map[string]struct{}
 	offlineUntil time.Time
 	requests     atomic.Int64
+	background   chan struct{}
+	pending      map[string]*remotePending
 	// refreshed is called after a background refresh (tests).
 	refreshed func(string)
 }
@@ -93,6 +109,20 @@ type remoteIndex struct {
 	names      map[string]struct{}
 	generation string
 }
+
+type remotePending struct {
+	done   chan struct{}
+	data   []byte
+	source string
+	err    error
+}
+
+// connError marks failures to reach the server (dial, TLS, no response), the
+// only errors that put the source in its offline back-off.
+type connError struct{ err error }
+
+func (e connError) Error() string { return e.err.Error() }
+func (e connError) Unwrap() error { return e.err }
 
 type remoteCall struct {
 	done chan struct{}
@@ -129,7 +159,8 @@ func newRemoteSource(opts RemoteOptions) (*remoteSource, error) {
 		transport := http.DefaultTransport.(*http.Transport).Clone()
 		transport.DialContext = (&net.Dialer{Timeout: 5 * time.Second, KeepAlive: 30 * time.Second}).DialContext
 		transport.ResponseHeaderTimeout = 20 * time.Second
-		transport.MaxIdleConnsPerHost = 8
+		transport.MaxIdleConnsPerHost = remoteMaxConns
+		transport.MaxConnsPerHost = remoteMaxConns
 		client = &http.Client{Transport: transport}
 	}
 	aliases := make(map[string]string, len(opts.Aliases))
@@ -142,7 +173,10 @@ func newRemoteSource(opts RemoteOptions) (*remoteSource, error) {
 	}
 	return &remoteSource{
 		base:       base,
+		host:       strings.ToLower(base.Host),
 		cacheDir:   opts.CacheDir,
+		background: make(chan struct{}, remoteBackground),
+		pending:    make(map[string]*remotePending),
 		aliases:    aliases,
 		client:     client,
 		indexReady: make(chan struct{}),
@@ -162,6 +196,12 @@ func (m *Manager) EnableRemote(opts RemoteOptions) error {
 		return err
 	}
 	m.remote = source
+	// newManager may already have resolved resnametable.txt (reading
+	// clientinfo falls back to aliases) while nothing was streamed; load the
+	// table again so the server's copy counts. EnableRemote must run before
+	// the manager is shared between goroutines.
+	m.resourceAliasesOnce = sync.Once{}
+	m.resourceAliases = nil
 	go source.loadIndex()
 	glog.Infof("remote data: streaming from %s (cache %s)", source.base.Redacted(), opts.CacheDir)
 	return nil
@@ -202,6 +242,11 @@ func remotePath(name string) string {
 	}
 	first, rest, ok := strings.Cut(clean, "/")
 	if !ok || rest == "" {
+		return ""
+	}
+	// The server list stays local: never stream a login server table.
+	switch strings.ToLower(path.Base(clean)) {
+	case "clientinfo.xml", "sclientinfo.xml":
 		return ""
 	}
 	switch strings.ToLower(first) {
@@ -303,7 +348,7 @@ func (r *remoteSource) readPath(p string) ([]byte, error) {
 }
 
 func (r *remoteSource) cachePaths(p string) (string, string) {
-	sum := sha256.Sum256([]byte(p))
+	sum := sha256.Sum256([]byte(r.host + "\x00" + p))
 	name := hex.EncodeToString(sum[:])
 	dir := filepath.Join(r.cacheDir, "files", name[:2])
 	return filepath.Join(dir, name), filepath.Join(dir, name+".json")
@@ -356,10 +401,16 @@ func (r *remoteSource) fetch(p string) ([]byte, error) {
 	body, newETag, status, err := r.get(p, etag)
 	switch {
 	case err != nil:
-		r.mu.Lock()
-		r.offlineUntil = time.Now().Add(remoteOfflineBackoff)
-		r.mu.Unlock()
-		r.logOnce("offline", "remote data: %s unreachable, using cached files for %s: %v", r.base.Redacted(), remoteOfflineBackoff, err)
+		var conn connError
+		if errors.As(err, &conn) {
+			r.mu.Lock()
+			r.offlineUntil = time.Now().Add(remoteOfflineBackoff)
+			r.mu.Unlock()
+			r.logOnce("offline", "remote data: %s unreachable, using cached files for %s: %v", r.base.Redacted(), remoteOfflineBackoff, err)
+		} else {
+			// One bad file (too large, cut short) must not stall the rest.
+			r.logOnce("file:"+p, "remote data: %s: %v", p, err)
+		}
 		if cacheErr == nil {
 			return cached, nil
 		}
@@ -423,6 +474,8 @@ func (r *remoteSource) revalidation(p string, meta remoteMeta, generation string
 
 // refresh revalidates a cached file and stores a newer copy if there is one.
 func (r *remoteSource) refresh(p, dataPath, metaPath string, meta remoteMeta, generation string) {
+	r.background <- struct{}{}
+	defer func() { <-r.background }()
 	body, etag, status, err := r.get(p, meta.ETag)
 	switch {
 	case err != nil:
@@ -469,18 +522,21 @@ func (r *remoteSource) get(p, etag string) ([]byte, string, int, error) {
 	r.requests.Add(1)
 	resp, err := r.client.Do(req)
 	if err != nil {
-		return nil, "", 0, err
+		return nil, "", 0, connError{err}
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
 		return nil, "", resp.StatusCode, nil
 	}
+	if resp.ContentLength > remoteMaxFile {
+		return nil, "", 0, fmt.Errorf("%s is larger than %d bytes", p, remoteMaxFile)
+	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, remoteMaxFile+1))
 	if err != nil {
 		return nil, "", 0, err
 	}
-	if len(body) > remoteMaxFile {
+	if int64(len(body)) > remoteMaxFile {
 		return nil, "", 0, fmt.Errorf("%s is larger than %d bytes", p, remoteMaxFile)
 	}
 	if resp.ContentLength >= 0 && int64(len(body)) != resp.ContentLength {
@@ -537,19 +593,31 @@ func (r *remoteSource) logOnce(key, format string, args ...any) {
 	}
 }
 
-// loadIndex loads the cached archive index first, then the server's current
-// one. Either way indexReady closes, so waiters never hang.
+// loadIndex loads the cached archive index first, then asks the server for
+// a newer one with its ETag. An unchanged list is neither parsed nor written
+// again. Either way indexReady closes, so waiters never hang.
 func (r *remoteSource) loadIndex() {
 	defer close(r.indexReady)
-	indexPath := filepath.Join(r.cacheDir, "list-files.json")
+	indexPath, etagPath := r.indexPaths()
+	cachedETag := ""
 	if cached, err := os.ReadFile(indexPath); err == nil {
 		if index, err := parseRemoteIndex(cached); err == nil {
 			r.index.Store(index)
+			if raw, err := os.ReadFile(etagPath); err == nil {
+				cachedETag = strings.TrimSpace(string(raw))
+			}
 		}
 	}
-	body, _, status, err := r.getIndex()
+	body, etag, status, err := r.getIndex(cachedETag)
+	if err == nil && status == http.StatusNotModified && r.index.Load() != nil {
+		return
+	}
 	if err != nil || status != http.StatusOK {
 		r.logOnce("index", "remote data: archive index unavailable (status %d): %v", status, err)
+		return
+	}
+	if current := r.index.Load(); current != nil && current.generation == remoteIndexGeneration(body) {
+		r.writeIndexETag(etagPath, etag)
 		return
 	}
 	index, err := parseRemoteIndex(body)
@@ -558,11 +626,27 @@ func (r *remoteSource) loadIndex() {
 		return
 	}
 	r.index.Store(index)
-	_ = writeFileAtomic(indexPath, body)
+	if err := writeFileAtomic(indexPath, body); err == nil {
+		r.writeIndexETag(etagPath, etag)
+	}
 	glog.Infof("remote data: %d archive files indexed", len(index.names))
 }
 
-func (r *remoteSource) getIndex() ([]byte, string, int, error) {
+func (r *remoteSource) indexPaths() (string, string) {
+	sum := sha256.Sum256([]byte(r.host))
+	name := "list-files-" + hex.EncodeToString(sum[:8])
+	return filepath.Join(r.cacheDir, name+".json"), filepath.Join(r.cacheDir, name+".etag")
+}
+
+func (r *remoteSource) writeIndexETag(etagPath, etag string) {
+	if etag == "" {
+		_ = os.Remove(etagPath)
+		return
+	}
+	_ = writeFileAtomic(etagPath, []byte(etag))
+}
+
+func (r *remoteSource) getIndex(etag string) ([]byte, string, int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), remoteRequestTimeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, r.base.String()+"list-files", nil)
@@ -570,6 +654,9 @@ func (r *remoteSource) getIndex() ([]byte, string, int, error) {
 		return nil, "", 0, err
 	}
 	req.Header.Set("User-Agent", "goro-remote-data/1")
+	if etag != "" {
+		req.Header.Set("If-None-Match", etag)
+	}
 	resp, err := r.client.Do(req)
 	if err != nil {
 		return nil, "", 0, err
@@ -578,14 +665,22 @@ func (r *remoteSource) getIndex() ([]byte, string, int, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, "", resp.StatusCode, nil
 	}
+	if resp.ContentLength > remoteMaxIndex {
+		return nil, "", 0, errors.New("archive index too large")
+	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, remoteMaxIndex+1))
 	if err != nil {
 		return nil, "", 0, err
 	}
-	if len(body) > remoteMaxIndex {
+	if int64(len(body)) > remoteMaxIndex {
 		return nil, "", 0, errors.New("archive index too large")
 	}
 	return body, resp.Header.Get("ETag"), http.StatusOK, nil
+}
+
+func remoteIndexGeneration(body []byte) string {
+	sum := sha256.Sum256(body)
+	return hex.EncodeToString(sum[:])
 }
 
 func parseRemoteIndex(body []byte) (*remoteIndex, error) {
@@ -602,7 +697,129 @@ func parseRemoteIndex(body []byte) (*remoteIndex, error) {
 			index.names[strings.ToLower(p)] = struct{}{}
 		}
 	}
-	sum := sha256.Sum256(body)
-	index.generation = hex.EncodeToString(sum[:])
+	index.generation = remoteIndexGeneration(body)
 	return index, nil
+}
+
+// ReadFileCandidatesWithin is ReadFileCandidates for per-frame callers: when
+// a lookup needs the network it waits at most budget, then returns
+// ErrRemotePending while the download finishes in the background. Asking
+// again later returns the file (from the cache) without waiting twice. Do not
+// record ErrRemotePending as a permanent miss.
+func (m *Manager) ReadFileCandidatesWithin(names []string, budget time.Duration) ([]byte, string, error) {
+	if m == nil || m.remote == nil || budget <= 0 {
+		return m.ReadFileCandidates(names)
+	}
+	r := m.remote
+	key := strings.Join(names, "\x00")
+	r.mu.Lock()
+	call, running := r.pending[key]
+	if !running {
+		call = &remotePending{done: make(chan struct{})}
+		r.pending[key] = call
+		go func() {
+			call.data, call.source, call.err = m.ReadFileCandidates(names)
+			r.mu.Lock()
+			delete(r.pending, key)
+			r.mu.Unlock()
+			close(call.done)
+		}()
+	}
+	r.mu.Unlock()
+	if running {
+		// A previous frame already waited; never stall twice for one file.
+		select {
+		case <-call.done:
+			return call.data, call.source, call.err
+		default:
+			return nil, "", ErrRemotePending
+		}
+	}
+	timer := time.NewTimer(budget)
+	defer timer.Stop()
+	select {
+	case <-call.done:
+		return call.data, call.source, call.err
+	case <-timer.C:
+		return nil, "", ErrRemotePending
+	}
+}
+
+// RemoteBatch tracks background prefetches. A nil batch is done.
+type RemoteBatch struct {
+	remaining atomic.Int64
+}
+
+// Done reports whether every prefetch in the batch has finished.
+func (b *RemoteBatch) Done() bool { return b == nil || b.remaining.Load() <= 0 }
+
+// PrefetchRemote downloads, in parallel and in the background, the file each
+// candidate list would stream, so a loading screen can keep drawing while
+// the network works. Lists that a local file satisfies first are skipped.
+func (m *Manager) PrefetchRemote(lists [][]string) *RemoteBatch {
+	if m == nil || m.remote == nil {
+		return nil
+	}
+	r := m.remote
+	seen := make(map[string]struct{})
+	var paths []string
+	for _, candidates := range lists {
+		for _, name := range candidates {
+			if m.hasLocal(name) {
+				break
+			}
+			if p := r.prefetchPath(name); p != "" {
+				if _, ok := seen[p]; !ok {
+					seen[p] = struct{}{}
+					paths = append(paths, p)
+				}
+				break
+			}
+		}
+	}
+	if len(paths) == 0 {
+		return nil
+	}
+	batch := &RemoteBatch{}
+	batch.remaining.Store(int64(len(paths)))
+	for _, p := range paths {
+		go func() {
+			defer batch.remaining.Add(-1)
+			r.background <- struct{}{}
+			defer func() { <-r.background }()
+			_, _ = r.readPath(p)
+		}()
+	}
+	return batch
+}
+
+// prefetchPath picks the server file a lookup of name would read: listed
+// archive files once the index is in, otherwise the first resolvable path.
+func (r *remoteSource) prefetchPath(name string) string {
+	paths := r.resolve(name)
+	if len(paths) == 0 {
+		return ""
+	}
+	index := r.index.Load()
+	if index == nil {
+		return paths[0]
+	}
+	for _, p := range paths {
+		if _, ok := index.names[strings.ToLower(p)]; ok {
+			return p
+		}
+	}
+	return ""
+}
+
+func (m *Manager) hasLocal(name string) bool {
+	if _, ok := m.Find(name); ok {
+		return true
+	}
+	for _, archive := range m.Archives {
+		if archive != nil && archive.Has(name) {
+			return true
+		}
+	}
+	return false
 }

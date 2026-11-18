@@ -27,11 +27,19 @@ type fakeAssetServer struct {
 	raw    []string // raw request paths, to check percent-encoding
 	gate   chan struct{}
 	server *httptest.Server
+
+	delay     map[string]time.Duration
+	broken    map[string]bool // send a short body
+	indexETag string
+	indexFull int // list-files answered with a body
+	active    int
+	maxActive int
 }
 
 func newFakeAssetServer(t *testing.T) *fakeAssetServer {
 	t.Helper()
-	f := &fakeAssetServer{t: t, files: map[string][]byte{}, etags: map[string]string{}, hits: map[string]int{}}
+	f := &fakeAssetServer{t: t, files: map[string][]byte{}, etags: map[string]string{}, hits: map[string]int{},
+		delay: map[string]time.Duration{}, broken: map[string]bool{}}
 	f.server = httptest.NewServer(http.HandlerFunc(f.serve))
 	t.Cleanup(f.server.Close)
 	return f
@@ -48,7 +56,17 @@ func (f *fakeAssetServer) serve(w http.ResponseWriter, r *http.Request) {
 		}
 		f.mu.Lock()
 		body, _ := json.Marshal(f.index)
+		etag := f.indexETag
+		if etag != "" && r.Header.Get("If-None-Match") == etag {
+			f.mu.Unlock()
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
+		f.indexFull++
 		f.mu.Unlock()
+		if etag != "" {
+			w.Header().Set("ETag", etag)
+		}
 		_, _ = w.Write(body)
 		return
 	}
@@ -57,7 +75,24 @@ func (f *fakeAssetServer) serve(w http.ResponseWriter, r *http.Request) {
 	f.raw = append(f.raw, r.URL.EscapedPath())
 	data, ok := f.files[p]
 	etag := f.etags[p]
+	delay := f.delay[p]
+	broken := f.broken[p]
+	f.active++
+	f.maxActive = max(f.maxActive, f.active)
 	f.mu.Unlock()
+	defer func() {
+		f.mu.Lock()
+		f.active--
+		f.mu.Unlock()
+	}()
+	if delay > 0 {
+		time.Sleep(delay)
+	}
+	if broken {
+		w.Header().Set("Content-Length", "1000")
+		_, _ = w.Write([]byte("short"))
+		return
+	}
 	if !ok {
 		http.NotFound(w, r)
 		return
@@ -212,8 +247,13 @@ func TestRemoteMissingFilesFailGracefullyAndAreAskedOnce(t *testing.T) {
 	if _, err := m.ReadFile("texture\\item\\x.bmp"); !errors.Is(err, errResourceNotFound) {
 		t.Fatalf("bare name: %v", err)
 	}
-	if n := srv.totalHits(); n != 1 {
+	// Besides the alias table (resnametable.txt, asked once), only the
+	// missing text table was requested.
+	if n := srv.totalHits() - srv.hitCount("data/resnametable.txt"); n != 1 {
 		t.Fatalf("%d requests, want only the one text probe", n)
+	}
+	if n := srv.hitCount("data/resnametable.txt"); n > 1 {
+		t.Fatalf("resnametable.txt requested %d times", n)
 	}
 	// A missing candidate falls through to the next one.
 	srv.put("data/known.spr", []byte("spr"), "")
