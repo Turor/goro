@@ -12,11 +12,6 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	chatRoomCreateW        = 306
-	chatRoomCreateContentH = 180
-)
-
 type ChatRoomCreateWindowAction struct {
 	Edit     bool
 	Title    string
@@ -49,7 +44,8 @@ func (w *ChatRoomCreateWindow) OpenEdit(ctx Context, title string, limit uint16,
 func (w *ChatRoomCreateWindow) Editing() bool { return w.IsOpen() && w.edit }
 
 func (w *ChatRoomCreateWindow) openForm(ctx Context, room ChatRoomCreateWindowAction) {
-	w.EnsureWindow(chatRoomCreateW, ROWindowTitleHeight+chatRoomCreateContentH+ROWindowFooterHeight)
+	w.EnsureWindow(chatRoomCreateW, chatRoomCreateWindowH())
+	w.SetSize(chatRoomCreateW, chatRoomCreateWindowH())
 	w.ctx = ctx
 	w.edit = room.Edit
 	w.title = room.Title
@@ -61,12 +57,35 @@ func (w *ChatRoomCreateWindow) openForm(ctx Context, room ChatRoomCreateWindowAc
 	w.limitField = nil
 	w.action = ChatRoomCreateWindowAction{}
 	w.Window.Open(ctx, w.widgetTree(ctx))
+	w.OnLayoutReload(w.reloadLayout)
 	w.Publish(ctx)
 	w.focusTitle()
 }
 
+func (w *ChatRoomCreateWindow) reloadLayout() {
+	var focused *textfield.Widget
+	switch {
+	case w.titleField != nil && w.titleField.IsFocused():
+		focused = w.titleField
+	case w.passwordField != nil && w.passwordField.IsFocused():
+		focused = w.passwordField
+	case w.limitField != nil && w.limitField.IsFocused():
+		focused = w.limitField
+	}
+	w.SetSize(chatRoomCreateW, chatRoomCreateWindowH())
+	w.SetContent(w.widgetTree(w.ctx))
+	if focused == nil {
+		return
+	}
+	if wc := windowWidgetContext(w.ctx); wc != nil {
+		wc.RequestFocus(focused)
+	} else {
+		focused.SetFocused(true)
+	}
+}
+
 func (w *ChatRoomCreateWindow) Update(ctx Context) bool {
-	w.EnsureWindow(chatRoomCreateW, ROWindowTitleHeight+chatRoomCreateContentH+ROWindowFooterHeight)
+	w.EnsureWindow(chatRoomCreateW, chatRoomCreateWindowH())
 	w.ctx = ctx
 	if !w.IsOpen() {
 		return false
@@ -108,22 +127,22 @@ func (w *ChatRoomCreateWindow) widgetTree(ctx Context) widget.Widget {
 		Title(title),
 		CloseButton(true),
 		OnClose(w.Close),
-		Size(chatRoomCreateW, ROWindowTitleHeight+chatRoomCreateContentH+ROWindowFooterHeight),
+		Size(float32(chatRoomCreateW), float32(chatRoomCreateWindowH())),
 		Content(
 			primitives.Box(
 				rotheme.Label("Title"),
 				primitives.Box(w.titleInput(ctx)).
-					Height(24).
+					Height(float32(chatRoomCreateFieldH)).
 					CrossAlign(primitives.CrossAxisStretch),
 				primitives.HBox(
 					primitives.Box(
 						rotheme.Label("Limit"),
 						primitives.Box(w.limitInput(ctx)).
-							Height(24).
+							Height(float32(chatRoomCreateFieldH)).
 							CrossAlign(primitives.CrossAxisStretch),
 					).
-						Width(72).
-						Gap(4),
+						Width(float32(chatRoomCreateLimitW)).
+						Gap(float32(chatRoomCreateLabelGap)),
 					primitives.Box(
 						rotheme.Label("Type"),
 						primitives.Box(
@@ -138,18 +157,18 @@ func (w *ChatRoomCreateWindow) widgetTree(ctx Context) widget.Widget {
 									w.public = value != "private"
 								}),
 							),
-						).Height(24),
+						).Height(float32(chatRoomCreateFieldH)),
 					).
-						Gap(4),
+						Gap(float32(chatRoomCreateLabelGap)),
 				).
-					Gap(12),
+					Gap(float32(chatRoomCreateColumnGap)),
 				rotheme.Label(passwordLabel),
 				primitives.Box(w.passwordInput(ctx)).
-					Height(24).
+					Height(float32(chatRoomCreateFieldH)).
 					CrossAlign(primitives.CrossAxisStretch),
 			).
-				Padding(14).
-				Gap(6),
+				Padding(float32(chatRoomCreatePad)).
+				Gap(float32(chatRoomCreateGap)),
 		),
 		Footer(
 			primitives.Expanded(primitives.Box()),

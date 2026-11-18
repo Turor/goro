@@ -8,26 +8,28 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	friendSettingsW        = 286
-	friendSettingsContentH = 112
-)
-
 type FriendSettingsWindow struct {
 	Window
 	settings session.WhisperSettings
 }
 
 func (w *FriendSettingsWindow) Open(ctx Context) {
-	w.EnsureWindow(friendSettingsW, ROWindowTitleHeight+friendSettingsContentH+ROWindowFooterHeight)
+	w.EnsureWindow(friendSettingsW, friendSettingsWindowH())
+	w.SetSize(friendSettingsW, friendSettingsWindowH())
 	w.ctx = ctx
 	w.settings = friendSettings(ctx.Session)
 	w.Window.Open(ctx, w.widgetTree(ctx))
+	w.OnLayoutReload(w.reloadLayout)
 	w.Publish(ctx)
 }
 
+func (w *FriendSettingsWindow) reloadLayout() {
+	w.SetSize(friendSettingsW, friendSettingsWindowH())
+	w.SetContent(w.widgetTree(w.ctx))
+}
+
 func (w *FriendSettingsWindow) Update(ctx Context) bool {
-	w.EnsureWindow(friendSettingsW, ROWindowTitleHeight+friendSettingsContentH+ROWindowFooterHeight)
+	w.EnsureWindow(friendSettingsW, friendSettingsWindowH())
 	w.ctx = ctx
 	if !w.IsOpen() {
 		return false
@@ -50,7 +52,7 @@ func (w *FriendSettingsWindow) widgetTree(ctx Context) widget.Widget {
 		Title("Friend Setup"),
 		CloseButton(true),
 		OnClose(w.Close),
-		Size(friendSettingsW, ROWindowTitleHeight+friendSettingsContentH+ROWindowFooterHeight),
+		Size(float32(friendSettingsW), float32(friendSettingsWindowH())),
 		Content(
 			primitives.Box(
 				rotheme.Checkbox(
@@ -78,8 +80,8 @@ func (w *FriendSettingsWindow) widgetTree(ctx Context) widget.Widget {
 					}),
 				),
 			).
-				Padding(14).
-				Gap(8),
+				Padding(float32(friendSettingsPad)).
+				Gap(float32(friendSettingsGap)),
 		),
 		Footer(
 			primitives.Expanded(primitives.Box()),
