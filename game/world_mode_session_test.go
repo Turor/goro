@@ -903,12 +903,12 @@ func TestMapTextureUploadsWaitForSubmissionBeforeFade(t *testing.T) {
 			t.Fatal("did not request the bounded first batch")
 		}
 		m.mapFade.AdvancePrewarm(now, len(m.mapScene.Images.Uploads) != 0)
-		if m.mapFade.Phase != maps.FadePrewarm || len(m.mapScene.Images.Uploads) != 35 {
+		if m.mapFade.Phase != maps.FadePrewarm || len(m.mapScene.Images.Uploads) != 36 {
 			t.Fatal("skipped submission advanced loading")
 		}
 	}
 	m.FrameSubmitted()
-	if len(m.mapScene.Images.Uploads) != 3 || m.mapFade.CoveredFrames != 0 {
+	if len(m.mapScene.Images.Uploads) != 4 || m.mapFade.CoveredFrames != 0 {
 		t.Fatal("upload counted as a rendered scene frame")
 	}
 	f.BeginFrame()

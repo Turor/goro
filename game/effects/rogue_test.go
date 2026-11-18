@@ -121,7 +121,7 @@ func TestRogueRealAssets(t *testing.T) {
 	for _, id := range []int{StealCoin, RogueCoin, Intimidate, BackStab, TeiHit3, StripWeapon, StripShield, StripArmor, StripHelm, QuakeBody4, NPCStop2} {
 		spec, _ := Lookup(id)
 		for _, c := range spec.Components {
-			if c.TextureFile != "" && m.EffectFileTexture(manager, c.TextureFile) == nil {
+			if c.TextureFile != "" && !TextureLoaded(m.EffectFileTexture(manager, c.TextureFile)) {
 				t.Errorf("effect %d missing texture %s", id, c.TextureFile)
 			}
 			if c.SpriteFile != "" && m.EffectSpriteView(manager, c.SpriteFile) == nil {
@@ -137,7 +137,7 @@ func TestRogueRealAssets(t *testing.T) {
 			}
 		}
 	}
-	if m.EffectFileTexture(manager, "effect/alpabet.bmp") == nil {
+	if !TextureLoaded(m.EffectFileTexture(manager, "effect/alpabet.bmp")) {
 		t.Fatal("missing Scribble bitmap alphabet")
 	}
 }

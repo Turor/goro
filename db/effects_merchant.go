@@ -25,5 +25,17 @@ func cartRevolutionEffectSpec() EffectSpec {
 }
 
 func loudEffectSpec() EffectSpec {
-	return strEffectSpecAttached("loud", "effect\\고성방가.wav", false)
+	spec := strEffectSpecAttached("loud", "effect\\고성방가.wav", false)
+	// Draw with the actor pass and a camera-plane bias so Crazy Uproar sits
+	// in front of NPCs. G61 owns any remaining depth-test visual fix.
+	spec.Layer = EffectLayerActor
+	spec.ZOrder = 10
+	spec.Depth = 0.05
+	if len(spec.Components) > 0 {
+		spec.Components[0].Layer = EffectLayerActor
+		spec.Components[0].ZOrder = 10
+		spec.Components[0].Depth = 0.05
+		spec.Components[0].RenderBefore = false
+	}
+	return spec
 }

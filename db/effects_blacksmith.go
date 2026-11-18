@@ -26,10 +26,11 @@ func repairWeaponEffectSpec() EffectSpec {
 }
 
 func crashEarthEffectSpec() EffectSpec {
-	spec := strEffectSpec("crashearth", "effect\\wizard_fire_pillar_b.wav")
-	spec.SFXDelays = []time.Duration{30 * EffectFrameDuration}
+	// roBrowser EF_CRASHEARTH: unattached STR crashearth, black_hammerfall,
+	// Camera.setQuake(startTick+350) with the default 650ms duration.
+	spec := strEffectSpec("crashearth", "effect\\black_hammerfall.wav")
 	spec.CameraShake = 650 * time.Millisecond
-	spec.CameraShakeDelay = 35 * EffectFrameDuration
+	spec.CameraShakeDelay = 350 * time.Millisecond
 	return spec
 }
 

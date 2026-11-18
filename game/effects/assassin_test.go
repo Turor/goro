@@ -80,7 +80,7 @@ func TestAssassinRealEffectAssets(t *testing.T) {
 	for _, id := range []int{Cloaking, SonicBlow, SonicBlow2, SonicBlowHit, Grimtooth, GrimtoothAtk, EnchantPoison, PoisonReact, VenomDust, VenomDust2, VenomSplasher, ThrowItem6} {
 		spec, _ := Lookup(id)
 		for _, c := range spec.Components {
-			if c.TextureFile != "" && m.EffectFileTexture(manager, c.TextureFile) == nil {
+			if c.TextureFile != "" && !TextureLoaded(m.EffectFileTexture(manager, c.TextureFile)) {
 				t.Errorf("effect %d missing texture %s", id, c.TextureFile)
 			}
 			if c.SpriteFile != "" && m.EffectSpriteView(manager, c.SpriteFile) == nil {

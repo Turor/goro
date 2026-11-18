@@ -138,8 +138,9 @@ as the skill trees, without a restart and without re-downloading everything.
   the Turoran overlay names count), calls `Manager.ReloadSkillData()`. That
   clears the load-once flags, rebuilds the tree, validates it, and installs it
   with `db.SetSkillTreeData`. The new tree generation makes open skill windows
-  rebuild. Other loaded tables (item names, map names) can register the same
-  way later.
+  rebuild. Effect overlays (`effects.json`, `ez2streffect.bson`) call
+  `Manager.ReloadEffectData()` the same way. Other loaded tables (item names,
+  map names) can register later.
 
 ## Rollout
 
