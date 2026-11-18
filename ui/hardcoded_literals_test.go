@@ -195,12 +195,15 @@ func scanUILiteralDirs(t *testing.T, dirs []string) (violations, annotated, unre
 	t.Helper()
 	for _, dir := range dirs {
 		pattern := filepath.Join(dir, "*.go")
-		if strings.ContainsAny(dir, "*?[") {
+		if strings.ContainsAny(dir, "*?[") || strings.HasSuffix(dir, ".go") {
 			pattern = dir
 		}
 		files, err := filepath.Glob(pattern)
 		if err != nil {
 			t.Fatal(err)
+		}
+		if len(files) == 0 {
+			t.Fatalf("literal guard: %s matches no Go files", pattern)
 		}
 		sort.Strings(files)
 		fset := token.NewFileSet()
