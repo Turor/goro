@@ -16,7 +16,13 @@ const (
 	modelUniformSize   = 80
 	modelSlotCount     = 64
 	shadowMapSize      = 1024
+	// shadowClearDepth is the depth stored before any shadow draw (far plane).
+	shadowClearDepth float32 = 1
 )
+
+// shadowClearColorFormat is the throwaway color attachment that makes the
+// Vulkan backend begin the shadow pass. It is not sampled.
+const shadowClearColorFormat = gputypes.TextureFormatRGBA8Unorm
 
 func (r *gpuRenderer) initEnhancedResources() error {
 	var err error
@@ -80,8 +86,31 @@ func (r *gpuRenderer) initEnhancedResources() error {
 		shadowTex.Release()
 		return err
 	}
+	colorTex, err := r.dev.CreateTexture(&wgpu.TextureDescriptor{
+		Label:         "goro-shadow-clear-color",
+		Size:          wgpu.Extent3D{Width: shadowMapSize, Height: shadowMapSize, DepthOrArrayLayers: 1},
+		MipLevelCount: 1,
+		SampleCount:   1,
+		Dimension:     gputypes.TextureDimension2D,
+		Format:        shadowClearColorFormat,
+		Usage:         wgpu.TextureUsageRenderAttachment,
+	})
+	if err != nil {
+		shadowView.Release()
+		shadowTex.Release()
+		return err
+	}
+	colorView, err := r.dev.CreateTextureView(colorTex, nil)
+	if err != nil {
+		colorTex.Release()
+		shadowView.Release()
+		shadowTex.Release()
+		return err
+	}
 	r.shadowTex = shadowTex
 	r.shadowView = shadowView
+	r.shadowColorTex = colorTex
+	r.shadowColorView = colorView
 	if err := r.clearShadowMap(); err != nil {
 		return err
 	}
@@ -137,6 +166,15 @@ func (r *gpuRenderer) initEnhancedResources() error {
 			DepthWriteEnabled: true,
 			DepthCompare:      gputypes.CompareFunctionLessEqual,
 		},
+		Multisample: gputypes.MultisampleState{Count: 1, Mask: 0xFFFFFFFF},
+		Fragment: &wgpu.FragmentState{
+			Module:     shader,
+			EntryPoint: "fs_main",
+			Targets: []gputypes.ColorTargetState{{
+				Format:    shadowClearColorFormat,
+				WriteMask: gputypes.ColorWriteMaskNone,
+			}},
+		},
 	})
 	if pipeErr != nil {
 		return nil
@@ -155,17 +193,78 @@ func (r *gpuRenderer) makeModelGroup(buf *wgpu.Buffer) (*wgpu.BindGroup, error) 
 	})
 }
 
+// shadowMapPass is the pass renderer init uses to clear the shadow map, and
+// the pass the directional shadow draw begins. This Vulkan backend returns
+// from BeginRenderPass without vkCmdBeginRenderPass when ColorAttachments is
+// empty, then End still calls vkCmdEndRenderPass and the driver faults on a
+// null render pass at 0x108. The color attachment is what makes Begin start
+// the pass. DepthLoadOpClear stores shadowClearDepth for later sampling.
+func (r *gpuRenderer) shadowMapPass() *wgpu.RenderPassDescriptor {
+	return shadowMapClearPass(r.shadowView, r.shadowColorView)
+}
+
+func shadowMapClearPass(depth, color *wgpu.TextureView) *wgpu.RenderPassDescriptor {
+	if depth == nil || color == nil {
+		return nil
+	}
+	return &wgpu.RenderPassDescriptor{
+		ColorAttachments: []wgpu.RenderPassColorAttachment{{
+			View:       color,
+			LoadOp:     gputypes.LoadOpClear,
+			StoreOp:    gputypes.StoreOpDiscard,
+			ClearValue: gputypes.Color{},
+		}},
+		DepthStencilAttachment: &wgpu.RenderPassDepthStencilAttachment{
+			View:            depth,
+			DepthLoadOp:     gputypes.LoadOpClear,
+			DepthStoreOp:    gputypes.StoreOpStore,
+			DepthClearValue: shadowClearDepth,
+		},
+	}
+}
+
+// vulkanPassEndable reports whether this Vulkan backend has begun a pass End
+// can finish. BeginRenderPass bails out when there is no color attachment.
+func vulkanPassEndable(desc *wgpu.RenderPassDescriptor) bool {
+	if desc == nil || len(desc.ColorAttachments) == 0 {
+		return false
+	}
+	for _, attachment := range desc.ColorAttachments {
+		if attachment.View == nil {
+			return false
+		}
+	}
+	if desc.DepthStencilAttachment != nil && desc.DepthStencilAttachment.View == nil {
+		return false
+	}
+	return true
+}
+
+// sampledShadowDepthBeforeDraw is the depth later frames sample after the
+// init clear and before any shadow draw. An unendable pass does not store it.
+func sampledShadowDepthBeforeDraw(desc *wgpu.RenderPassDescriptor) (float32, bool) {
+	if !vulkanPassEndable(desc) || desc.DepthStencilAttachment == nil {
+		return 0, false
+	}
+	depth := desc.DepthStencilAttachment
+	if depth.DepthLoadOp != gputypes.LoadOpClear || depth.DepthStoreOp != gputypes.StoreOpStore {
+		return 0, false
+	}
+	return depth.DepthClearValue, true
+}
+
 func (r *gpuRenderer) clearShadowMap() error {
+	desc := r.shadowMapPass()
+	if !vulkanPassEndable(desc) {
+		// Do not call End. The backend never began this pass.
+		return nil
+	}
 	enc, err := r.dev.CreateCommandEncoder(&wgpu.CommandEncoderDescriptor{Label: "goro-shadow-clear"})
 	if err != nil {
 		return err
 	}
 	defer enc.DiscardEncoding()
-	pass, err := enc.BeginRenderPass(&wgpu.RenderPassDescriptor{
-		DepthStencilAttachment: &wgpu.RenderPassDepthStencilAttachment{
-			View: r.shadowView, DepthLoadOp: gputypes.LoadOpClear, DepthStoreOp: gputypes.StoreOpStore, DepthClearValue: 1,
-		},
-	})
+	pass, err := enc.BeginRenderPass(desc)
 	if err != nil {
 		return err
 	}
@@ -267,6 +366,12 @@ func (r *gpuRenderer) releaseEnhanced() {
 	}
 	if r.shadowTex != nil {
 		r.shadowTex.Release()
+	}
+	if r.shadowColorView != nil {
+		r.shadowColorView.Release()
+	}
+	if r.shadowColorTex != nil {
+		r.shadowColorTex.Release()
 	}
 	if r.shadowUniform != nil {
 		r.shadowUniform.Release()
@@ -438,11 +543,15 @@ func (r *gpuRenderer) drawDirectionalShadow(enc *wgpu.CommandEncoder, screen *Fr
 		Texture: r.shadowTex,
 		Usage:   wgpu.TextureUsageTransition{OldUsage: wgpu.TextureUsageTextureBinding, NewUsage: wgpu.TextureUsageRenderAttachment},
 	}})
-	pass, err := enc.BeginRenderPass(&wgpu.RenderPassDescriptor{
-		DepthStencilAttachment: &wgpu.RenderPassDepthStencilAttachment{
-			View: r.shadowView, DepthLoadOp: gputypes.LoadOpClear, DepthStoreOp: gputypes.StoreOpStore, DepthClearValue: 1,
-		},
-	})
+	desc := r.shadowMapPass()
+	if !vulkanPassEndable(desc) {
+		enc.TransitionTextures([]wgpu.TextureBarrier{{
+			Texture: r.shadowTex,
+			Usage:   wgpu.TextureUsageTransition{OldUsage: wgpu.TextureUsageRenderAttachment, NewUsage: wgpu.TextureUsageTextureBinding},
+		}})
+		return nil
+	}
+	pass, err := enc.BeginRenderPass(desc)
 	if err != nil {
 		return err
 	}

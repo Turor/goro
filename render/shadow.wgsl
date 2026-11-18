@@ -30,3 +30,8 @@ fn vs_main(input: VertexInput) -> @builtin(position) vec4<f32> {
 	let world_pos = model_point(input.pos);
 	return cam.row0 * world_pos.x + cam.row1 * world_pos.y + cam.row2 * world_pos.z + cam.row3;
 }
+
+@fragment
+fn fs_main() -> @location(0) vec4<f32> {
+	return vec4<f32>(0.0, 0.0, 0.0, 0.0);
+}
