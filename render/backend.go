@@ -323,7 +323,9 @@ func Run(game Game, cfg config.WindowConfig, renderCfg config.RenderConfig) erro
 		WithSize(cfg.Width, cfg.Height).
 		WithResizable(true).
 		WithContinuousRender(true).
-		WithVSync(renderCfg.VSync)
+		WithVSync(renderCfg.VSync).
+		WithLowLatencyVSync(lowLatencyVSync(renderCfg)).
+		WithMaxFPS(renderCfg.MaxFPS)
 	if cfg.Fullscreen {
 		appConfig = appConfig.WithFullscreen()
 	}
@@ -459,6 +461,15 @@ func (r *runner) close() {
 		_ = r.uiOverlayCanvas.Close()
 		r.uiOverlayCanvas = nil
 	}
+}
+
+// lowLatencyVSync selects tear-free mailbox presentation when vsync is on and a
+// frame cap bounds the work. FIFO throttles in swapchain acquire, queueing up to
+// a swapchain of frames (about 50 ms at 60 Hz with four images), and on
+// Hyprland with wp_fifo_v1 it misses vblanks (40-45 FPS on 60 Hz). Uncapped
+// vsync keeps FIFO pacing so the GPU is never left spinning.
+func lowLatencyVSync(renderCfg config.RenderConfig) bool {
+	return renderCfg.VSync && renderCfg.MaxFPS > 0
 }
 
 func configureGogpuVSync(renderCfg config.RenderConfig) {

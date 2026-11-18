@@ -103,6 +103,10 @@ type AudioConfig struct {
 	SFXVolume float64
 }
 
+// DefaultMaxFPS caps rendering when no max_fps is configured. It covers
+// 60-144 Hz displays; with vsync on, a cap selects mailbox presentation.
+const DefaultMaxFPS = 144
+
 type RenderConfig struct {
 	GraphicsAPI        string
 	Anisotropy         int
@@ -112,6 +116,7 @@ type RenderConfig struct {
 	Bloom              bool
 	SSAO               bool
 	VSync              bool
+	MaxFPS             int
 	FPS                bool
 	NoUI               bool
 	AsyncUI            bool
@@ -187,6 +192,7 @@ func LoadConfig(args []string) (Config, error) {
 type UserSettings struct {
 	Fullscreen       bool
 	VSync            bool
+	MaxFPS           int
 	FPS              bool
 	Anisotropy       int
 	TextureUpscaling bool
@@ -249,6 +255,9 @@ func (cfg Config) SaveUserSettings(settings UserSettings) (string, error) {
 	if err := validateAnisotropy(settings.Anisotropy); err != nil {
 		return "", err
 	}
+	if settings.MaxFPS < 0 {
+		return "", fmt.Errorf("max fps must be 0 (unlimited) or positive")
+	}
 	if settings.BGMVolume < 0 || settings.BGMVolume > 1 {
 		return "", fmt.Errorf("bgm volume must be between 0 and 1")
 	}
@@ -267,6 +276,7 @@ func (cfg Config) SaveUserSettings(settings UserSettings) (string, error) {
 			"bloom":             formatINIValueBool(settings.Bloom),
 			"ssao":              formatINIValueBool(settings.SSAO),
 			"vsync":             formatINIValueBool(settings.VSync),
+			"max_fps":           strconv.Itoa(settings.MaxFPS),
 			"fps":               formatINIValueBool(settings.FPS),
 		},
 		"audio": {
@@ -356,6 +366,7 @@ func defaultConfig() Config {
 			SmoothSprites:      true,
 			AsyncUI:            true,
 			VSync:              true,
+			MaxFPS:             DefaultMaxFPS,
 			BenchWarmupSeconds: 0,
 		},
 		Fog: FogConfig{
@@ -425,6 +436,7 @@ func parseCLI(cfg *Config, args []string) error {
 	fs.BoolVar(&cfg.Render.MSAA, "msaa", cfg.Render.MSAA, "enable 4x multisample anti-aliasing for the world")
 	fs.BoolVar(&cfg.Render.SmoothSprites, "smooth-sprites", cfg.Render.SmoothSprites, "smooth world sprites (false uses nearest-neighbor filtering)")
 	fs.BoolVar(&cfg.Render.VSync, "vsync", cfg.Render.VSync, "enable vsync")
+	fs.IntVar(&cfg.Render.MaxFPS, "max-fps", cfg.Render.MaxFPS, "cap the frame rate, 0 for unlimited (with vsync, a cap selects low-latency mailbox presentation)")
 	fs.BoolVar(&cfg.Render.FPS, "fps", cfg.Render.FPS, "show measured FPS counter")
 	fs.BoolVar(&cfg.Render.NoUI, "no-ui", cfg.Render.NoUI, "disable UI rendering for benchmarking")
 	fs.BoolVar(&cfg.Render.AsyncUI, "async-ui", cfg.Render.AsyncUI, "rasterize UI off the draw thread")
@@ -592,6 +604,8 @@ func applyConfigValue(cfg *Config, section, key, value string) error {
 		return setBool(value, &cfg.Render.SmoothSprites)
 	case "render.vsync":
 		return setBool(value, &cfg.Render.VSync)
+	case "render.maxfps":
+		return setInt(value, &cfg.Render.MaxFPS)
 	case "render.fps":
 		return setBool(value, &cfg.Render.FPS)
 	case "render.noui":
@@ -783,7 +797,7 @@ func upsertINIValues(src string, values map[string]map[string]string) string {
 }
 
 func sortedINIKeys(values map[string]string) []string {
-	preferred := []string{"fullscreen", "vsync", "fps", "bgm_volume", "sfx_volume", "no_shift", "no_ctrl", "keep_id", "saved_username", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0"}
+	preferred := []string{"fullscreen", "vsync", "max_fps", "fps", "bgm_volume", "sfx_volume", "no_shift", "no_ctrl", "keep_id", "saved_username", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0"}
 	keys := make([]string, 0, len(values))
 	seen := make(map[string]bool, len(values))
 	for _, key := range preferred {
