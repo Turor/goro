@@ -422,13 +422,20 @@ func (r *remoteSource) fetch(p string) ([]byte, error) {
 	if cacheErr == nil {
 		switch r.revalidation(p, meta, generation) {
 		case revalidateNever:
-			return cached, nil
+			return r.useCached(p, dataPath, metaPath, cached)
 		case revalidateBackground:
 			// Serve the cached table now so startup never waits on the
 			// network; a changed overlay is picked up on the next run.
+			// A digest miss is not served: fall through and refetch.
+			checked, err := r.useCached(p, dataPath, metaPath, cached)
+			if err != nil {
+				cacheErr = err
+				cached = nil
+				break
+			}
 			r.markValidated(p)
 			go r.refresh(p, dataPath, metaPath, meta, generation)
-			return cached, nil
+			return checked, nil
 		}
 	}
 
@@ -437,7 +444,7 @@ func (r *remoteSource) fetch(p string) ([]byte, error) {
 	r.mu.Unlock()
 	if offline {
 		if cacheErr == nil {
-			return cached, nil
+			return r.useCached(p, dataPath, metaPath, cached)
 		}
 		return nil, errors.New("asset server offline")
 	}
@@ -460,16 +467,20 @@ func (r *remoteSource) fetch(p string) ([]byte, error) {
 			r.logOnce("file:"+p, "remote data: %s: %v", p, err)
 		}
 		if cacheErr == nil {
-			return cached, nil
+			return r.useCached(p, dataPath, metaPath, cached)
 		}
 		return nil, err
 	case status == http.StatusNotModified && cacheErr == nil:
+		checked, err := r.useCached(p, dataPath, metaPath, cached)
+		if err != nil {
+			return nil, err
+		}
 		r.markValidated(p)
 		if meta.Generation != generation && generation != "" {
 			meta.Generation = generation
 			r.writeMeta(metaPath, meta)
 		}
-		return cached, nil
+		return checked, nil
 	case status == http.StatusOK:
 		if err := r.verifyDigest(p, body); err != nil {
 			r.logOnce("digest:"+p, "remote data: discarding %s: %v", p, err)
@@ -491,10 +502,26 @@ func (r *remoteSource) fetch(p string) ([]byte, error) {
 	default:
 		r.logOnce("status:"+p, "remote data: %s returned HTTP %d", p, status)
 		if cacheErr == nil {
-			return cached, nil
+			return r.useCached(p, dataPath, metaPath, cached)
 		}
 		return nil, fmt.Errorf("HTTP %d", status)
 	}
+}
+
+// useCached returns a cached body only when it matches the accepted signed
+// manifest. Before a manifest exists, verifyDigest allows the body. A miss
+// deletes the copy so a later read cannot serve it again.
+func (r *remoteSource) useCached(p, dataPath, metaPath string, body []byte) ([]byte, error) {
+	if err := r.verifyDigest(p, body); err != nil {
+		_ = os.Remove(dataPath)
+		_ = os.Remove(metaPath)
+		r.mu.Lock()
+		delete(r.validated, p)
+		r.mu.Unlock()
+		r.logOnce("digest:"+p, "remote data: discarding cached %s: %v", p, err)
+		return nil, err
+	}
+	return body, nil
 }
 
 type revalidateMode int

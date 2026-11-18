@@ -89,12 +89,43 @@ func TestRemoteAdoptsFirstDataVersionWithoutDelta(t *testing.T) {
 	}
 }
 
+func signedDataManifest(t *testing.T, priv ed25519.PrivateKey, version uint64, files map[string][]byte) []byte {
+	t.Helper()
+	list := make([]updater.DataFile, 0, len(files))
+	for p, b := range files {
+		list = append(list, updater.DataFile{Path: p, SHA256: updater.SHA256Hex(b), Size: int64(len(b))})
+	}
+	payload, err := updater.CanonicalDataPayload(updater.DataManifest{Version: version, Files: list})
+	if err != nil {
+		t.Fatal(err)
+	}
+	env, err := updater.SignDataEnvelope(payload, priv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return []byte(env)
+}
+
+func testKey(t *testing.T) (ed25519.PublicKey, ed25519.PrivateKey) {
+	t.Helper()
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return pub, priv
+}
+
 func TestRemoteAppliesChangesSinceAndEvictsPaths(t *testing.T) {
+	pub, priv := testKey(t)
 	srv := newFakeAssetServer(t)
 	srv.dataVersion = 10
 	srv.index = []string{"data\\a.txt", "data\\b.txt"}
 	srv.put("data/a.txt", []byte("a1"), "ea")
 	srv.put("data/b.txt", []byte("b1"), "eb")
+	srv.manifest = signedDataManifest(t, priv, 10, map[string][]byte{
+		"data/a.txt": []byte("a1"),
+		"data/b.txt": []byte("b1"),
+	})
 	srv.changes = func(since uint64) []byte {
 		if since != 10 {
 			t.Errorf("since=%d", since)
@@ -102,7 +133,7 @@ func TestRemoteAppliesChangesSinceAndEvictsPaths(t *testing.T) {
 		b, _ := json.Marshal(changesResponse{Version: 11, Paths: []string{"data/a.txt"}})
 		return b
 	}
-	m := versionedManager(t, srv, RemoteOptions{})
+	m := versionedManager(t, srv, RemoteOptions{TrustedKeys: []ed25519.PublicKey{pub}})
 	m.WaitRemoteIndex(3 * time.Second)
 	if _, err := m.ReadFile("data\\a.txt"); err != nil {
 		t.Fatal(err)
@@ -113,6 +144,10 @@ func TestRemoteAppliesChangesSinceAndEvictsPaths(t *testing.T) {
 	srv.dataVersion = 11
 	srv.files["data/a.txt"] = []byte("a2")
 	srv.etags["data/a.txt"] = "ea2"
+	srv.manifest = signedDataManifest(t, priv, 11, map[string][]byte{
+		"data/a.txt": []byte("a2"),
+		"data/b.txt": []byte("b1"),
+	})
 	srv.mu.Unlock()
 	if _, err := m.ReadFile("data\\b.txt"); err != nil {
 		t.Fatal(err)
@@ -134,16 +169,21 @@ func TestRemoteAppliesChangesSinceAndEvictsPaths(t *testing.T) {
 }
 
 func TestRemoteTooOldChangesTriggersFullRecheck(t *testing.T) {
+	pub, priv := testKey(t)
 	srv := newFakeAssetServer(t)
 	srv.dataVersion = 5
 	srv.index = []string{"data\\a.txt", "data\\b.txt"}
 	srv.put("data/a.txt", []byte("a1"), "e1")
 	srv.put("data/b.txt", []byte("b1"), "eb")
+	srv.manifest = signedDataManifest(t, priv, 5, map[string][]byte{
+		"data/a.txt": []byte("a1"),
+		"data/b.txt": []byte("b1"),
+	})
 	srv.changes = func(since uint64) []byte {
 		b, _ := json.Marshal(changesResponse{Version: 50, Full: true})
 		return b
 	}
-	m := versionedManager(t, srv, RemoteOptions{})
+	m := versionedManager(t, srv, RemoteOptions{TrustedKeys: []ed25519.PublicKey{pub}})
 	m.WaitRemoteIndex(3 * time.Second)
 	if _, err := m.ReadFile("data\\a.txt"); err != nil {
 		t.Fatal(err)
@@ -152,6 +192,10 @@ func TestRemoteTooOldChangesTriggersFullRecheck(t *testing.T) {
 	srv.dataVersion = 50
 	srv.files["data/a.txt"] = []byte("a-new")
 	srv.etags["data/a.txt"] = "e2"
+	srv.manifest = signedDataManifest(t, priv, 50, map[string][]byte{
+		"data/a.txt": []byte("a-new"),
+		"data/b.txt": []byte("b1"),
+	})
 	srv.mu.Unlock()
 	if _, err := m.ReadFile("data\\b.txt"); err != nil {
 		t.Fatal(err)
@@ -259,5 +303,198 @@ func TestRemoteSignedManifestVerifiesMatchingFile(t *testing.T) {
 	data, err := mgr.ReadFile("data\\a.txt")
 	if err != nil || string(data) != "good-bytes" {
 		t.Fatalf("got %q %v", data, err)
+	}
+}
+
+func TestRemoteManifestChecksBodyCachedBeforeIt(t *testing.T) {
+	pub, priv := testKey(t)
+	bad := []byte("tampered")
+	good := []byte("good-bytes")
+	srv := newFakeAssetServer(t)
+	srv.dataVersion = 9
+	srv.index = []string{"data\\prontera.gat"}
+	srv.put("data/prontera.gat", bad, "etag-bad")
+	mgr := versionedManager(t, srv, RemoteOptions{TrustedKeys: []ed25519.PublicKey{pub}})
+	if !mgr.WaitRemoteIndex(3 * time.Second) {
+		t.Fatal("index")
+	}
+	got, err := mgr.ReadFile("data\\prontera.gat")
+	if err != nil || string(got) != "tampered" {
+		t.Fatalf("prime cache: %q %v", got, err)
+	}
+	hits := srv.hitCount("data/prontera.gat")
+	srv.mu.Lock()
+	srv.manifest = signedDataManifest(t, priv, 9, map[string][]byte{
+		"data/prontera.gat": good,
+	})
+	srv.mu.Unlock()
+	if !mgr.remote.loadDataManifest() || !mgr.WaitRemoteManifest(time.Second) {
+		t.Fatal("manifest not accepted")
+	}
+	got, err = mgr.ReadFile("data\\prontera.gat")
+	if err == nil && string(got) == "tampered" {
+		t.Fatal("pre-manifest cache was served without a digest match")
+	}
+	if err == nil {
+		t.Fatalf("mismatched cache returned %q", got)
+	}
+	// Same ETag: the recheck is a 304, so the rejection is of the cached body.
+	if srv.hitCount("data/prontera.gat") <= hits {
+		t.Fatal("cached body was not rechecked after the manifest")
+	}
+	dataPath, _ := mgr.remote.cachePaths("data/prontera.gat")
+	if _, statErr := os.Stat(dataPath); !os.IsNotExist(statErr) {
+		t.Fatal("mismatched cached body was kept")
+	}
+}
+
+func TestRemoteManifestKeepsCachedBodyThatMatches(t *testing.T) {
+	pub, priv := testKey(t)
+	good := []byte("good-bytes")
+	srv := newFakeAssetServer(t)
+	srv.dataVersion = 9
+	srv.index = []string{"data\\prontera.gat"}
+	srv.put("data/prontera.gat", good, "etag-good")
+	mgr := versionedManager(t, srv, RemoteOptions{TrustedKeys: []ed25519.PublicKey{pub}})
+	mgr.WaitRemoteIndex(3 * time.Second)
+	if _, err := mgr.ReadFile("data\\prontera.gat"); err != nil {
+		t.Fatal(err)
+	}
+	srv.mu.Lock()
+	srv.manifest = signedDataManifest(t, priv, 9, map[string][]byte{
+		"data/prontera.gat": good,
+	})
+	srv.mu.Unlock()
+	if !mgr.remote.loadDataManifest() {
+		t.Fatal("manifest")
+	}
+	got, err := mgr.ReadFile("data\\prontera.gat")
+	if err != nil || string(got) != "good-bytes" {
+		t.Fatalf("matching cache: %q %v", got, err)
+	}
+}
+
+func TestRemoteUnsignedChangesDoNotEvictOrAdvance(t *testing.T) {
+	srv := newFakeAssetServer(t)
+	srv.dataVersion = 10
+	srv.index = []string{"data\\a.gat", "data\\b.gat"}
+	srv.put("data/a.gat", []byte("a1"), "ea")
+	srv.put("data/b.gat", []byte("b1"), "eb")
+	srv.changes = func(since uint64) []byte {
+		b, _ := json.Marshal(changesResponse{Version: 11, Paths: []string{"data/a.gat"}})
+		return b
+	}
+	m := versionedManager(t, srv, RemoteOptions{})
+	m.WaitRemoteIndex(3 * time.Second)
+	if _, err := m.ReadFile("data\\a.gat"); err != nil {
+		t.Fatal(err)
+	}
+	srv.mu.Lock()
+	srv.dataVersion = 11
+	srv.files["data/a.gat"] = []byte("a2")
+	srv.etags["data/a.gat"] = "ea2"
+	srv.mu.Unlock()
+	if _, err := m.ReadFile("data\\b.gat"); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(200 * time.Millisecond)
+	if m.RemoteCachedVersion() != 10 {
+		t.Fatalf("unsigned changes advanced cached version to %d", m.RemoteCachedVersion())
+	}
+	data, err := m.ReadFile("data\\a.gat")
+	if err != nil || string(data) != "a1" {
+		t.Fatalf("unsigned changes evicted the cache: %q %v", data, err)
+	}
+	srv.mu.Lock()
+	hits := srv.changesHits
+	srv.mu.Unlock()
+	if hits > 4 {
+		t.Fatalf("changes requests spun: %d", hits)
+	}
+}
+
+func TestRemoteChangesRejectsRollbackAndDoesNotSpin(t *testing.T) {
+	srv := newFakeAssetServer(t)
+	srv.dataVersion = 10
+	srv.index = []string{"data\\a.gat", "data\\b.gat"}
+	srv.put("data/a.gat", []byte("a1"), "ea")
+	srv.put("data/b.gat", []byte("b1"), "eb")
+	srv.changes = func(since uint64) []byte {
+		b, _ := json.Marshal(changesResponse{Version: 4, Paths: []string{"data/a.gat"}})
+		return b
+	}
+	m := versionedManager(t, srv, RemoteOptions{})
+	m.WaitRemoteIndex(3 * time.Second)
+	if _, err := m.ReadFile("data\\a.gat"); err != nil {
+		t.Fatal(err)
+	}
+	srv.mu.Lock()
+	srv.dataVersion = 40
+	srv.files["data/a.gat"] = []byte("a2")
+	srv.etags["data/a.gat"] = "ea2"
+	srv.mu.Unlock()
+	if _, err := m.ReadFile("data\\b.gat"); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(250 * time.Millisecond)
+	if m.RemoteCachedVersion() != 10 {
+		t.Fatalf("rollback moved cached version to %d", m.RemoteCachedVersion())
+	}
+	data, err := m.ReadFile("data\\a.gat")
+	if err != nil || string(data) != "a1" {
+		t.Fatalf("rollback evicted the cache: %q %v", data, err)
+	}
+	srv.mu.Lock()
+	hits := srv.changesHits
+	srv.mu.Unlock()
+	if hits == 0 || hits > 4 {
+		t.Fatalf("changes hits = %d, want a bounded retry", hits)
+	}
+}
+
+func TestRemoteChangesStallDoesNotTightLoop(t *testing.T) {
+	pub, priv := testKey(t)
+	bodyA := []byte("a1")
+	bodyB := []byte("b1")
+	srv := newFakeAssetServer(t)
+	srv.dataVersion = 10
+	srv.index = []string{"data\\a.gat", "data\\b.gat"}
+	srv.put("data/a.gat", bodyA, "ea")
+	srv.put("data/b.gat", bodyB, "eb")
+	srv.manifest = signedDataManifest(t, priv, 15, map[string][]byte{
+		"data/a.gat": bodyA,
+		"data/b.gat": bodyB,
+	})
+	srv.changes = func(since uint64) []byte {
+		b, _ := json.Marshal(changesResponse{Version: 15, Paths: []string{"data/a.gat"}})
+		return b
+	}
+	m := versionedManager(t, srv, RemoteOptions{TrustedKeys: []ed25519.PublicKey{pub}})
+	m.WaitRemoteIndex(3 * time.Second)
+	if !m.WaitRemoteManifest(3 * time.Second) {
+		t.Fatal("manifest")
+	}
+	if _, err := m.ReadFile("data\\a.gat"); err != nil {
+		t.Fatal(err)
+	}
+	srv.mu.Lock()
+	srv.dataVersion = 40
+	srv.mu.Unlock()
+	if _, err := m.ReadFile("data\\b.gat"); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) && m.RemoteCachedVersion() != 15 {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if m.RemoteCachedVersion() != 15 {
+		t.Fatalf("cached %d, want 15 (not seen 40)", m.RemoteCachedVersion())
+	}
+	time.Sleep(250 * time.Millisecond)
+	srv.mu.Lock()
+	hits := srv.changesHits
+	srv.mu.Unlock()
+	if hits > 6 {
+		t.Fatalf("stalled changes version tight-looped: %d GETs", hits)
 	}
 }

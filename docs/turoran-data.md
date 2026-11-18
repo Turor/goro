@@ -51,8 +51,13 @@ lacks is fetched on first use and kept in
   when the log says the client is too old), and polls `GET version` every
   60–120 seconds with jitter while idle. A signed GDAT1 manifest for that
   version, when published, is verified against the trusted public-key list
-  before any streamed file is cached or used; a digest mismatch is
-  discarded. Details: `docs/data-version-invalidation.md`.
+  before any streamed file is cached or used. Once that manifest is
+  accepted, a body already in the cache is digest-checked (and the cache
+  generation is bumped) before it is used again. A digest mismatch is
+  discarded. An unsigned `/changes` body cannot move the version cursor
+  backward or evict paths until a signed manifest covers that version, and
+  a cursor that never catches up does not tight-loop. Details:
+  `docs/data-version-invalidation.md`.
 - **Failures.** A 404 is remembered for the run and the lookup falls through
   to the next candidate. A bad file (over 128 MB, cut short) only fails that
   file. If the server cannot be reached (dial, TLS, no response), cached

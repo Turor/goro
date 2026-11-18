@@ -90,16 +90,28 @@ as the skill trees, without a restart and without re-downloading everything.
   (singleflight: at most one `changes` request in flight). It waits about
   2 seconds of debounce, so a burst of responses during a map load triggers
   one request, then asks `changes?since=cachedVersion`.
+- The unsigned JSON cursor follows the same rollback rule as the signed
+  manifest: a `version` that is not strictly greater than `cachedVersion`
+  is ignored, and the worker stops instead of issuing another GET in a
+  tight loop. The next wake is a later header or the idle poll.
+- **Paths and full** are applied only after `GET data-manifest` verifies
+  and the accepted manifest version is at least the changes version. Until
+  then nothing is evicted and `cachedVersion` stays put.
 - **Paths:** for each path, evict it from the streaming cache: mark it stale
   and forget any cached "not on server" answer. Then queue it for the game
   thread with `Manager.QueueDataInvalidation(paths...)`. Persist
-  `cachedVersion = version` only after that, so a crash re-asks.
+  `cachedVersion = version` only after that, and only when it is greater
+  than the cursor already stored, so a crash re-asks.
 - **Full:** mark every cached path stale (one generation counter that each
   entry's metadata is compared against), reload the archive index, and queue
   an invalidation of every loaded table.
-- If versions moved on while the request ran, the worker loops once more.
-  It never runs two requests at once. Failures retry with the offline
-  back-off.
+- If versions moved on while the request ran, the worker loops again after
+  the same debounce it uses before the first request. It never runs two
+  requests at once. Failures retry with the offline back-off.
+- Accepting a newer signed manifest bumps that same cache generation, so a
+  body stored before the manifest is revalidated before reuse. A conditional
+  304 still has its cached bytes digest-checked; a mismatch is deleted and
+  not returned.
 
 ### Interaction with ETag caching
 

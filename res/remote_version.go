@@ -212,6 +212,22 @@ func (r *remoteSource) runDelta() {
 			r.logOnce("changes", "remote data: bad changes response")
 			return
 		}
+		// Unsigned cursor, same rule as signed RejectRollback: never move
+		// backward or sideways, and never spin while the feed stays behind
+		// seenVersion. The response's own X-Data-Version would otherwise
+		// wake this worker again immediately.
+		if resp.Version <= cached {
+			r.logOnce("changes-cursor", "remote data: ignoring changes version %d (cached %d)", resp.Version, cached)
+			r.holdDelta()
+			return
+		}
+		if !r.loadDataManifest() || r.acceptedManifestVersion() < resp.Version {
+			// Paths and full-recheck come from unsigned JSON. Do not evict
+			// or advance the cursor until a signed manifest covers them.
+			r.logOnce("changes-unsigned", "remote data: not applying changes %d before a signed manifest covers it", resp.Version)
+			r.holdDelta()
+			return
+		}
 		if resp.Full {
 			r.markAllStale()
 			r.refreshIndex()
@@ -223,12 +239,47 @@ func (r *remoteSource) runDelta() {
 			r.queuePaths(resp.Paths)
 		}
 		r.mu.Lock()
-		r.cachedVersion = resp.Version
-		r.haveCached = true
+		if resp.Version > r.cachedVersion {
+			r.cachedVersion = resp.Version
+			r.haveCached = true
+		}
 		r.mu.Unlock()
 		r.persistCachedVersion()
-		r.loadDataManifest()
+		// A response that advanced the cursor but did not catch seenVersion
+		// is paced; a stuck feed hits the <= cached branch and stops.
+		if r.seenVersion.Load() > resp.Version {
+			if !r.sleepDelta() {
+				return
+			}
+		}
 	}
+}
+
+func (r *remoteSource) acceptedManifestVersion() uint64 {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.acceptedManifest
+}
+
+// sleepDelta paces a catch-up iteration. holdDelta also drops the wake this
+// response just queued so a cursor that cannot move does not tight-loop.
+func (r *remoteSource) sleepDelta() bool {
+	timer := time.NewTimer(r.deltaDebounce)
+	defer timer.Stop()
+	select {
+	case <-r.stopCh:
+		return false
+	case <-timer.C:
+		return true
+	}
+}
+
+func (r *remoteSource) holdDelta() {
+	select {
+	case <-r.deltaWake:
+	default:
+	}
+	r.sleepDelta()
 }
 
 func (r *remoteSource) queuePaths(paths []string) {
@@ -339,23 +390,27 @@ func (r *remoteSource) getMeta(rel string, limit int64) ([]byte, error) {
 	return body, nil
 }
 
-func (r *remoteSource) loadDataManifest() {
+// loadDataManifest stores a verified manifest. It reports whether one is
+// accepted afterward. A failed fetch leaves a previously accepted manifest
+// in place and returns false so the caller does not treat this attempt as
+// covering a newer unsigned cursor.
+func (r *remoteSource) loadDataManifest() bool {
 	body, err := r.getMeta("data-manifest", dataManifestMax)
 	if err != nil {
-		return
+		return false
 	}
 	keys := r.keyRing.Keys()
 	m, err := updater.OpenDataEnvelopeWithKeys(body, keys)
 	if err != nil {
 		r.logOnce("data-manifest", "remote data: signed data manifest rejected: %v", err)
-		return
+		return false
 	}
 	r.mu.Lock()
 	accepted := r.acceptedManifest
 	r.mu.Unlock()
 	if err := m.RejectRollback(accepted); err != nil {
 		r.logOnce("data-manifest", "remote data: %v", err)
-		return
+		return false
 	}
 	if err := r.keyRing.AcceptNextKeys(m.NextKeys); err != nil {
 		glog.Warnf("remote data: next-keys not persisted: %v", err)
@@ -363,8 +418,16 @@ func (r *remoteSource) loadDataManifest() {
 	stored := m
 	r.dataManifest.Store(&stored)
 	r.mu.Lock()
+	advanced := m.Version > r.acceptedManifest
 	r.acceptedManifest = m.Version
 	r.mu.Unlock()
+	// A cache filled before this manifest (or under an older one) must be
+	// digest-checked before reuse. The generation bump forces revalidation;
+	// a 304 still goes through useCached.
+	if advanced {
+		r.markAllStale()
+	}
+	return true
 }
 
 func (r *remoteSource) verifyDigest(p string, body []byte) error {
