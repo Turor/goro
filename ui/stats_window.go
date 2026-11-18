@@ -265,7 +265,7 @@ func statsDerivedWidget(stats session.Stats) widget.Widget {
 	return primitives.Box(
 		rotheme.Table(
 			rows,
-			rotheme.TableRowHeightOpt(18),
+			rotheme.TableRowHeightOpt(float32(statsRowH)),
 			rotheme.TableColors(rotheme.Default.Colors.ButtonHover, rotheme.Default.Colors.WindowFooter),
 		),
 	)
