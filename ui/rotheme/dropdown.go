@@ -31,8 +31,8 @@ func (DropdownPainter) PaintTrigger(canvas widget.Canvas, state *dropdown.Trigge
 		textColor = Default.Colors.MutedText
 	}
 	DrawText(canvas, state.SelectedText, geometry.Rect{
-		Min: geometry.Pt(state.Bounds.Min.X+6, state.Bounds.Min.Y),
-		Max: geometry.Pt(state.Bounds.Max.X-18, state.Bounds.Max.Y),
+		Min: geometry.Pt(state.Bounds.Min.X+dropdownTriggerPadLeft, state.Bounds.Min.Y),
+		Max: geometry.Pt(state.Bounds.Max.X-dropdownTriggerPadRight, state.Bounds.Max.Y),
 	}, Default.Typography.TextSize, textColor, false, widget.TextAlignLeft)
 	drawDropdownArrow(canvas, state.Bounds, state.Open, textColor)
 }
@@ -69,20 +69,21 @@ func (DropdownPainter) PaintMenu(canvas widget.Canvas, state *dropdown.MenuPaint
 			textColor = Default.Colors.MutedText
 		}
 		DrawText(canvas, state.Items[i].DisplayText(), geometry.Rect{
-			Min: geometry.Pt(itemBounds.Min.X+6, itemBounds.Min.Y),
-			Max: geometry.Pt(itemBounds.Max.X-6, itemBounds.Max.Y),
+			Min: geometry.Pt(itemBounds.Min.X+dropdownItemPadX, itemBounds.Min.Y),
+			Max: geometry.Pt(itemBounds.Max.X-dropdownItemPadX, itemBounds.Max.Y),
 		}, Default.Typography.TextSize, textColor, false, widget.TextAlignLeft)
 	}
 }
 
 func drawDropdownArrow(canvas widget.Canvas, bounds geometry.Rect, open bool, color widget.Color) {
-	cx := bounds.Max.X - 10
+	cx := bounds.Max.X - dropdownArrowInset
 	cy := bounds.Center().Y
+	hw, hh := dropdownArrowHalfW, dropdownArrowHalfH
 	if open {
-		canvas.DrawLine(geometry.Pt(cx-4, cy+2), geometry.Pt(cx, cy-2), color, 1)
-		canvas.DrawLine(geometry.Pt(cx, cy-2), geometry.Pt(cx+4, cy+2), color, 1)
+		canvas.DrawLine(geometry.Pt(cx-hw, cy+hh), geometry.Pt(cx, cy-hh), color, 1)
+		canvas.DrawLine(geometry.Pt(cx, cy-hh), geometry.Pt(cx+hw, cy+hh), color, 1)
 		return
 	}
-	canvas.DrawLine(geometry.Pt(cx-4, cy-2), geometry.Pt(cx, cy+2), color, 1)
-	canvas.DrawLine(geometry.Pt(cx, cy+2), geometry.Pt(cx+4, cy-2), color, 1)
+	canvas.DrawLine(geometry.Pt(cx-hw, cy-hh), geometry.Pt(cx, cy+hh), color, 1)
+	canvas.DrawLine(geometry.Pt(cx, cy+hh), geometry.Pt(cx+hw, cy-hh), color, 1)
 }

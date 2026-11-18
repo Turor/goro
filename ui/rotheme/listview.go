@@ -7,8 +7,6 @@ import (
 	"github.com/gogpu/ui/widget"
 )
 
-const SelectListRowPadX float32 = 6
-
 type SelectListPainter struct {
 	EmptyText string
 }
@@ -72,7 +70,7 @@ func (p SelectListPainter) PaintEmptyState(canvas widget.Canvas, bounds geometry
 }
 
 func (SelectListPainter) PaintItemBackground(canvas widget.Canvas, state listview.ItemPaintState) {
-	fill := widget.RGBA8(246, 249, 253, 255)
+	fill := selectListRowFill
 	if state.Index%2 == 1 {
 		fill = Default.Colors.PanelBody
 	}

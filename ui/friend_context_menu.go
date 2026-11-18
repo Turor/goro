@@ -8,8 +8,6 @@ import (
 	"github.com/kivutar/goro/session"
 )
 
-const friendContextMenuWidth = 124
-
 type FriendContextMenu struct {
 	Window
 	friend session.Friend
@@ -31,6 +29,10 @@ func (m *FriendContextMenu) Open(ctx Context, x, y int, friend session.Friend) {
 	x = clampWindowInt(x, windowScreenMargin, maxInt(windowScreenMargin, screenW-friendContextMenuWidth-windowScreenMargin))
 	y = clampWindowInt(y, windowScreenMargin, maxInt(windowScreenMargin, screenH-height-windowScreenMargin))
 	m.OpenAt(x, y, m.widgetTree())
+	m.claimLayoutReload(func() {
+		m.SetSize(friendContextMenuWidth, m.height())
+		m.SetContent(m.widgetTree())
+	})
 	m.Publish(ctx)
 }
 
@@ -58,7 +60,12 @@ func (m *FriendContextMenu) Rebind(ctx Context) {
 		return
 	}
 	m.ctx = ctx
+	m.SetSize(friendContextMenuWidth, m.height())
 	m.SetContent(m.widgetTree())
+	m.claimLayoutReload(func() {
+		m.SetSize(friendContextMenuWidth, m.height())
+		m.SetContent(m.widgetTree())
+	})
 	m.Publish(ctx)
 }
 

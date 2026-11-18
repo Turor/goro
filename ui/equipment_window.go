@@ -18,19 +18,6 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	equipmentWindowWidth    = 300
-	equipmentWindowPad      = 10
-	equipmentLeftColW       = 112
-	equipmentCenterColW     = 56
-	equipmentRightColW      = 112
-	equipmentRowH           = 24
-	equipmentPreviewImageH  = 106
-	equipmentCenterColH     = equipmentPreviewImageH + equipmentRowH
-	equipmentWindowContentH = equipmentCenterColH + 2*equipmentWindowPad
-	equipmentWindowHeight   = ROWindowTitleHeight + equipmentWindowContentH + ROWindowFooterHeight
-)
-
 type EquipmentWindow struct {
 	Window
 	snapshot      string
@@ -92,6 +79,7 @@ func (w *EquipmentWindow) Toggle(ctx Context) {
 	w.hasPeco = equipmentHasPeco(ctx)
 	w.preview = nil
 	w.Window.Open(ctx, w.widgetTree(ctx, nil, nil))
+	w.bindLayoutReload()
 	w.Publish(ctx)
 }
 
@@ -140,8 +128,20 @@ func (w *EquipmentWindow) Rebind(ctx Context, itemInfo *ItemWindows, cart *CartW
 	if assets != nil {
 		w.preview = assets.EquipmentPreviewImage(ctx, equipmentCenterColW, equipmentPreviewImageH)
 	}
+	w.SetSize(equipmentWindowWidth, equipmentWindowHeight)
 	w.SetContent(w.widgetTree(ctx, itemInfo, cart))
+	w.bindLayoutReload()
 	w.Publish(ctx)
+}
+
+func (w *EquipmentWindow) bindLayoutReload() {
+	w.OnLayoutReload(func() {
+		if !w.IsOpen() {
+			return
+		}
+		w.SetSize(equipmentWindowWidth, equipmentWindowHeight)
+		w.SetContent(w.widgetTree(w.ctx, w.itemInfo, w.cart))
+	})
 }
 
 func (w *EquipmentWindow) widgetTree(ctx Context, itemInfo *ItemWindows, cart *CartWindow) widget.Widget {
@@ -152,7 +152,7 @@ func (w *EquipmentWindow) widgetTree(ctx Context, itemInfo *ItemWindows, cart *C
 			w.Window.Close()
 			w.Publish(ctx)
 		}),
-		Size(equipmentWindowWidth, equipmentWindowHeight),
+		Size(float32(equipmentWindowWidth), float32(equipmentWindowHeight)),
 		Content(
 			primitives.Box(
 				primitives.HBox(
@@ -163,15 +163,15 @@ func (w *EquipmentWindow) widgetTree(ctx Context, itemInfo *ItemWindows, cart *C
 						w.slotWidget(ctx, itemInfo, equipmentSlotGarment, equipmentLeftColW),
 						w.slotWidget(ctx, itemInfo, equipmentSlotAccessory, equipmentLeftColW),
 					).
-						Width(equipmentLeftColW).
+						Width(float32(equipmentLeftColW)).
 						Gap(0),
 
 					primitives.Box(
 						newStaticImageWidget(w.preview, equipmentCenterColW, equipmentPreviewImageH),
 						w.slotWidget(ctx, itemInfo, equipmentSlotAmmo, equipmentCenterColW),
 					).
-						Width(equipmentCenterColW).
-						Height(equipmentCenterColH).
+						Width(float32(equipmentCenterColW)).
+						Height(float32(equipmentCenterColH)).
 						Gap(0),
 
 					primitives.Box(
@@ -181,12 +181,12 @@ func (w *EquipmentWindow) widgetTree(ctx Context, itemInfo *ItemWindows, cart *C
 						w.slotWidget(ctx, itemInfo, equipmentSlotShoes, equipmentRightColW),
 						w.slotWidget(ctx, itemInfo, equipmentSlotAccessory2, equipmentRightColW),
 					).
-						Width(equipmentRightColW).
+						Width(float32(equipmentRightColW)).
 						Gap(0),
 				).
 					Gap(0),
 			).
-				Padding(equipmentWindowPad),
+				Padding(float32(equipmentWindowPad)),
 		),
 		Footer(w.footerWidgets(ctx, itemInfo, cart)...),
 	)
@@ -210,8 +210,8 @@ func (w *EquipmentWindow) footerWidgets(ctx Context, itemInfo *ItemWindows, cart
 				}),
 			),
 		).
-			Width(120).
-			Height(20),
+			Width(float32(equipmentFooterCheckW)).
+			Height(float32(equipmentFooterCheckH)),
 		primitives.Expanded(primitives.Box()),
 	}
 	if inventoryBagHasCart(ctx) {
@@ -233,7 +233,7 @@ func (w *EquipmentWindow) slotWidget(ctx Context, itemInfo *ItemWindows, slot eq
 	if !equipmentSlotVisible(ctx.Session, slot) {
 		return primitives.Box().
 			Width(float32(width)).
-			Height(equipmentRowH)
+			Height(float32(equipmentRowH))
 	}
 	item, hasItem := equippedItemForSlot(ctx.Session, slot.location)
 	return newEquipmentSlotWidget(equipmentSlotWidgetConfig{
@@ -268,7 +268,7 @@ func (w *EquipmentWindow) showTooltip(ctx Context, item session.InventoryItem) {
 		return
 	}
 	text := inventoryItemDisplayName(ctx.Resources, item)
-	w.tooltip.Show(ctx, text, ctx.Input.MouseX, ctx.Input.MouseY+18, ctx.Input.MouseY-6)
+	w.tooltip.Show(ctx, text, ctx.Input.MouseX, ctx.Input.MouseY+equipmentTooltipBelow, ctx.Input.MouseY-equipmentTooltipAbove)
 }
 
 func (w *EquipmentWindow) hideTooltip() {
@@ -447,7 +447,7 @@ func newEquipmentSlotWidget(cfg equipmentSlotWidgetConfig) *equipmentSlotWidget 
 }
 
 func (w *equipmentSlotWidget) Layout(ctx widget.Context, constraints geometry.Constraints) geometry.Size {
-	size := constraints.Constrain(geometry.Sz(float32(w.cfg.width), equipmentRowH))
+	size := constraints.Constrain(geometry.Sz(float32(w.cfg.width), float32(equipmentRowH)))
 	w.SetBounds(geometry.FromPointSize(w.Position(), size))
 	return size
 }
@@ -563,26 +563,26 @@ func equipmentSlotIconPosition(bounds geometry.Rect, slot equipmentSlotDef, icon
 	y := bounds.Min.Y + (bounds.Height()-height)/2
 	switch slot.side {
 	case equipmentSlotRight:
-		return geometry.Pt(bounds.Max.X-width-4, y)
+		return geometry.Pt(bounds.Max.X-width-equipmentIconPad, y)
 	case equipmentSlotCenter:
 		return geometry.Pt(bounds.Min.X+(bounds.Width()-width)/2, y)
 	default:
-		return geometry.Pt(bounds.Min.X+4, y)
+		return geometry.Pt(bounds.Min.X+equipmentIconPad, y)
 	}
 }
 
 func equipmentSlotTextBounds(bounds geometry.Rect, slot equipmentSlotDef, icon image.Image) geometry.Rect {
 	if icon == nil {
-		return geometry.NewRect(bounds.Min.X+4, bounds.Min.Y+4, bounds.Width()-8, bounds.Height()-8)
+		return geometry.NewRect(bounds.Min.X+equipmentTextPad, bounds.Min.Y+equipmentTextPad, bounds.Width()-equipmentTextInset, bounds.Height()-equipmentTextInset)
 	}
 	iconWidth := float32(icon.Bounds().Dx())
 	switch slot.side {
 	case equipmentSlotRight:
-		return geometry.NewRect(bounds.Min.X+4, bounds.Min.Y+4, bounds.Width()-iconWidth-12, bounds.Height()-8)
+		return geometry.NewRect(bounds.Min.X+equipmentTextPad, bounds.Min.Y+equipmentTextPad, bounds.Width()-iconWidth-equipmentIconTextTrail, bounds.Height()-equipmentTextInset)
 	case equipmentSlotCenter:
-		return geometry.NewRect(bounds.Min.X+4, bounds.Min.Y+8, bounds.Width()-8, bounds.Height()-8)
+		return geometry.NewRect(bounds.Min.X+equipmentTextPad, bounds.Min.Y+equipmentCenterTextTop, bounds.Width()-equipmentTextInset, bounds.Height()-equipmentTextInset)
 	default:
-		return geometry.NewRect(bounds.Min.X+iconWidth+8, bounds.Min.Y+4, bounds.Width()-iconWidth-12, bounds.Height()-8)
+		return geometry.NewRect(bounds.Min.X+iconWidth+equipmentIconTextLead, bounds.Min.Y+equipmentTextPad, bounds.Width()-iconWidth-equipmentIconTextTrail, bounds.Height()-equipmentTextInset)
 	}
 }
 
@@ -598,9 +598,9 @@ func equipmentSlotTextAlign(slot equipmentSlotDef) widget.TextAlign {
 
 func equipmentSlotTextLimit(slot equipmentSlotDef) int {
 	if slot.side == equipmentSlotCenter {
-		return 8
+		return 8 // theme:ok text length limit
 	}
-	return 14
+	return 14 // theme:ok text length limit
 }
 
 func equipmentSlotShowsAmount(slot equipmentSlotDef, item session.InventoryItem) bool {

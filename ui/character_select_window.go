@@ -38,28 +38,6 @@ type CharacterSelectWindow struct {
 	callbacks CharacterSelectWindowCallbacks
 }
 
-const (
-	characterSelectWindowW      = 576
-	characterSelectInfoRowCount = 6
-	characterSelectInfoRowH     = 16
-	characterSelectInfoTableGap = 1
-	characterSelectInfoPanelPad = 2
-	characterSelectInfoPanelW   = 318
-	characterSelectInfoTableH   = characterSelectInfoRowCount*characterSelectInfoRowH + (characterSelectInfoRowCount-1)*characterSelectInfoTableGap
-	characterSelectInfoPanelH   = characterSelectInfoTableH + 2*characterSelectInfoPanelPad
-	characterSelectWindowH      = 356 + characterSelectInfoRowH + characterSelectInfoTableGap
-	characterSelectSlotW        = 139
-	characterSelectSlotH        = 144
-	characterSelectArrowGap     = 13
-	characterSelectInfoColumnW  = (float32(characterSelectInfoPanelW-2*characterSelectInfoPanelPad) - rotheme.TableGap) / 2
-	characterSelectInfoLabelW   = float32(44)
-	characterSelectInfoValueW   = characterSelectInfoColumnW - characterSelectInfoLabelW - rotheme.TableGap
-	characterSelectStatLabelW   = float32(32)
-	characterSelectStatValueW   = characterSelectInfoColumnW - characterSelectStatLabelW - rotheme.TableGap
-)
-
-var characterSelectSelectedBG = widget.RGBA8(222, 237, 252, 255)
-
 func NewCharacterSelectWindow(ctx client.Context, opts CharacterSelectWindowOptions, callbacks CharacterSelectWindowCallbacks) *CharacterSelectWindow {
 	x, y, width, height := characterSelectWindowRect(ctx)
 	w := &CharacterSelectWindow{
@@ -68,7 +46,13 @@ func NewCharacterSelectWindow(ctx client.Context, opts CharacterSelectWindowOpti
 	}
 	w.Window = NewWindow(width, height)
 	w.OpenAt(x, y, w.widgetTree())
+	w.OnLayoutReload(w.reloadForLayout)
 	return w
+}
+
+func (w *CharacterSelectWindow) reloadForLayout() {
+	w.SetSize(characterSelectWindowW, characterSelectWindowH)
+	w.SetContent(w.widgetTree())
 }
 
 func (w *CharacterSelectWindow) SetOptions(ctx client.Context, opts CharacterSelectWindowOptions) {
@@ -116,40 +100,41 @@ func characterSelectWindowTreeEqual(a, b CharacterSelectWindowOptions) bool {
 }
 
 func (w *CharacterSelectWindow) widgetTree() widget.Widget {
+	pageSlots := characterSelectPageSlotsNow()
 	page := CharacterSelectPage(w.opts.SelectedSlot)
-	pageCount := maxInt(1, (w.opts.MaxSlots+2)/3)
-	pageStart := page * 3
+	pageCount := maxInt(1, (w.opts.MaxSlots+pageSlots-1)/pageSlots)
+	pageStart := page * pageSlots
+	slots := make([]widget.Widget, 0, pageSlots)
+	for i := 0; i < pageSlots; i++ {
+		slots = append(slots, w.slotWidget(pageStart+i))
+	}
 	selected, hasSelection := characterBySlot(w.opts.Characters, w.opts.SelectedSlot)
 	deleteDisabled := characterSelectDeleteDisabled(w.opts)
 	makeDisabled := characterSelectMakeDisabled(w.opts)
 	return Win(
 		Title("Select Character"),
 		CloseButton(false),
-		Size(characterSelectWindowW, characterSelectWindowH),
+		Size(float32(characterSelectWindowW), float32(characterSelectWindowH)),
 		Content(
 			primitives.Box(
 				primitives.HBox(
 					characterSelectArrowButton(rotheme.IconButtonLeft, w.callbacks.OnPreviousSlot),
-					primitives.HBox(
-						w.slotWidget(pageStart),
-						w.slotWidget(pageStart+1),
-						w.slotWidget(pageStart+2),
-					).
-						Gap(25),
+					primitives.HBox(slots...).
+						Gap(float32(characterSelectSlotGap)),
 					characterSelectArrowButton(rotheme.IconButtonRight, w.callbacks.OnNextSlot),
 				).
 					CrossAlign(primitives.CrossAxisCenter).
-					Gap(characterSelectArrowGap),
+					Gap(float32(characterSelectArrowGap)),
 
 				rotheme.Text(fmt.Sprintf("%d / %d", page+1, pageCount)).
 					Color(rotheme.Default.Colors.MutedText),
 
 				w.infoPanel(selected, hasSelection),
 			).
-				PaddingTop(12).
-				PaddingLeft(24).
-				PaddingRight(24).
-				Gap(9).
+				PaddingTop(float32(characterSelectContentPadTop)).
+				PaddingLeft(float32(characterSelectContentPadX)).
+				PaddingRight(float32(characterSelectContentPadX)).
+				Gap(float32(characterSelectContentGap)).
 				CrossAlign(primitives.CrossAxisCenter),
 		),
 		Footer(
@@ -188,7 +173,7 @@ func characterSelectArrowButton(kind rotheme.IconButtonKind, onClick func()) wid
 		}),
 		primitives.Expanded(primitives.Box()),
 	).
-		Height(characterSelectSlotH).
+		Height(float32(characterSelectSlotH)).
 		CrossAlign(primitives.CrossAxisCenter)
 }
 
@@ -221,8 +206,8 @@ func (w *CharacterSelectWindow) slotWidget(slot int) widget.Widget {
 			),
 		),
 	).
-		Width(characterSelectSlotW).
-		Height(characterSelectSlotH).
+		Width(float32(characterSelectSlotW)).
+		Height(float32(characterSelectSlotH)).
 		CrossAlign(primitives.CrossAxisStretch)
 }
 
@@ -247,7 +232,7 @@ func (p characterSelectSlotPainter) PaintButton(canvas widget.Canvas, state butt
 		border = rotheme.Default.Colors.ButtonBorder
 	}
 	canvas.DrawRect(bounds, bg)
-	canvas.StrokeRect(bounds, border, 1)
+	canvas.StrokeRect(bounds, border, characterSelectBorderWidth)
 	if p.preview != nil {
 		imgBounds := p.preview.Bounds()
 		x := bounds.Min.X + (bounds.Width()-float32(imgBounds.Dx()))/2
@@ -266,33 +251,33 @@ func (w *CharacterSelectWindow) infoPanel(character session.Character, hasCharac
 			rotheme.Text("Empty Slot"),
 			rotheme.Text("Use Make to create a character later."),
 		).
-			Width(characterSelectInfoPanelW).
-			Height(characterSelectInfoPanelH).
-			Padding(12).
-			Gap(8).
+			Width(float32(characterSelectInfoPanelW)).
+			Height(float32(characterSelectInfoPanelH)).
+			Padding(float32(characterSelectEmptyPad)).
+			Gap(float32(characterSelectEmptyGap)).
 			Background(rotheme.Default.Colors.PanelBody).
-			BorderStyle(1, rotheme.Default.Colors.WindowBorder)
+			BorderStyle(characterSelectBorderWidth, rotheme.Default.Colors.WindowBorder)
 	}
 	return primitives.Box(
 		characterSelectStatsTable(character),
 	).
-		Width(characterSelectInfoPanelW).
-		Height(characterSelectInfoPanelH).
-		Padding(characterSelectInfoPanelPad).
+		Width(float32(characterSelectInfoPanelW)).
+		Height(float32(characterSelectInfoPanelH)).
+		Padding(float32(characterSelectInfoPanelPad)).
 		Background(rotheme.Default.Colors.PanelBody).
-		BorderStyle(1, rotheme.Default.Colors.WindowBorder)
+		BorderStyle(characterSelectBorderWidth, rotheme.Default.Colors.WindowBorder)
 }
 
 func characterSelectStatsTable(character session.Character) widget.Widget {
 	return rotheme.Table(
 		characterSelectStatsRows(character),
-		rotheme.TableRowHeightOpt(characterSelectInfoRowH),
+		rotheme.TableRowHeightOpt(float32(characterSelectInfoRowH)),
 		rotheme.TableColors(characterSelectSelectedBG, rotheme.Default.Colors.WindowFooter),
 	)
 }
 
 func characterSelectStatsRows(character session.Character) []rotheme.TableRow {
-	leftRows := [characterSelectInfoRowCount]struct {
+	leftRows := []struct {
 		label string
 		value string
 	}{
@@ -303,7 +288,7 @@ func characterSelectStatsRows(character session.Character) []rotheme.TableRow {
 		{"HP", fmt.Sprintf("%d / %d", character.HP, character.MaxHP)},
 		{"SP", fmt.Sprintf("%d / %d", character.SP, character.MaxSP)},
 	}
-	rightRows := [characterSelectInfoRowCount]struct {
+	rightRows := []struct {
 		label string
 		value string
 	}{
@@ -314,8 +299,13 @@ func characterSelectStatsRows(character session.Character) []rotheme.TableRow {
 		{"DEX", fmt.Sprintf("%d", character.Dex)},
 		{"LUK", fmt.Sprintf("%d", character.Luk)},
 	}
-	rows := make([]rotheme.TableRow, 0, len(leftRows))
-	for i, left := range leftRows {
+	n := characterSelectInfoRowCount
+	if n > len(leftRows) {
+		n = len(leftRows)
+	}
+	rows := make([]rotheme.TableRow, 0, n)
+	for i := 0; i < n; i++ {
+		left := leftRows[i]
 		right := rightRows[i]
 		rows = append(rows, rotheme.TableRow{
 			{Text: left.label, Width: characterSelectInfoLabelW, Align: widget.TextAlignLeft, Head: true},
@@ -331,7 +321,22 @@ func CharacterSelectPage(slot int) int {
 	if slot < 0 {
 		return 0
 	}
-	return slot / 3
+	return slot / characterSelectPageSlotsNow()
+}
+
+func characterSelectPageSlotsNow() int {
+	if characterSelectPageSlots < 1 {
+		return 1
+	}
+	return characterSelectPageSlots
+}
+
+// CharacterSelectPageSize is how many character slots one page shows.
+func CharacterSelectPageSize() int { return characterSelectPageSlotsNow() }
+
+// CharacterSelectSlotSize is the preview image size, matching the slot.
+func CharacterSelectSlotSize() (int, int) {
+	return characterSelectSlotW, characterSelectSlotH
 }
 
 func characterSelectDeleteDisabled(opts CharacterSelectWindowOptions) bool {

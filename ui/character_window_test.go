@@ -31,7 +31,7 @@ func TestCharacterRestoreCompactBeforeOpening(t *testing.T) {
 }
 
 func TestCharacterEXPPanelWrapsBothRowsInRoundedGreyContainer(t *testing.T) {
-	const width float32 = characterWindowWidth - 24
+	width := float32(characterWindowWidth) - characterBodyPadX*2
 	panel := characterEXPPanel(session.Progress{
 		BaseLevel:   42,
 		JobLevel:    27,

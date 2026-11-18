@@ -7,9 +7,6 @@ import (
 	"github.com/kivutar/goro/res"
 )
 
-// ROBrowser's 2D SpriteRenderer subtracts half of a 35px cell from canvas Y.
-const uiSpriteRendererMidCellY = 17.5
-
 func drawUISpriteLayer(target, img *render.Image, layer res.ACTLayer, anchorX, anchorY float64) {
 	bounds := img.Bounds()
 	width := float64(bounds.Dx())

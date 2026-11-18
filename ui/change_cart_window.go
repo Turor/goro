@@ -10,14 +10,6 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	changeCartWindowWidth  = 248
-	changeCartWindowHeight = 188
-	changeCartPad          = 14
-	changeCartGap          = 8
-	changeCartButtonW      = 64
-)
-
 type ChangeCartWindow struct {
 	Window
 	status string
@@ -26,11 +18,16 @@ type ChangeCartWindow struct {
 func (w *ChangeCartWindow) Open(ctx client.Context) {
 	w.ctx = ctx
 	w.EnsureWindow(changeCartWindowWidth, changeCartWindowHeight)
+	w.SetSize(changeCartWindowWidth, changeCartWindowHeight)
 	w.status = ""
 	if !inventoryBagHasCart(ctx) {
 		w.status = "You need a cart."
 	}
 	w.Window.Open(ctx, w.widgetTree(ctx))
+	w.OnLayoutReload(func() {
+		w.SetSize(changeCartWindowWidth, changeCartWindowHeight)
+		w.SetContent(w.widgetTree(ctx))
+	})
 	w.Publish(ctx)
 }
 
@@ -83,15 +80,15 @@ func (w *ChangeCartWindow) widgetTree(ctx client.Context) widget.Widget {
 			w.Window.Close()
 			w.Publish(ctx)
 		}),
-		Size(changeCartWindowWidth, changeCartWindowHeight),
+		Size(float32(changeCartWindowWidth), float32(changeCartWindowHeight)),
 		Content(
 			primitives.Box(
 				rotheme.Text("Select a cart."),
 				w.cartGrid(ctx),
 				rotheme.Text(w.status),
 			).
-				Padding(changeCartPad).
-				Gap(changeCartGap).
+				Padding(float32(changeCartPad)).
+				Gap(float32(changeCartGap)).
 				CrossAlign(primitives.CrossAxisStretch),
 		),
 	)
@@ -99,18 +96,18 @@ func (w *ChangeCartWindow) widgetTree(ctx client.Context) widget.Widget {
 
 func (w *ChangeCartWindow) cartGrid(ctx client.Context) widget.Widget {
 	allowed := changeCartChoices(baseLevelForChangeCart(ctx))
-	rows := make([]widget.Widget, 0, 3)
-	for i := 0; i < len(allowed); i += 3 {
-		cells := make([]widget.Widget, 0, 3)
-		for _, cartNum := range allowed[i:minInt(i+3, len(allowed))] {
+	rows := make([]widget.Widget, 0, changeCartColumns)
+	for i := 0; i < len(allowed); i += changeCartColumns {
+		cells := make([]widget.Widget, 0, changeCartColumns)
+		for _, cartNum := range allowed[i:minInt(i+changeCartColumns, len(allowed))] {
 			num := cartNum
 			cells = append(cells, rotheme.Button(fmt.Sprintf("%d", num), func() {
 				w.selectCart(ctx, num)
-			}).Width(changeCartButtonW))
+			}).Width(float32(changeCartButtonW)))
 		}
-		rows = append(rows, primitives.HBox(cells...).Gap(changeCartGap))
+		rows = append(rows, primitives.HBox(cells...).Gap(float32(changeCartGap)))
 	}
-	return primitives.Box(rows...).Gap(changeCartGap)
+	return primitives.Box(rows...).Gap(float32(changeCartGap))
 }
 
 func changeCartChoices(baseLevel int) []int {

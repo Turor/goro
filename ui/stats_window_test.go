@@ -99,7 +99,7 @@ func TestStatsPrimaryRowsUseTableRhythm(t *testing.T) {
 	rows := w.statRowsWidget(Context{Session: &session.Session{}})
 	rows.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(
 		statsPrimaryColumnWidth,
-		6*float32(statsRowH)+5*statsRowGap,
+		6*float32(statsRowH)+5*rotheme.TableGap,
 	)))
 	children := rows.(interface{ Children() []widget.Widget }).Children()
 	if len(children) != 6 {
@@ -110,7 +110,7 @@ func TestStatsPrimaryRowsUseTableRhythm(t *testing.T) {
 		if bounds.Height() != float32(statsRowH) {
 			t.Fatalf("primary row %d height = %.1f, want %d", i, bounds.Height(), statsRowH)
 		}
-		wantY := float32(i) * (float32(statsRowH) + statsRowGap)
+		wantY := float32(i) * (float32(statsRowH) + rotheme.TableGap)
 		if bounds.Min.Y != wantY {
 			t.Fatalf("primary row %d y = %.1f, want %.1f", i, bounds.Min.Y, wantY)
 		}

@@ -3,6 +3,7 @@ package actors
 import (
 	"errors"
 	"fmt"
+	"github.com/kivutar/goro/ui/rotheme"
 	"image/color"
 	"math"
 	"time"
@@ -23,7 +24,7 @@ func (m *System) DrawVendingBoardLabels(screen *render.Frame, ctx client.Context
 			continue
 		}
 		label := scene.SanitizeActorName(entry.Actor.VendingName)
-		labelY := ActorSpriteTopY(entry.ScreenY, entry.Scale) - boardLabelGap - boardLabelHeight(label)
+		labelY := ActorSpriteTopY(entry.ScreenY, entry.Scale) - float64(boardLabelGap) - boardLabelHeight(label)
 		drawBoardLabel(screen, entry.Actor.VendingName, entry.ScreenX, labelY, icon)
 	}
 }
@@ -35,10 +36,10 @@ func (m *System) DrawChatRoomBoardLabels(screen *render.Frame, ctx client.Contex
 		}
 		label := chatRoomBoardLabel(entry.Actor)
 		icon := m.chatRoomBoardIcon(ctx.Resources, entry.Actor.ChatRoomPublic)
-		labelY := ActorSpriteTopY(entry.ScreenY, entry.Scale) - boardLabelGap - boardLabelHeight(label)
+		labelY := ActorSpriteTopY(entry.ScreenY, entry.Scale) - float64(boardLabelGap) - boardLabelHeight(label)
 		if social.ActorHasVending(entry.Actor) {
 			vendingLabel := scene.SanitizeActorName(entry.Actor.VendingName)
-			labelY -= boardLabelHeight(vendingLabel) + boardLabelGap
+			labelY -= boardLabelHeight(vendingLabel) + float64(boardLabelGap)
 		}
 		drawBoardLabel(screen, label, entry.ScreenX, labelY, icon)
 	}
@@ -55,27 +56,12 @@ func chatRoomBoardLabel(actor worldstate.Actor) string {
 	return fmt.Sprintf("%s (%d/%d)", title, actor.ChatRoomCount, actor.ChatRoomLimit)
 }
 
-const (
-	boardLabelW        = 158
-	boardLabelH        = 36
-	boardLabelPadX     = 5
-	boardLabelIconGap  = 5
-	boardLabelGap      = 4
-	boardLabelIcon     = 24
-	boardLabelTextH    = 20
-	boardLabelRadius   = 4
-	boardLabelOutlineW = 3
-	boardLabelBorderW  = 1
-)
-
+// The board surface is drawn once per layout generation ([boards] in
+// ui-layout.ini) and reused.
 var (
-	boardLabelFillColor    = color.RGBA{R: 255, G: 255, B: 255, A: 245}
-	boardLabelOutlineColor = color.RGBA{R: 255, G: 255, B: 255, A: 245}
-	boardLabelBorderColor  = color.RGBA{R: 74, G: 138, B: 202, A: 245}
-	boardLabelTextColor    = color.RGBA{R: 30, G: 34, B: 40, A: 255}
+	boardSurfaceCache *render.Image
+	boardSurfaceGen   uint64
 )
-
-var boardSurfaceCache *render.Image
 
 type vendingBoardBounds struct {
 	X float64
@@ -109,7 +95,7 @@ func drawBoardLabel(screen *render.Frame, label string, centerX, topY float64, i
 	}
 	maxTextWidth := int(bounds.X+bounds.W) - int(math.Round(textX)) - contentInset - boardLabelPadX
 	text := trimBoardLabel(label, maxTextWidth)
-	textY := bounds.Y + float64(boardLabelH-boardLabelTextH)/2 - 2
+	textY := bounds.Y + float64(boardLabelH-boardLabelTextH)/2 - float64(boardLabelTextNudge)
 	render.DrawUITextAt(screen, text, textX, textY, boardLabelTextColor)
 }
 
@@ -128,11 +114,11 @@ func drawBoardSurface(screen *render.Frame, bounds vendingBoardBounds) {
 }
 
 func cachedBoardSurface() *render.Image {
-	if boardSurfaceCache != nil {
+	if boardSurfaceCache != nil && boardSurfaceGen == rotheme.Generation() {
 		return boardSurfaceCache
 	}
 	img := render.NewImage(boardLabelW, boardLabelH)
-	gameui.DrawRoundedSurface(img, 0, 0, boardLabelW, boardLabelH, boardLabelOutlineColor, color.RGBA{}, boardLabelRadius)
+	gameui.DrawRoundedSurface(img, 0, 0, boardLabelW, boardLabelH, boardLabelOutlineColor, color.RGBA{}, float32(boardLabelRadius))
 	blueInset := boardLabelOutlineW
 	gameui.DrawRoundedSurface(
 		img,
@@ -142,7 +128,7 @@ func cachedBoardSurface() *render.Image {
 		boardLabelH-blueInset*2,
 		boardLabelBorderColor,
 		color.RGBA{},
-		float32(scene.MaxInt(0, int(boardLabelRadius)-blueInset)),
+		float32(scene.MaxInt(0, boardLabelRadius-blueInset)),
 	)
 	fillInset := boardLabelOutlineW + boardLabelBorderW
 	gameui.DrawRoundedSurface(
@@ -153,9 +139,9 @@ func cachedBoardSurface() *render.Image {
 		boardLabelH-fillInset*2,
 		boardLabelFillColor,
 		color.RGBA{},
-		float32(scene.MaxInt(0, int(boardLabelRadius)-fillInset)),
+		float32(scene.MaxInt(0, boardLabelRadius-fillInset)),
 	)
-	boardSurfaceCache = img
+	boardSurfaceCache, boardSurfaceGen = img, rotheme.Generation()
 	return boardSurfaceCache
 }
 
@@ -252,7 +238,7 @@ func VendingBoardActorBounds(ctx client.Context, projection scene.Projection, ac
 	terrainZ := scene.TerrainHeightAt(ctx.World, actorX, actorY)
 	point := projection.Project(scene.CellCenter(actorX), scene.CellCenter(actorY), terrainZ)
 	scale := scene.ActorBillboardScreenScale(projection, scene.CellCenter(actorX), scene.CellCenter(actorY), terrainZ)
-	topY := ActorSpriteTopY(float64(point.Y), scale) - boardLabelGap - boardLabelHeight(label)
+	topY := ActorSpriteTopY(float64(point.Y), scale) - float64(boardLabelGap) - boardLabelHeight(label)
 	return boardLabelBounds(label, float64(point.X), topY)
 }
 
@@ -265,9 +251,9 @@ func (m *System) chatRoomBoardActorBounds(ctx client.Context, projection scene.P
 	terrainZ := scene.TerrainHeightAt(ctx.World, actorX, actorY)
 	point := projection.Project(scene.CellCenter(actorX), scene.CellCenter(actorY), terrainZ)
 	scale := scene.ActorBillboardScreenScale(projection, scene.CellCenter(actorX), scene.CellCenter(actorY), terrainZ)
-	topY := ActorSpriteTopY(float64(point.Y), scale) - boardLabelGap - boardLabelHeight(label)
+	topY := ActorSpriteTopY(float64(point.Y), scale) - float64(boardLabelGap) - boardLabelHeight(label)
 	if social.ActorHasVending(actor) {
-		topY -= boardLabelHeight(actor.VendingName) + boardLabelGap
+		topY -= boardLabelHeight(actor.VendingName) + float64(boardLabelGap)
 	}
 	return boardLabelBounds(label, float64(point.X), topY)
 }
@@ -280,8 +266,8 @@ func boardLabelBounds(label string, centerX, topY float64) (vendingBoardBounds, 
 	return vendingBoardBounds{
 		X: math.Round(centerX - float64(boardLabelW)/2),
 		Y: math.Round(topY),
-		W: boardLabelW,
-		H: boardLabelH,
+		W: float64(boardLabelW),
+		H: float64(boardLabelH),
 	}, true
 }
 
@@ -289,7 +275,7 @@ func boardLabelHeight(label string) float64 {
 	if scene.SanitizeActorName(label) == "" {
 		return 0
 	}
-	return boardLabelH
+	return float64(boardLabelH)
 }
 
 func trimBoardLabel(label string, maxWidth int) string {
@@ -297,7 +283,7 @@ func trimBoardLabel(label string, maxWidth int) string {
 	if label == "" || maxWidth <= 0 {
 		return ""
 	}
-	maxWidth -= 14
+	maxWidth -= boardLabelEllipsisReserve
 	if maxWidth <= 0 {
 		return "..."
 	}

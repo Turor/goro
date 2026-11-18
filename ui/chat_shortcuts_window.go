@@ -13,11 +13,6 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	chatShortcutsW = 280
-	chatShortcutsH = ROWindowTitleHeight + 10*28 + 20 + ROWindowFooterHeight
-)
-
 type ChatShortcutsWindow struct {
 	Window
 	commands config.ChatShortcuts
@@ -54,10 +49,22 @@ func (w *ChatShortcutsWindow) Toggle(ctx Context, console *ChatConsole, onView f
 		return
 	}
 	w.load(ctx)
-	w.EnsureWindow(chatShortcutsW, chatShortcutsH)
+	w.EnsureWindow(chatShortcutsW, chatShortcutsH())
+	w.SetSize(chatShortcutsW, chatShortcutsH())
 	w.ctx, w.console, w.onView = ctx, console, onView
 	w.Window.Open(ctx, w.widgetTree())
+	w.OnLayoutReload(w.reloadLayout)
 	w.Publish(ctx)
+}
+
+func (w *ChatShortcutsWindow) reloadLayout() {
+	slot := w.selected
+	focused := slot >= 0 && slot < len(w.fields) && w.fields[slot] != nil && w.fields[slot].IsFocused()
+	w.SetSize(chatShortcutsW, chatShortcutsH())
+	w.SetContent(w.widgetTree())
+	if focused && w.fields[slot] != nil {
+		w.fields[slot].SetFocused(true)
+	}
 }
 
 func (w *ChatShortcutsWindow) Update(ctx Context) bool {
@@ -149,14 +156,14 @@ func (w *ChatShortcutsWindow) widgetTree() widget.Widget {
 			textfield.MaxLength(consoleMaxInput),
 		)
 		rows = append(rows, primitives.HBox(
-			primitives.Box(rotheme.Label(fmt.Sprintf("Alt + %d", (slot+1)%10))).Width(54),
+			primitives.Box(rotheme.Label(fmt.Sprintf("Alt + %d", (slot+1)%10))).Width(float32(chatShortcutsLabelW)),
 			primitives.Expanded(w.fields[slot]),
-		).Height(24).Gap(8).CrossAlign(primitives.CrossAxisCenter))
+		).Height(float32(chatShortcutsRowH)).Gap(float32(chatShortcutsLabelGap)).CrossAlign(primitives.CrossAxisCenter))
 	}
 	return Win(
 		Title("Shortcut List"), CloseButton(true), OnClose(w.Close),
-		Size(chatShortcutsW, chatShortcutsH),
-		Content(primitives.Box(rows...).Padding(12).Gap(4)),
+		Size(float32(chatShortcutsW), float32(chatShortcutsH())),
+		Content(primitives.Box(rows...).Padding(float32(chatShortcutsPad)).Gap(float32(chatShortcutsRowGap))),
 		Footer(primitives.Expanded(primitives.Box()), rotheme.Button("View", func() {
 			if w.onView != nil {
 				w.onView()
