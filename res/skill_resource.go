@@ -2,6 +2,7 @@ package res
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -122,8 +123,10 @@ func (m *Manager) loadSkillResourceNames() {
 	}
 	m.skillResourceNamesLoaded = true
 	m.skillResourceNames = make(map[int]string, len(db.SkillResourceName))
+	m.skillIDNames = make(map[string]int, len(db.SkillResourceName))
 	for id, name := range db.SkillResourceName {
 		m.skillResourceNames[int(id)] = name
+		m.skillIDNames[name] = int(id)
 	}
 	globals := make(map[string]luaValue)
 	_, data, ok := m.ReadFirst(skillIDLuaCandidates)
@@ -137,14 +140,36 @@ func (m *Manager) loadSkillResourceNames() {
 	if table.kind != luaTable {
 		return
 	}
+	fileIDs := make(map[string]int, len(table.table))
 	for key, value := range table.table {
 		name, ok := key.(string)
-		if !ok || value.kind != luaNumber || name == "" {
+		if !ok || value.kind != luaNumber || name == "" || value.num <= 0 {
 			continue
 		}
-		id := int(value.num)
-		if id > 0 {
+		fileIDs[name] = int(value.num)
+	}
+	// The client table wins: drop built-in names it assigns to another ID,
+	// so the SKID table is never ambiguous.
+	for id, name := range m.skillResourceNames {
+		if fileID, ok := fileIDs[name]; ok && fileID != id {
+			delete(m.skillResourceNames, id)
+		}
+	}
+	// Several names may share one ID (renamed skills keep their old name as
+	// an alias). Every name stays resolvable in SKID; the display name per ID
+	// is picked deterministically, the smallest name.
+	names := make([]string, 0, len(fileIDs))
+	for name := range fileIDs {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	fromFile := make(map[int]bool, len(names))
+	for _, name := range names {
+		id := fileIDs[name]
+		m.skillIDNames[name] = id
+		if !fromFile[id] {
 			m.skillResourceNames[id] = name
+			fromFile[id] = true
 		}
 	}
 }
@@ -215,10 +240,15 @@ func (m *Manager) loadSkillInfoList() {
 	m.skillInfoListLoaded = true
 	m.skillInfoNames = make(map[int]string)
 	m.skillInfoMaxLevels = make(map[int]int)
+	m.skillInfoReqs = make(map[int][]db.SkillRequirement)
+	m.skillInfoJobReqs = make(map[int]map[int][]db.SkillRequirement)
+	m.skillInfoWarnings = nil
+	m.skillInfoSource = nil
 	_, data, ok := m.ReadFirst(skillInfoListLuaCandidates)
 	if !ok {
 		return
 	}
+	m.skillInfoSource = data
 	globals := m.skillIDGlobals()
 	if executeLuaChunk(data, globals) != nil {
 		return
@@ -238,16 +268,70 @@ func (m *Manager) loadSkillInfoList() {
 		if level := luaField(entry, "MaxLv"); level.kind == luaNumber && level.num > 0 {
 			m.skillInfoMaxLevels[id] = int(level.num)
 		}
+		m.skillInfoReqs[id] = m.parseSkillRequirements(id, -1, luaField(entry, "_NeedSkillList"))
+		if byJob := luaField(entry, "NeedSkillList"); byJob.kind == luaTable {
+			for rawJob, list := range byJob.table {
+				job, ok := rawJob.(int)
+				if !ok || job < 0 {
+					continue
+				}
+				if m.skillInfoJobReqs[id] == nil {
+					m.skillInfoJobReqs[id] = make(map[int][]db.SkillRequirement)
+				}
+				m.skillInfoJobReqs[id][job] = m.parseSkillRequirements(id, job, list)
+			}
+		}
 	}
+}
+
+// parseSkillRequirements reads a { { SKID.X, level }, ... } list. An entry
+// whose skill did not resolve (a SKID name skillid.lub lacks) is dropped with
+// a warning; the source scan in validateSkillTree names it.
+func (m *Manager) parseSkillRequirements(skillID, job int, list luaValue) []db.SkillRequirement {
+	if list.kind != luaTable {
+		return nil
+	}
+	var out []db.SkillRequirement
+	for i := 1; i <= len(list.table)+1; i++ {
+		entry, ok := list.table[i]
+		if !ok {
+			continue
+		}
+		var required, level luaValue
+		if entry.kind == luaTable {
+			required, level = entry.table[1], entry.table[2]
+		}
+		if required.kind != luaNumber || required.num <= 0 || required.num > 0xffff {
+			where := "_NeedSkillList"
+			if job >= 0 {
+				where = fmt.Sprintf("NeedSkillList[%d]", job)
+			}
+			m.skillInfoWarnings = append(m.skillInfoWarnings,
+				fmt.Sprintf("skill %s: %s entry %d names an unknown skill", m.skillLabel(skillID), where, i))
+			continue
+		}
+		lv := 1
+		if level.kind == luaNumber && level.num > 0 {
+			lv = int(level.num)
+		}
+		out = append(out, db.SkillRequirement{SkillID: uint16(required.num), Level: lv})
+	}
+	return out
 }
 
 // skillIDGlobals seeds a Lua environment with SKID from the loaded skill IDs
 // and JOBID from jobidentity.lub, which skillinfolist and skilltreeview key on.
 func (m *Manager) skillIDGlobals() map[string]luaValue {
 	m.loadSkillResourceNames()
-	skillIDs := make(map[interface{}]luaValue, len(m.skillResourceNames))
-	for id, name := range m.skillResourceNames {
+	skillIDs := make(map[interface{}]luaValue, len(m.skillIDNames))
+	for name, id := range m.skillIDNames {
 		if id > 0 && name != "" {
+			skillIDs[name] = luaValue{kind: luaNumber, num: float64(id)}
+		}
+	}
+	// roBrowserLegacy seeds WS_ARMORREFINE, which kRO skillid tables lack.
+	for name, id := range compatSkillIDs {
+		if _, ok := skillIDs[name]; !ok {
 			skillIDs[name] = luaValue{kind: luaNumber, num: float64(id)}
 		}
 	}
@@ -256,6 +340,16 @@ func (m *Manager) skillIDGlobals() map[string]luaValue {
 		globals["JOBID"] = jobs
 	}
 	return globals
+}
+
+var compatSkillIDs = map[string]int{"WS_ARMORREFINE": 709}
+
+// compatJobIDs are mounted-job constants skill tables reference (NeedSkillList
+// for Crusader on a Grand Peco) that newer jobidentity tables dropped.
+// roBrowserLegacy derives them from its own job list.
+var compatJobIDs = map[string]int{
+	"JT_KNIGHT2": 13, "JT_KNIGHT2_H": 4014, "JT_KNIGHT2_B": 4036,
+	"JT_CRUSADER2": 21, "JT_CRUSADER2_H": 4022, "JT_CRUSADER2_B": 4044,
 }
 
 // jobIDTable returns the job constants from jobidentity.lub. Older clients
@@ -273,6 +367,13 @@ func (m *Manager) jobIDTable() luaValue {
 	m.jobIDs = globals["JOBID"]
 	if m.jobIDs.kind != luaTable {
 		m.jobIDs = globals["JTtbl"]
+	}
+	if m.jobIDs.kind == luaTable {
+		for name, id := range compatJobIDs {
+			if _, ok := m.jobIDs.table[name]; !ok {
+				m.jobIDs.table[name] = luaValue{kind: luaNumber, num: float64(id)}
+			}
+		}
 	}
 	return m.jobIDs
 }
@@ -311,6 +412,7 @@ func (m *Manager) loadSkillTreePositions() {
 	}
 	m.skillTreePositionsLoaded = true
 	m.skillTreePositions = make(map[int]map[int]int)
+	m.skillTreeViewSource = nil
 	m.loadSkillResourceNames()
 	if _, data, ok := m.ReadFirst(skillDataTableCandidates("skilltreeview.txt")); ok {
 		m.skillTreeTextPositions = parseSkillTreeTextPositions(data, m.skillNameToID())
@@ -325,6 +427,7 @@ func (m *Manager) loadSkillTreePositions() {
 		return
 	}
 	m.skillTreePositions = parseSkillTreePositions(globals["SKILL_TREEVIEW_FOR_JOB"])
+	m.skillTreeViewSource = treeData
 }
 
 // Text clients use JOB { SKILL#position#prerequisite positions#max level@ ... }.
@@ -391,8 +494,8 @@ func parseSkillTreePositions(table luaValue) map[int]map[int]int {
 }
 
 func (m *Manager) skillNameToID() map[string]int {
-	out := make(map[string]int, len(m.skillResourceNames))
-	for id, name := range m.skillResourceNames {
+	out := make(map[string]int, len(m.skillIDNames))
+	for name, id := range m.skillIDNames {
 		if name == "" {
 			continue
 		}
