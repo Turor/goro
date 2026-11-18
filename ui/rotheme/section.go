@@ -48,6 +48,11 @@ func (s LayoutSection) Float(key string, ptr *float32, minValue, maxValue float6
 	RegisterFloat(s.name, key, ptr, minValue, maxValue, doc)
 }
 
+// Float64 registers a float64 scale or ratio, kept exact.
+func (s LayoutSection) Float64(key string, ptr *float64, minValue, maxValue float64, doc string) {
+	RegisterFloat64(s.name, key, ptr, minValue, maxValue, doc)
+}
+
 // Color registers a gogpu/ui color.
 func (s LayoutSection) Color(key string, ptr *widget.Color, doc string) {
 	RegisterColor(s.name, key, ptr, doc)

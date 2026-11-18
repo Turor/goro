@@ -128,7 +128,7 @@ func (w *MercenaryInfoWindow) statsTable() widget.Widget {
 
 func (w *MercenaryInfoWindow) detailsColumn(ctx Context) widget.Widget {
 	timeFill := Color(mercenaryInfoTimeColor)
-	if mercenaryRemainingRatio(w.companion.ExpireTick) < float64(mercenaryInfoTimeLowRatio) {
+	if mercenaryRemainingRatio(w.companion.ExpireTick) < mercenaryInfoTimeLowRatio {
 		timeFill = Color(mercenaryInfoTimeLow)
 	}
 	return primitives.Box(

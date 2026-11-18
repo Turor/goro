@@ -25,7 +25,7 @@ func Tokens() []TokenInfo {
 	for _, t := range tokens {
 		out = append(out, TokenInfo{
 			Section: t.section, Key: t.key, Doc: t.doc,
-			Numeric: t.kind == tokenInt || t.kind == tokenFloat,
+			Numeric: t.kind == tokenInt || t.kind == tokenFloat || t.kind == tokenFloat64,
 			Integer: t.kind == tokenInt,
 			Min:     t.min, Max: t.max,
 			Value: t.format(t.current()), Default: t.format(t.def),

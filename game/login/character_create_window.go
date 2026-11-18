@@ -205,7 +205,7 @@ func (m *Screen) characterCreatePreviewImage(ctx client.Context) image.Image {
 		m.create.previewImageKey = key
 		return m.create.previewImage
 	}
-	scale := float64(charCreatePreviewScale)
+	scale := charCreatePreviewScale
 	bounds := billboard.Image.Bounds()
 	var opts render.DrawImageOptions
 	opts.GeoM.Scale(scale, scale)

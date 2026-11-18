@@ -291,7 +291,7 @@ func (m *Screen) drawCharacterPreview(screen characterPreviewTarget, ctx client.
 		return
 	}
 	var opts render.DrawImageOptions
-	scale := float64(charSelectPreviewScale)
+	scale := charSelectPreviewScale
 	if db.IsBabyJob(int(character.Job)) {
 		scale *= scene.BabyPlayerBodyScale
 	}
