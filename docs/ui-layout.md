@@ -25,16 +25,17 @@ file:line: reason` for a bad edit, which keeps the last good values. Deleting
 the file restores the built-in layout. Without `--ui-dev` nothing is polled and
 F10 does nothing.
 
-What updates live, and what needs the window reopened:
+What updates live:
 
-- **Live:** window body, border, radius and title text; title bar, footer and
-  button colors; button text and other text drawn at paint time; the hotbar
-  (slot size, gaps, padding); inventory cell size, columns and rows.
-- **On reopen:** colors and sizes that a window copies when it is built, such
-  as table rows, labels inside window bodies, title and footer padding, and
-  button heights. Reopen the window (or restart) to see those.
+- **Every persistent in-game window** (status, inventory, equipment, skills,
+  basic info, menu, chat, minimap, quests, social, companions, settings and
+  the rest rebound on map entry) is rebuilt after a reload, so padding, row
+  heights, labels and button heights follow the file without reopening. The
+  NPC dialog, hotbar and inventory rebuild themselves too.
+- **Not yet:** the login, server and character select screens, and transient
+  pop-ups (shops, trades, prompts) keep their values until they are reopened.
 
-
+## What the file covers
 
 | Section | Keys |
 |---|---|
