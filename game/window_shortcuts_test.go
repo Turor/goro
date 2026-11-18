@@ -29,6 +29,7 @@ func TestWindowShortcutsToggle(t *testing.T) {
 		{"homunculus", gpucontext.KeyR, false, func(m *WorldMode) *gameui.Window { return &m.ui.companions.HomunculusInfo.Window }},
 		{"mercenary", gpucontext.KeyR, true, func(m *WorldMode) *gameui.Window { return &m.ui.companions.MercenaryInfo.Window }},
 		{"settings", gpucontext.KeyO, false, func(m *WorldMode) *gameui.Window { return &m.ui.settingsWindow.Window }},
+		{"companions", gpucontext.KeyP, false, func(m *WorldMode) *gameui.Window { return &m.ui.companions.Companion.Window }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := chatShortcutTestContext(t)
