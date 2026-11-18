@@ -210,3 +210,51 @@ func TestDecodeAllRealImagesWhenConfigured(t *testing.T) {
 	}
 	t.Logf("decoded %d images", len(jobs))
 }
+func TestDecodeTGARejectsHugeHeaderBeforeAlloc(t *testing.T) {
+	// The review fuzzer case: 25600x49151x32bpp in an 18-byte file. Previously
+	// NewNRGBA ran before the pixel-length check and the process was killed.
+	data := tgaHeader(2, 0, 0, 0, 32, 25600, 49151, 0x30)
+	if _, err := decodeTGA(data); err == nil {
+		t.Fatal("expected an error for oversized TGA header")
+	}
+	if _, err := DecodeImageData(data); err == nil {
+		t.Fatal("expected DecodeImageData to reject oversized TGA")
+	}
+}
+
+func TestDecodeTGARejectsTruncatedPixelsBeforeAlloc(t *testing.T) {
+	// Under the dimension cap, but not enough bytes for the declared pixels.
+	data := tgaHeader(2, 0, 0, 0, 32, 8000, 8000, 0x20)
+	if _, err := decodeTGA(data); err == nil {
+		t.Fatal("expected truncated tga error")
+	}
+}
+
+func TestDecodeTGARejectsUndersizedRLE(t *testing.T) {
+	data := tgaHeader(10, 0, 0, 0, 32, 4000, 4000, 0x20)
+	if _, err := decodeTGA(data); err == nil {
+		t.Fatal("expected truncated tga rle error")
+	}
+}
+
+func TestDecodeImageDataRejectsOversizedPNGHeader(t *testing.T) {
+	var buf bytes.Buffer
+	buf.WriteString("\x89PNG\r\n\x1a\n")
+	ihdr := make([]byte, 13)
+	binary.BigEndian.PutUint32(ihdr[0:], 65535)
+	binary.BigEndian.PutUint32(ihdr[4:], 65535)
+	ihdr[8] = 8
+	ihdr[9] = 2
+	var chunk bytes.Buffer
+	binary.Write(&chunk, binary.BigEndian, uint32(13))
+	chunk.WriteString("IHDR")
+	chunk.Write(ihdr)
+	binary.Write(&chunk, binary.BigEndian, crc32.ChecksumIEEE(append([]byte("IHDR"), ihdr...)))
+	buf.Write(chunk.Bytes())
+	// IEND
+	buf.Write([]byte{0, 0, 0, 0, 'I', 'E', 'N', 'D'})
+	binary.Write(&buf, binary.BigEndian, crc32.ChecksumIEEE([]byte("IEND")))
+	if _, err := DecodeImageData(buf.Bytes()); err == nil {
+		t.Fatal("expected oversized PNG header to be rejected")
+	}
+}
