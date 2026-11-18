@@ -21,11 +21,18 @@
 //	<sha256 lowercase hex>
 //	<size decimal>
 //	<url>
+//	optional:
+//	next-keys
+//	<count>
+//	<64 lowercase hex public key>...
 //
 // The on-disk envelope prepends "GORO1SIG\n" and a 128-character lowercase hex
 // signature line. The layout mirrors Korangar's KRUP1 so the same controller
 // seed can sign both, while the different magic stops a Korangar manifest
 // from ever being accepted by goro (and the other way round).
 //
-// See docs/turoran-auto-update.md.
+// Data versions use the same Ed25519 envelope with magic GDAT1 / GDAT1SIG and
+// list every served file's path, size and SHA-256. The client ships
+// TrustedPublicKeys and accepts a signed next-key list before the old key
+// retires. See docs/turoran-auto-update.md.
 package updater

@@ -42,6 +42,35 @@ func TestSignVerifyRoundTrip(t *testing.T) {
 	}
 }
 
+func TestSignDataAndNextKeys(t *testing.T) {
+	dir := t.TempDir()
+	seed := filepath.Join(dir, "seed")
+	if err := os.WriteFile(seed, bytes.Repeat([]byte{5}, 32), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	src := filepath.Join(dir, "skillid.lub")
+	if err := os.WriteFile(src, []byte("lua"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	pub := ed25519.NewKeyFromSeed(bytes.Repeat([]byte{5}, 32)).Public().(ed25519.PublicKey)
+	next := hex.EncodeToString(bytes.Repeat([]byte{9}, 32))
+	out := filepath.Join(dir, "data.gdat")
+	var buf bytes.Buffer
+	if err := run([]string{"sign-data", "--private-key", seed, "--version", "42", "--out", out, "--file", "data/lua files/skillid.lub=" + src, "--next-key", hex.EncodeToString(pub), "--next-key", next}, &buf); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(buf.String(), hex.EncodeToString(bytes.Repeat([]byte{5}, 32))) {
+		t.Fatal("seed printed")
+	}
+	buf.Reset()
+	if err := run([]string{"verify-data", "--manifest", out, "--public-key", hex.EncodeToString(pub)}, &buf); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(buf.String(), "ok version=42 files=1 next-keys=2") {
+		t.Fatalf("verify-data output %q", buf.String())
+	}
+}
+
 func TestRefusesZeroAndShortSeeds(t *testing.T) {
 	dir := t.TempDir()
 	for name, data := range map[string][]byte{"zero": make([]byte, 32), "short": []byte("abc")} {
