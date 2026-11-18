@@ -261,18 +261,18 @@ func (m *System) SkillEffectDirection(ctx client.Context, actorID uint32, direct
 			if frame < 30 || frame > 54 {
 				continue
 			}
-			turn = float64(frame-29) * 30
+			turn = float64(frame-29) * 30 // theme:ok animation frame math
 		case effects.CastSpin:
 			anim, ok := m.ActorAnims[effect.ActorID]
 			if frame >= 100 || !ok || anim.ActionFamily != scene.SpriteActionIdle || !anim.Started.Equal(effect.Starts) || now.Sub(anim.Started) >= anim.Duration {
 				continue
 			}
 			ticks := frame + 1
-			turn = float64(12*min(ticks, 16) + 18*scene.ClampInt(ticks-16, 0, 15) + 24*scene.ClampInt(ticks-31, 0, 10) + 48*max(0, ticks-41))
+			turn = float64(12*min(ticks, 16) + 18*scene.ClampInt(ticks-16, 0, 15) + 24*scene.ClampInt(ticks-31, 0, 10) + 48*max(0, ticks-41)) // theme:ok animation frame math
 		default:
 			continue
 		}
-		direction = (direction + int(math.Floor((turn+22.5)/45))) % 8
+		direction = (direction + int(math.Floor((turn+22.5)/45))) % 8 // theme:ok direction sector math
 	}
 	return direction
 }

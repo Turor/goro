@@ -25,12 +25,6 @@ const (
 	damageMsgACT    = "data\\sprite\\이팩트\\msg.act"
 )
 
-var (
-	DamageFloaterWhite  = color.RGBA{R: 255, G: 255, B: 255, A: 255}
-	damageFloaterYellow = color.RGBA{R: 230, G: 230, B: 38, A: 255}
-	damageFloaterRed    = color.RGBA{R: 255, G: 64, B: 64, A: 255}
-)
-
 func (m *System) damageNumberSprite(ctx client.Context) *scene.SpriteView {
 	if m.DamageNumberView != nil || m.DamageNumberMiss || ctx.Resources == nil {
 		return m.DamageNumberView
@@ -57,6 +51,11 @@ func (m *System) DamageNumberBillboard(ctx client.Context, text string) (*scene.
 	}
 	if m.DamageNumbers == nil {
 		m.DamageNumbers = make(map[string]*scene.Billboard)
+	}
+	if m.damageNumberGap != damageNumberDigitGap {
+		// [damage_numbers] digit_gap changed: recompose the cached numbers.
+		clear(m.DamageNumbers)
+		m.damageNumberGap = damageNumberDigitGap
 	}
 	if billboard, ok := m.DamageNumbers[text]; ok {
 		return billboard, true
@@ -118,7 +117,7 @@ func (m *System) damageMessageBillboard(ctx client.Context, actionIndex, motion 
 }
 
 func composeDamageNumberBillboard(view *scene.SpriteView, text string) (*scene.Billboard, bool) {
-	const digitGap = 2
+	digitGap := damageNumberDigitGap
 	digits := make([]*scene.Billboard, 0, len(text))
 	totalWidth := 0
 	maxHeight := 0
@@ -197,21 +196,21 @@ func damageFloaterPlacement(kind FloaterKind, progress float64) (dx, dy, zLift, 
 	switch kind {
 	case FloaterCombo:
 		scale = math.Min(progress, 0.05) * 70
-		zLift = 7.0 + progress
+		zLift = 7.0 + progress // theme:ok roBrowser damage motion curve
 	case FloaterRecoveryHP, FloaterRecoverySP:
 		scale = math.Max((1-progress*2)*3, 0.8)
 		zLift = 2.0
 		if progress >= 0.4 {
-			zLift += (progress - 0.4) * 5.0
+			zLift += (progress - 0.4) * 5.0 // theme:ok roBrowser damage motion curve
 		}
 	case FloaterMiss:
-		scale = 0.5
-		zLift = 3.5 + progress*7.0
+		scale = damageMissScale
+		zLift = 3.5 + progress*7.0 // theme:ok roBrowser damage motion curve
 	default:
 		scale = math.Max((1-progress)*4, 0)
-		arc := math.Sin(-math.Pi/2+math.Pi*(0.5+progress*1.5)) * 5.0
+		arc := math.Sin(-math.Pi/2+math.Pi*(0.5+progress*1.5)) * 5.0 // theme:ok roBrowser damage motion curve
 		dx = progress * 4.0
-		zLift = 2.0 + arc
+		zLift = 2.0 + arc // theme:ok roBrowser damage motion curve
 	}
 	return dx, dy, zLift, scale, alpha
 }
@@ -221,13 +220,15 @@ func damageFloaterColor(kind FloaterKind, fallback color.RGBA) color.RGBA {
 	case FloaterCritical:
 		return damageFloaterYellow
 	case FloaterCombo:
-		return damageFloaterYellow
+		return damageFloaterCombo
 	case FloaterIncoming:
 		return damageFloaterRed
 	case FloaterRecoveryHP:
-		return color.RGBA{R: 0, G: 255, B: 0, A: 255}
+		return damageFloaterHealHP
 	case FloaterRecoverySP:
-		return color.RGBA{R: 0, G: 0, B: 255, A: 255}
+		return damageFloaterHealSP
+	case FloaterMiss:
+		return damageFloaterMiss
 	default:
 		if fallback.A != 0 {
 			return fallback
@@ -321,7 +322,7 @@ func (m *System) addComboDamageFloater(actorID uint32, x, y int, value int, star
 	if final {
 		visible = DamageFloaterDuration(FloaterCombo)
 	}
-	m.addDamageFloaterWithTiming(actorID, x, y, strconv.Itoa(value), damageFloaterYellow, FloaterCombo, starts, visible, DamageFloaterDuration(FloaterCombo))
+	m.addDamageFloaterWithTiming(actorID, x, y, strconv.Itoa(value), damageFloaterCombo, FloaterCombo, starts, visible, DamageFloaterDuration(FloaterCombo))
 }
 
 func (m *System) addDamageFloaterWithTiming(actorID uint32, x, y int, text string, floaterColor color.RGBA, kind FloaterKind, starts time.Time, visible, duration time.Duration) {
@@ -432,10 +433,10 @@ func actionDamageFloater(action network.ActorActionNotify, targetLocal, sourceLo
 		return strconv.Itoa(int(total)), FloaterNormal, DamageFloaterWhite
 	}
 	if action.Action == 11 {
-		return "miss", FloaterMiss, DamageFloaterWhite
+		return "miss", FloaterMiss, damageFloaterMiss
 	}
 	if action.Action == 0 || action.Action == 7 || (action.SkillID > 0 && total == 0) {
-		return "miss", FloaterMiss, DamageFloaterWhite
+		return "miss", FloaterMiss, damageFloaterMiss
 	}
 	return "", FloaterNormal, color.RGBA{}
 }
@@ -452,7 +453,7 @@ func DamageFloaterDuration(kind FloaterKind) time.Duration {
 }
 
 func DamageFloaterComboTransientDuration() time.Duration {
-	const robrowserComboTransient = 450 * time.Millisecond
+	const robrowserComboTransient = 450 * time.Millisecond // theme:ok timer
 	if scene.MultiHitDelay < robrowserComboTransient {
 		return scene.MultiHitDelay
 	}
@@ -483,6 +484,7 @@ func (m *System) DrawDamageFloaters(screen *render.Frame, ctx client.Context, pr
 		}
 		progress := damageFloaterProgress(floater, now)
 		dx, dy, zLift, scale, alpha := damageFloaterPlacement(floater.Kind, progress)
+		scale *= damageNumberScale
 		floaterColor := damageFloaterColor(floater.Kind, floater.Color)
 		terrainZ := scene.TerrainHeightAt(ctx.World, x, y)
 		worldX := scene.CellCenter(x) + dx
@@ -496,7 +498,7 @@ func (m *System) DrawDamageFloaters(screen *render.Frame, ctx client.Context, pr
 		}
 		if floater.Kind == FloaterCritical {
 			if billboard, ok := m.damageMessageBillboard(ctx, 2, 0); ok {
-				sprites.DrawOverlay3D(screen, projection, billboard, worldX, worldY, terrainZ+zLift+0.05, screenScale*scale*0.6, alpha, 1, color.RGBA{R: 168, G: 168, B: 168, A: 255})
+				sprites.DrawOverlay3D(screen, projection, billboard, worldX, worldY, terrainZ+zLift+0.05, screenScale*scale*damageCriticalBackdropScale, alpha, 1, damageCriticalBackdrop) // theme:ok depth bias above the number
 			}
 		}
 		if billboard, ok := m.DamageNumberBillboard(ctx, floater.Text); ok {
@@ -504,7 +506,7 @@ func (m *System) DrawDamageFloaters(screen *render.Frame, ctx client.Context, pr
 			continue
 		}
 		point := projection.Project(worldX, worldY, terrainZ+zLift)
-		render.DrawBitmapTextAtColor(screen, floater.Text, int(point.X)-8, int(point.Y)-40, scene.WithAlpha(floaterColor, alpha))
+		render.DrawBitmapTextAtColor(screen, floater.Text, int(point.X)+damageFallbackTextDX, int(point.Y)+damageFallbackTextDY, scene.WithAlpha(floaterColor, alpha))
 	}
 	m.DamageFloaters = active
 }

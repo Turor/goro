@@ -11,8 +11,6 @@ import (
 	"github.com/gogpu/ui/widget"
 )
 
-const TableHeaderPadY = float32(4)
-
 type TableViewColumn struct {
 	Key      string
 	Title    string
@@ -36,7 +34,9 @@ type tableViewConfig struct {
 	columns         []TableViewColumn
 	rowCount        int
 	rowHeight       float32
+	rowHeightSet    bool
 	headerHeight    float32
+	headerHeightSet bool
 	showHeader      bool
 	emptyText       string
 	scrollY         state.Signal[float32]
@@ -71,7 +71,7 @@ type TableViewWidget struct {
 
 func TableView(opts ...TableViewOption) *TableViewWidget {
 	cfg := tableViewConfig{
-		rowHeight:            32,
+		rowHeight:            tableViewRowHeight,
 		headerHeight:         Default.Typography.TextSize + TableHeaderPadY*2,
 		showHeader:           true,
 		emptyText:            "No rows",
@@ -124,11 +124,17 @@ func TableViewRowCount(count int) TableViewOption {
 }
 
 func TableViewRowHeight(height float32) TableViewOption {
-	return func(c *tableViewConfig) { c.rowHeight = height }
+	return func(c *tableViewConfig) {
+		c.rowHeight = height
+		c.rowHeightSet = true
+	}
 }
 
 func TableViewHeaderHeight(height float32) TableViewOption {
-	return func(c *tableViewConfig) { c.headerHeight = height }
+	return func(c *tableViewConfig) {
+		c.headerHeight = height
+		c.headerHeightSet = true
+	}
 }
 
 func TableViewShowHeader(show bool) TableViewOption {
@@ -171,16 +177,26 @@ func TableViewDispatchHoverToCells(dispatch bool) TableViewOption {
 	return func(c *tableViewConfig) { c.dispatchHoverToCells = dispatch }
 }
 
+func (w *TableViewWidget) syncLayoutTokens() {
+	if !w.cfg.rowHeightSet {
+		w.cfg.rowHeight = tableViewRowHeight
+	}
+	if !w.cfg.headerHeightSet {
+		w.cfg.headerHeight = Default.Typography.TextSize + TableHeaderPadY*2
+	}
+}
+
 func (w *TableViewWidget) Layout(ctx widget.Context, constraints geometry.Constraints) geometry.Size {
+	w.syncLayoutTokens()
 	size := constraints.Biggest()
 	if size.Width >= geometry.Infinity {
-		size.Width = constraints.Constrain(geometry.Sz(240, 0)).Width
+		size.Width = constraints.Constrain(geometry.Sz(tableViewFallbackW, 0)).Width
 	}
 	if size.Height >= geometry.Infinity {
 		size.Height = w.contentHeight()
 	}
 	if size.Width <= 0 {
-		size.Width = 240
+		size.Width = tableViewFallbackW
 	}
 	if size.Height <= 0 {
 		size.Height = w.contentHeight()
@@ -199,6 +215,7 @@ func (w *TableViewWidget) Layout(ctx widget.Context, constraints geometry.Constr
 }
 
 func (w *TableViewWidget) Draw(ctx widget.Context, canvas widget.Canvas) {
+	w.syncLayoutTokens()
 	if !w.IsVisible() {
 		return
 	}
@@ -435,7 +452,7 @@ func tableViewColors() struct {
 	}{
 		Body:     Default.Colors.WindowBody,
 		Header:   Default.Colors.WindowBody,
-		Row:      widget.RGBA8(246, 249, 253, 255),
+		Row:      tableViewRowFill,
 		AltRow:   Default.Colors.WindowBody,
 		Selected: Default.Colors.ButtonDown,
 	}

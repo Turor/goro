@@ -30,7 +30,7 @@ func TestCardIllustrationWindowLoadsMappedArtwork(t *testing.T) {
 	if window.title != "Poring Card" {
 		t.Fatalf("card illustration title = %q", window.title)
 	}
-	if window.width != cardIllustrationWidth || window.height != cardIllustrationWindowHeight {
+	if window.width != cardIllustrationWidth || window.height != cardIllustrationWindowHeight() {
 		t.Fatalf("card illustration window size = %dx%d", window.width, window.height)
 	}
 	if window.image == nil || window.image.Bounds().Dx() != cardIllustrationWidth || window.image.Bounds().Dy() != cardIllustrationHeight {

@@ -7,13 +7,6 @@ import (
 	"github.com/gogpu/ui/widget"
 )
 
-const (
-	ContextMenuItemHeight               = 18
-	contextMenuItemTextPaddingX float32 = 4
-)
-
-var contextMenuItemHover = widget.RGBA8(115, 156, 239, 255)
-
 // ContextMenuItem keeps the standard button interaction behavior while using
 // the flat, compact appearance of an action in a context menu.
 func ContextMenuItem(label string, onClick func()) *primitives.BoxWidget {
@@ -30,7 +23,7 @@ func ContextMenuItem(label string, onClick func()) *primitives.BoxWidget {
 		newMouseOnlyButton(button.New(opts...).PaddingXY(contextMenuItemTextPaddingX, 0)),
 	).
 		CrossAlign(primitives.CrossAxisStretch).
-		Height(ContextMenuItemHeight)
+		Height(float32(ContextMenuItemHeight))
 }
 
 type ContextMenuItemPainter struct{}
@@ -50,7 +43,7 @@ func (ContextMenuItemPainter) PaintButton(canvas widget.Canvas, state button.Pai
 	if state.Disabled {
 		textColor = Default.Colors.MutedText
 	}
-	textWidth := max(float32(0), state.Bounds.Width()-2*contextMenuItemTextPaddingX)
+	textWidth := max(float32(0), state.Bounds.Width()-contextMenuItemTextPaddingX*2)
 	textBounds := geometry.NewRect(
 		state.Bounds.Min.X+contextMenuItemTextPaddingX,
 		state.Bounds.Min.Y,

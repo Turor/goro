@@ -10,17 +10,6 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	bookWindowWidth        = 555
-	bookWindowHeight       = 455
-	bookWindowPaddingX     = 28
-	bookWindowPaddingY     = 12
-	bookWindowLineHeight   = 14
-	bookWindowLinesPerPage = 25
-	bookWindowLineRunes    = 70
-	bookWindowNavigationH  = 28
-)
-
 type BookWindow struct {
 	Window
 	title      string
@@ -52,6 +41,10 @@ func (w *BookWindow) Open(ctx Context, itemID uint32, title string) error {
 	w.EnsureWindow(bookWindowWidth, bookWindowHeight)
 	w.SetSize(bookWindowWidth, bookWindowHeight)
 	w.Window.Open(ctx, w.widgetTree(ctx))
+	w.OnLayoutReload(func() {
+		w.SetSize(bookWindowWidth, bookWindowHeight)
+		w.SetContent(w.widgetTree(w.ctx))
+	})
 	w.Publish(ctx)
 	return nil
 }
@@ -84,7 +77,7 @@ func (w *BookWindow) Rebind(ctx Context) {
 }
 
 func (w *BookWindow) widgetTree(ctx Context) widget.Widget {
-	background := widget.RGBA8(w.content.Background.R, w.content.Background.G, w.content.Background.B, w.content.Background.A)
+	background := Color(w.content.Background)
 	lineWidgets := make([]widget.Widget, 0, bookWindowLinesPerPage)
 	for _, line := range w.pageLines() {
 		lineWidgets = append(lineWidgets, itemInfoTextLineWidget(line))
@@ -99,13 +92,13 @@ func (w *BookWindow) widgetTree(ctx Context) widget.Widget {
 			w.Window.Close()
 			w.Publish(ctx)
 		}),
-		Size(bookWindowWidth, bookWindowHeight),
+		Size(float32(bookWindowWidth), float32(bookWindowHeight)),
 		Background(background),
 		Content(
 			primitives.Box(
 				primitives.Box(lineWidgets...).
 					Gap(0).
-					Height(bookWindowLinesPerPage*bookWindowLineHeight),
+					Height(float32(bookWindowLinesPerPage*bookWindowLineHeight)),
 				primitives.Expanded(primitives.Box()),
 				primitives.HBox(
 					rotheme.ButtonDisabled("Previous", w.page == 0, func() { w.setPage(ctx, w.page-1) }),
@@ -113,9 +106,9 @@ func (w *BookWindow) widgetTree(ctx Context) widget.Widget {
 					rotheme.ButtonDisabled("Next", w.page+1 >= w.totalPages, func() { w.setPage(ctx, w.page+1) }),
 				).
 					CrossAlign(primitives.CrossAxisCenter).
-					Height(bookWindowNavigationH),
+					Height(float32(bookWindowNavigationH)),
 			).
-				PaddingXY(bookWindowPaddingX, bookWindowPaddingY).
+				PaddingXY(float32(bookWindowPaddingX), float32(bookWindowPaddingY)).
 				Background(background),
 		),
 	)

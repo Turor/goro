@@ -157,8 +157,8 @@ func (m *System) SyncActorSpiritEffects(ctx client.Context, actorID uint32) {
 	if visible && actor.SpiritSpheres > 0 {
 		for i := range m.bindings.Effects.Active {
 			effect := &m.bindings.Effects.Active[i]
-			if effect.EffectID == sphereEffect && effect.ActorID == actorID && effect.HitCount != min(int(actor.SpiritSpheres), 10) {
-				effect.HitCount = min(int(actor.SpiritSpheres), 10)
+			if effect.EffectID == sphereEffect && effect.ActorID == actorID && effect.HitCount != min(int(actor.SpiritSpheres), 10) { // theme:ok spirit sphere count cap
+				effect.HitCount = min(int(actor.SpiritSpheres), 10) // theme:ok spirit sphere count cap
 				effect.Starts = time.Now()
 				effect.SpiritSpheres = effects.NewSpiritSpheres(*effect)
 			}

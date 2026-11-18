@@ -71,9 +71,31 @@ func (w *WorldMapWindow) OpenWindow(ctx Context) error {
 		w.previews = make(map[string]image.Image)
 	}
 	w.Window.Open(ctx, w.widgetTree(ctx))
+	w.OnLayoutReload(w.reloadLayout)
 	w.UpdatePresentation(ctx)
 	w.Publish(ctx)
 	return nil
+}
+
+func (w *WorldMapWindow) reloadLayout() {
+	if w.art == nil || !w.IsOpen() {
+		return
+	}
+	hovered := -1
+	if w.board != nil {
+		hovered = w.board.hovered
+	}
+	screenW, screenH := w.ctx.ScreenSize()
+	size := worldMapSize(w.art.Bounds().Size(), screenW, screenH)
+	w.SetSize(size.X, size.Y+ROWindowTitleHeight)
+	if w.scaled == nil || w.scaled.Bounds().Size() != size {
+		w.scaled = scaleWorldMapImage(w.art, size)
+	}
+	w.SetContent(w.widgetTree(w.ctx))
+	if w.board != nil {
+		w.board.hovered = hovered
+	}
+	w.UpdatePresentation(w.ctx)
 }
 
 func (w *WorldMapWindow) Rebind(ctx Context) {
@@ -157,8 +179,8 @@ func (w *WorldMapWindow) redraw(ctx Context) {
 }
 
 func worldMapSize(source image.Point, screenW, screenH int) image.Point {
-	scale := min(1., float64(max(1, screenW-2*windowScreenMargin))/float64(source.X),
-		float64(max(1, screenH-2*windowScreenMargin-ROWindowTitleHeight))/float64(source.Y))
+	scale := min(1., float64(max(1, screenW-windowScreenMargin*2))/float64(source.X),
+		float64(max(1, screenH-windowScreenMargin*2-ROWindowTitleHeight))/float64(source.Y))
 	return image.Pt(max(1, int(float64(source.X)*scale)), max(1, int(float64(source.Y)*scale)))
 }
 
@@ -241,7 +263,7 @@ func (w *worldMapWidget) loadPreview(name string) {
 	if w.resources != nil {
 		if img, _, err := res.LoadImage(w.resources, minimapImageCandidates(name)); err == nil {
 			size := img.Bounds().Size()
-			scale := 128. / float64(max(size.X, size.Y))
+			scale := float64(worldMapPreviewMax) / float64(max(size.X, size.Y))
 			preview = scaleWorldMapImage(img, image.Pt(max(1, int(float64(size.X)*scale)), max(1, int(float64(size.Y)*scale))))
 		}
 	}
@@ -256,23 +278,23 @@ func (w *worldMapWidget) Draw(_ widget.Context, canvas widget.Canvas) {
 	for i, entry := range w.entries {
 		r := w.mapRect(entry)
 		if i == w.hovered {
-			canvas.DrawRect(r, widget.Color{R: 1, G: 1, B: 1, A: .2})
-			canvas.StrokeRect(r, widget.ColorWhite, 1)
+			canvas.DrawRect(r, worldMapHoverFill)
+			canvas.StrokeRect(r, widget.ColorWhite, worldMapHoverStroke)
 		}
 		for _, member := range w.members {
 			if member.MapName == entry.MapName {
-				canvas.StrokeRect(r, Color(minimapMemberColor(member.ID)), 2)
+				canvas.StrokeRect(r, Color(minimapMemberColor(member.ID)), worldMapMemberStroke)
 				break
 			}
 		}
 		if w.showNames {
-			size := float32(9)
+			size := worldMapNameSize
 			width := rotheme.MeasureText(canvas, entry.MapName, size, false)
 			if width > r.Width() && width > 0 {
 				size *= r.Width() / width
 			}
-			label := geometry.NewRect(r.Min.X, r.Min.Y+(r.Height()-14)/2, r.Width(), 14)
-			canvas.DrawRect(label, widget.Color{R: 1, G: 1, B: 1, A: .85})
+			label := geometry.NewRect(r.Min.X, r.Min.Y+(r.Height()-worldMapNameH)/2, r.Width(), worldMapNameH)
+			canvas.DrawRect(label, worldMapLabelFill)
 			rotheme.DrawText(canvas, entry.MapName, label, size, rotheme.Default.Colors.Text, false, widget.TextAlignCenter)
 		}
 		if entry.MapName == w.currentMap {
@@ -288,37 +310,39 @@ func drawWorldMapStar(canvas widget.Canvas, center geometry.Point) {
 	// A small geometric star stays legible without depending on font coverage.
 	var points [5]geometry.Point
 	for i := range points {
+		// theme:ok five-point star angle
 		a := float64(i)*4*math.Pi/5 - math.Pi/2
-		points[i] = geometry.Pt(center.X+float32(math.Cos(a))*7, center.Y+float32(math.Sin(a))*7)
+		points[i] = geometry.Pt(center.X+float32(math.Cos(a))*worldMapStarRadius, center.Y+float32(math.Sin(a))*worldMapStarRadius)
 	}
 	for i, point := range points {
-		canvas.DrawLine(point, points[(i+1)%len(points)], Color(minimapPlayerColor), 2)
+		canvas.DrawLine(point, points[(i+1)%len(points)], Color(minimapPlayerColor), worldMapStarStroke)
 	}
 }
 
 func (w *worldMapWidget) drawPreview(canvas widget.Canvas, entry res.WorldMapEntry) {
 	b := w.Bounds()
-	width := min(float32(190), b.Width()-8)
+	width := min(worldMapPreviewW, b.Width()-worldMapPreviewEdge)
 	rows := 0
 	for _, member := range w.members {
 		if member.MapName == entry.MapName {
 			rows++
 		}
 	}
-	rows = min(rows, max(0, int((b.Height()-164)/16)))
-	height := min(float32(156+rows*16), b.Height()-8)
-	panel := geometry.NewRect(b.Max.X-width-4, b.Min.Y+4, width, height)
-	canvas.DrawRoundRect(panel, widget.Color{R: 1, G: 1, B: 1, A: .95}, 4)
-	canvas.StrokeRoundRect(panel, rotheme.Default.Colors.WindowBorder, 4, 1)
-	label := geometry.NewRect(panel.Min.X+6, panel.Min.Y+3, width-12, 18)
+	rows = min(rows, max(0, int((b.Height()-worldMapPreviewRowsTop)/worldMapPreviewRowH)))
+	height := min(worldMapPreviewBaseH+float32(rows)*worldMapPreviewRowH, b.Height()-worldMapPreviewEdge)
+	panel := geometry.NewRect(b.Max.X-width-worldMapPreviewInset, b.Min.Y+worldMapPreviewInset, width, height)
+	canvas.DrawRoundRect(panel, worldMapPreviewFill, worldMapPreviewRadius)
+	canvas.StrokeRoundRect(panel, rotheme.Default.Colors.WindowBorder, worldMapPreviewRadius, worldMapPreviewBorder)
+	labelW := width - worldMapPreviewPadX*2
+	label := geometry.NewRect(panel.Min.X+worldMapPreviewPadX, panel.Min.Y+worldMapPreviewLabelY, labelW, worldMapPreviewLabelH)
 	rotheme.DrawLabel(canvas, entry.MapName, label, widget.TextAlignCenter)
 	img := w.previews[entry.MapName]
 	if img == nil {
-		rotheme.DrawText(canvas, "No minimap available", geometry.NewRect(panel.Min.X+6, panel.Min.Y+22, width-12, 128),
+		rotheme.DrawText(canvas, "No minimap available", geometry.NewRect(panel.Min.X+worldMapPreviewPadX, panel.Min.Y+worldMapPreviewImageY, labelW, worldMapPreviewImageH),
 			rotheme.Default.Typography.TextSize, rotheme.Default.Colors.MutedText, false, widget.TextAlignCenter)
 	} else {
 		size := img.Bounds().Size()
-		at := geometry.Pt(panel.Min.X+(width-float32(size.X))/2, panel.Min.Y+22)
+		at := geometry.Pt(panel.Min.X+(width-float32(size.X))/2, panel.Min.Y+worldMapPreviewImageY)
 		canvas.DrawImage(img, at)
 		if entry.MapName == w.currentMap {
 			rect := minimapRect{x: int(at.X), y: int(at.Y), w: size.X, h: size.Y}
@@ -328,19 +352,19 @@ func (w *worldMapWidget) drawPreview(canvas widget.Canvas, entry res.WorldMapEnt
 					if dot.ID != 0 {
 						fill = minimapMemberColor(dot.ID)
 					}
-					drawMinimapSquareCentered(canvas, x, y, 4, fill)
+					drawMinimapSquareCentered(canvas, x, y, worldMapDotSize, fill)
 				}
 			}
 		}
 	}
-	y := panel.Min.Y + 153
+	y := panel.Min.Y + worldMapPreviewMemberY
 	for _, member := range w.members {
 		if member.MapName != entry.MapName || rows == 0 {
 			continue
 		}
-		rotheme.DrawText(canvas, trimRunes(member.Name, 24), geometry.NewRect(panel.Min.X+6, y, width-12, 16),
+		rotheme.DrawText(canvas, trimRunes(member.Name, 24), geometry.NewRect(panel.Min.X+worldMapPreviewPadX, y, labelW, worldMapPreviewRowH), // theme:ok name length limit
 			rotheme.Default.Typography.TextSize, rotheme.Default.Colors.Text, false, widget.TextAlignLeft)
-		y += 16
+		y += worldMapPreviewRowH
 		rows--
 	}
 }

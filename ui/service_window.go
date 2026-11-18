@@ -12,14 +12,7 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	serviceWindowWidth   = 280
-	serviceWindowRows    = 6
-	serviceWindowRowH    = 22
-	serviceWindowPadding = 10
-	serviceWindowHeight  = ROWindowTitleHeight + serviceWindowPadding*2 + serviceWindowRows*serviceWindowRowH + ROWindowFooterHeight
-	serviceDoubleClick   = 360 * time.Millisecond
-)
+const serviceDoubleClick = 360 * time.Millisecond // theme:ok double-click interval
 
 type ServiceWindowCallbacks struct {
 	OnSelect func(int)
@@ -61,10 +54,16 @@ func NewServiceWindow(ctx client.Context, services []string, options ServiceWind
 	w.CloseOnEsc = false
 	x, y := serviceWindowPosition(ctx)
 	w.OpenAt(x, y, w.widgetTree())
+	w.OnLayoutReload(w.reloadForLayout)
 	if wc := windowWidgetContext(ctx); wc != nil {
 		wc.RequestFocus(w.list)
 	}
 	return w
+}
+
+func (w *ServiceWindow) reloadForLayout() {
+	w.SetSize(serviceWindowWidth, serviceWindowHeight)
+	w.SetContent(w.widgetTree())
 }
 
 func (w *ServiceWindow) SetContext(ctx client.Context) {
@@ -121,10 +120,10 @@ func (w *ServiceWindow) widgetTree() widget.Widget {
 	return Win(
 		Title(w.title),
 		CloseButton(false),
-		Size(serviceWindowWidth, serviceWindowHeight),
+		Size(float32(serviceWindowWidth), float32(serviceWindowHeight)),
 		Content(
 			primitives.Box(w.serviceList()).
-				Padding(serviceWindowPadding).
+				Padding(float32(serviceWindowPadding)).
 				CrossAlign(primitives.CrossAxisStretch),
 		),
 		Footer(
@@ -140,7 +139,7 @@ func (w *ServiceWindow) widgetTree() widget.Widget {
 func (w *ServiceWindow) serviceList() widget.Widget {
 	lv := listview.New(
 		listview.ItemCount(len(w.services)),
-		listview.FixedItemHeight(serviceWindowRowH),
+		listview.FixedItemHeight(float32(serviceWindowRowH)),
 		listview.ScrollYSignal(w.scrollY),
 		listview.SelectionModeOpt(listview.SelectionSingle),
 		listview.SelectedIndexSignal(w.selected),
@@ -148,9 +147,9 @@ func (w *ServiceWindow) serviceList() widget.Widget {
 		listview.PainterOpt(rotheme.SelectListPainter{EmptyText: "No services."}),
 		listview.BuildItem(func(item listview.ItemContext) widget.Widget {
 			if item.Index < 0 || item.Index >= len(w.services) {
-				return rotheme.SelectListRow("", false, serviceWindowRowH)
+				return rotheme.SelectListRow("", false, float32(serviceWindowRowH))
 			}
-			return rotheme.SelectListRow(trimRunes(w.services[item.Index], 36), true, serviceWindowRowH)
+			return rotheme.SelectListRow(trimRunes(w.services[item.Index], 36), true, float32(serviceWindowRowH))
 		}),
 	)
 	lv.SetFocused(true)
@@ -187,14 +186,14 @@ func serviceWindowPosition(ctx client.Context) (int, int) {
 	width, height := ctx.ScreenSize()
 	x := (width - serviceWindowWidth) / 2
 	y := (height*2)/3 - serviceWindowHeight/2
-	if y < 48 {
+	if y < serviceWindowBiasMinY {
 		y = (height - serviceWindowHeight) / 2
 	}
-	if x < 8 {
-		x = 8
+	if x < serviceWindowScreenMargin {
+		x = serviceWindowScreenMargin
 	}
-	if y < 8 {
-		y = 8
+	if y < serviceWindowScreenMargin {
+		y = serviceWindowScreenMargin
 	}
 	return x, y
 }

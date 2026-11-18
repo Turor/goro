@@ -2,18 +2,13 @@ package ui
 
 import (
 	"image"
-	"image/color"
 	"strings"
 
 	"github.com/gogpu/ui/event"
 	"github.com/gogpu/ui/geometry"
 	"github.com/gogpu/ui/widget"
 	"github.com/kivutar/goro/res"
-)
-
-const (
-	levelUpNotificationDefaultSize = 43
-	levelUpNotificationBottom      = 0
+	"github.com/kivutar/goro/ui/rotheme"
 )
 
 type LevelUpNotificationAction uint8
@@ -26,15 +21,16 @@ const (
 )
 
 type LevelUpNotifications struct {
-	showBase bool
-	showJob  bool
-	pending  LevelUpNotificationAction
-	manager  *res.Manager
-	loaded   bool
-	offImage image.Image
-	onImage  image.Image
-	base     levelUpNotificationIcon
-	job      levelUpNotificationIcon
+	showBase  bool
+	showJob   bool
+	pending   LevelUpNotificationAction
+	manager   *res.Manager
+	loaded    bool
+	offImage  image.Image
+	onImage   image.Image
+	base      levelUpNotificationIcon
+	job       levelUpNotificationIcon
+	layoutGen uint64
 }
 
 type levelUpNotificationIcon struct {
@@ -95,6 +91,10 @@ func (n *LevelUpNotifications) Update(ctx Context) LevelUpNotificationAction {
 	y := maxInt(0, screenH-height-levelUpNotificationBottom)
 	n.syncIcon(ctx, &n.job, n.showJob, 0, y, width, height, LevelUpNotificationJob)
 	n.syncIcon(ctx, &n.base, n.showBase, maxInt(0, screenW-width), y, width, height, LevelUpNotificationBase)
+	if gen := rotheme.Generation(); gen != n.layoutGen {
+		n.layoutGen = gen
+		n.markLayoutRedraw()
+	}
 	action := n.pending
 	n.pending = LevelUpNotificationNone
 	return action
@@ -135,6 +135,17 @@ func (n *LevelUpNotifications) syncIcon(ctx Context, icon *levelUpNotificationIc
 	icon.published = true
 }
 
+func (n *LevelUpNotifications) markLayoutRedraw() {
+	if n.base.widget != nil {
+		n.base.widget.SetNeedsRedraw(true)
+		markNeedsRedraw(n.base.root)
+	}
+	if n.job.widget != nil {
+		n.job.widget.SetNeedsRedraw(true)
+		markNeedsRedraw(n.job.root)
+	}
+}
+
 func (n *LevelUpNotifications) activate(action LevelUpNotificationAction) {
 	switch action {
 	case LevelUpNotificationBase:
@@ -165,8 +176,8 @@ func (n *LevelUpNotifications) loadImages(manager *res.Manager) {
 
 func levelUpNotificationImageCandidates(name string) []string {
 	stem := name
-	if len(name) >= 4 && strings.EqualFold(name[len(name)-4:], ".bmp") {
-		stem = name[:len(name)-4]
+	if len(name) >= 4 && strings.EqualFold(name[len(name)-4:], ".bmp") { // theme:ok bmp extension length
+		stem = name[:len(name)-4] // theme:ok bmp extension length
 	}
 	candidates := []string{
 		"skin\\default\\basic_interface\\" + name,
@@ -212,7 +223,7 @@ func newLevelUpNotificationWidget(onActivate func()) *levelUpNotificationWidget 
 }
 
 func (w *levelUpNotificationWidget) Layout(_ widget.Context, constraints geometry.Constraints) geometry.Size {
-	size := constraints.BiggestFinite(levelUpNotificationDefaultSize, levelUpNotificationDefaultSize)
+	size := constraints.BiggestFinite(float32(levelUpNotificationDefaultSize), float32(levelUpNotificationDefaultSize))
 	w.SetBounds(geometry.FromPointSize(w.Position(), size))
 	return size
 }
@@ -227,9 +238,9 @@ func (w *levelUpNotificationWidget) Draw(_ widget.Context, canvas widget.Canvas)
 		return
 	}
 	bounds := w.Bounds()
-	canvas.DrawRect(bounds, Color(color.RGBA{R: 70, G: 126, B: 189, A: 255}))
-	canvas.StrokeRect(bounds, Color(color.RGBA{R: 35, G: 72, B: 120, A: 255}), 1)
-	canvas.DrawText("UP", bounds, 11, Color(color.RGBA{R: 255, G: 255, B: 255, A: 255}), true, widget.TextAlignCenter)
+	canvas.DrawRect(bounds, levelUpNotificationFill)
+	canvas.StrokeRect(bounds, levelUpNotificationBorder, 1)
+	canvas.DrawText("UP", bounds, levelUpNotificationFont, levelUpNotificationText, true, widget.TextAlignCenter)
 }
 
 func (w *levelUpNotificationWidget) Event(ctx widget.Context, raw event.Event) bool {

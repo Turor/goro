@@ -63,7 +63,7 @@ func (w *tabWidget) Draw(ctx widget.Context, canvas widget.Canvas) {
 		fill = rotheme.Default.Colors.ButtonHover
 	}
 	canvas.DrawRect(bounds, fill)
-	canvas.StrokeRect(bounds, rotheme.Default.Colors.WindowBorder, 1)
+	canvas.StrokeRect(bounds, rotheme.Default.Colors.WindowBorder, tabBorderW)
 	rotheme.DrawRotatedText(canvas, w.cfg.label, bounds, rotheme.Default.Typography.TextSize, textColor, false, w.cfg.labelRotation)
 }
 

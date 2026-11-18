@@ -138,7 +138,7 @@ func TestChatShortcutViewAndEscape(t *testing.T) {
 	w.Toggle(ctx, nil, func() { views++ })
 	app.Frame()
 	app.Window().DrawTo(&uitest.MockCanvas{})
-	point := geometry.Pt(float32(w.x+chatShortcutsW-35), float32(w.y+chatShortcutsH-ROWindowFooterHeight/2))
+	point := geometry.Pt(float32(w.x+chatShortcutsW-35), float32(w.y+chatShortcutsH()-ROWindowFooterHeight/2))
 	app.Window().HandleEvent(uitest.Click(point.X, point.Y))
 	app.Window().HandleEvent(uitest.Release(point.X, point.Y))
 	if views != 1 {

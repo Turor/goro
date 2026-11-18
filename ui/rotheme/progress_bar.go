@@ -6,8 +6,6 @@ import (
 	"github.com/gogpu/ui/widget"
 )
 
-var ProgressBarHeight float32 = 12
-
 // ProgressBar uses the button gradient and reflection, with room for a label.
 func ProgressBar(opts ...progressbar.Option) *progressbar.Widget {
 	opts = append([]progressbar.Option{
@@ -38,8 +36,8 @@ func (p ProgressBarPainter) PaintProgressBar(canvas widget.Canvas, state progres
 	radius := min(max(float32(0), state.Radius), height/2)
 	fill, border, text := lighterColor(Default.Colors.WindowBorder, 2), Default.Colors.ButtonBorder, Default.Colors.Text
 	if state.Value > 0 && state.Value < p.LowThreshold {
-		fill = lighterColor(widget.Hex(0xCE768A), 2)
-		border = widget.Hex(0xD68AA2)
+		fill = lighterColor(progressBarLowFill, 2)
+		border = progressBarLowBorder
 	}
 	if state.Disabled {
 		fill, border, text = Default.Colors.Disabled, Default.Colors.FooterLine, Default.Colors.MutedText

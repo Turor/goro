@@ -15,14 +15,6 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	petEggWindowWidth  = 312
-	petEggTableHeaderH = 24
-	petEggRowH         = 32
-	petEggRows         = 6
-	petEggWindowHeight = ROWindowTitleHeight + petEggTableHeaderH + petEggRows*petEggRowH + ROWindowFooterHeight
-)
-
 type PetEggWindow struct {
 	Window
 	scrollY     state.Signal[float32]
@@ -35,6 +27,7 @@ type PetEggWindow struct {
 
 func (w *PetEggWindow) OpenList(ctx Context, list network.PetEggList) {
 	w.EnsureWindow(petEggWindowWidth, petEggWindowHeight)
+	w.SetSize(petEggWindowWidth, petEggWindowHeight)
 	w.indexes = append(w.indexes[:0], list.Indexes...)
 	w.selectedRow = -1
 	w.ensureScrollSignal().Set(0)
@@ -46,6 +39,10 @@ func (w *PetEggWindow) OpenList(ctx Context, list network.PetEggList) {
 	}
 	w.snapshot = w.snapshotString(ctx.Session)
 	w.Open(ctx, w.widgetTree(ctx))
+	w.OnLayoutReload(func() {
+		w.SetSize(petEggWindowWidth, petEggWindowHeight)
+		w.SetContent(w.widgetTree(ctx))
+	})
 	w.Publish(ctx)
 }
 
@@ -78,7 +75,7 @@ func (w *PetEggWindow) widgetTree(ctx Context) widget.Widget {
 			w.Close()
 			w.Publish(ctx)
 		}),
-		Size(petEggWindowWidth, petEggWindowHeight),
+		Size(float32(petEggWindowWidth), float32(petEggWindowHeight)),
 		Content(
 			primitives.Box(w.tableWidget(ctx)).
 				Height(petEggTableHeight()).
@@ -103,8 +100,8 @@ func (w *PetEggWindow) tableWidget(ctx Context) *rotheme.TableViewWidget {
 	return itemTableView(
 		w.itemTableRows(ctx, items),
 		"Pet Egg",
-		petEggRowH,
-		petEggTableHeaderH,
+		float32(petEggRowH),
+		float32(petEggTableHeaderH),
 		"No items",
 		w.ensureScrollSignal(),
 		w.selectedRow,
@@ -223,5 +220,5 @@ func (w *PetEggWindow) snapshotString(s *session.Session) string {
 }
 
 func petEggTableHeight() float32 {
-	return petEggTableHeaderH + petEggRows*petEggRowH
+	return float32(petEggTableHeaderH + petEggRows*petEggRowH)
 }

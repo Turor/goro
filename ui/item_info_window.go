@@ -17,18 +17,6 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	itemInfoWindowWidth       = 340
-	itemInfoWindowMaxHeight   = 304
-	itemInfoWindowPad         = 10
-	itemInfoIllustrationWidth = 75
-	itemInfoIllustrationH     = 100
-	itemInfoSlotIcon          = 24
-	itemInfoLineH             = 14
-	itemInfoDescriptionW      = itemInfoWindowWidth - itemInfoWindowPad*2 - itemInfoIllustrationWidth - 12
-	itemInfoDescriptionMaxH   = itemInfoWindowMaxHeight - ROWindowTitleHeight - itemInfoWindowPad*2
-)
-
 type ItemInfoWindow struct {
 	Window
 	item            session.InventoryItem
@@ -77,9 +65,10 @@ func (w *ItemInfoWindow) openItem(ctx Context, item session.InventoryItem, mouse
 	height := w.windowHeight(ctx)
 	w.SetSize(itemInfoWindowWidth, height)
 	screenW, screenH := ctx.ScreenSize()
-	x := clampWindowInt(mouseX+14, windowScreenMargin, maxInt(windowScreenMargin, screenW-itemInfoWindowWidth-windowScreenMargin))
-	y := clampWindowInt(mouseY-22, windowScreenMargin, maxInt(windowScreenMargin, screenH-height-windowScreenMargin))
+	x := clampWindowInt(mouseX+itemInfoOpenOffsetX, windowScreenMargin, maxInt(windowScreenMargin, screenW-itemInfoWindowWidth-windowScreenMargin))
+	y := clampWindowInt(mouseY-itemInfoOpenOffsetY, windowScreenMargin, maxInt(windowScreenMargin, screenH-height-windowScreenMargin))
 	w.OpenAt(x, y, w.widgetTree(ctx))
+	w.bindLayoutReload(ctx)
 	w.Publish(ctx)
 }
 
@@ -115,7 +104,18 @@ func (w *ItemInfoWindow) Rebind(ctx Context, assets AssetProvider) {
 		w.illustration = assets.ItemInfoIllustrationImage(ctx.Resources, w.item, itemInfoIllustrationWidth, itemInfoIllustrationH)
 	}
 	w.SetContent(w.widgetTree(ctx))
+	w.bindLayoutReload(ctx)
 	w.Publish(ctx)
+}
+
+func (w *ItemInfoWindow) bindLayoutReload(ctx Context) {
+	w.OnLayoutReload(func() {
+		if !w.IsOpen() {
+			return
+		}
+		w.SetSize(itemInfoWindowWidth, w.windowHeight(ctx))
+		w.SetContent(w.widgetTree(ctx))
+	})
 }
 
 func (w *ItemInfoWindow) widgetTree(ctx Context) widget.Widget {
@@ -133,8 +133,8 @@ func (w *ItemInfoWindow) widgetTree(ctx Context) widget.Widget {
 				w.illustrationPanel(),
 				w.infoPanel(ctx),
 			).
-				Padding(itemInfoWindowPad).
-				Gap(12),
+				Padding(float32(itemInfoWindowPad)).
+				Gap(float32(itemInfoPanelGap)),
 		),
 	}
 	if w.footerHeight(ctx) > 0 {
@@ -149,8 +149,8 @@ func (w *ItemInfoWindow) illustrationPanel() widget.Widget {
 	return primitives.Box(
 		newStaticImageWidget(w.illustration, itemInfoIllustrationWidth, itemInfoIllustrationH),
 	).
-		Height(itemInfoIllustrationH).
-		Width(itemInfoIllustrationWidth).
+		Height(float32(itemInfoIllustrationH)).
+		Width(float32(itemInfoIllustrationWidth)).
 		Background(rotheme.Default.Colors.PanelBody).
 		BorderStyle(1, rotheme.Default.Colors.WindowBorder)
 }
@@ -160,8 +160,8 @@ func (w *ItemInfoWindow) infoPanel(ctx Context) widget.Widget {
 		w.descriptionPanel(ctx),
 	}
 	return primitives.Box(children...).
-		Width(itemInfoDescriptionW).
-		Gap(8)
+		Width(float32(itemInfoDescriptionW)).
+		Gap(float32(itemInfoInfoGap))
 }
 
 func (w *ItemInfoWindow) descriptionPanel(ctx Context) widget.Widget {
@@ -179,10 +179,10 @@ func (w *ItemInfoWindow) descriptionPanel(ctx Context) widget.Widget {
 				primitives.Box(textLines...).
 					Gap(0),
 			).
-				PaddingRight(ROScrollbarGutter),
+				PaddingRight(float32(ROScrollbarGutter)),
 			scrollview.DirectionOpt(scrollview.Vertical),
 			scrollview.ScrollbarOpt(scrollview.ScrollbarAuto),
-			scrollview.ScrollStep(itemInfoLineH),
+			scrollview.ScrollStep(float32(itemInfoLineH)),
 		),
 	).
 		Height(float32(w.descriptionHeight(ctx)))
@@ -192,7 +192,7 @@ func itemInfoTextLineWidget(line itemInfoTextLine) widget.Widget {
 	if len(line.Runs) == 0 {
 		return rotheme.Text(" ").
 			Color(itemInfoWidgetColor(inventoryTextColor)).
-			LineHeight(itemInfoLineH / rotheme.Default.Typography.TextSize)
+			LineHeight(float32(itemInfoLineH) / rotheme.Default.Typography.TextSize)
 	}
 	runs := make([]widget.Widget, 0, len(line.Runs))
 	for _, run := range line.Runs {
@@ -202,17 +202,17 @@ func itemInfoTextLineWidget(line itemInfoTextLine) widget.Widget {
 		runs = append(runs,
 			rotheme.Text(run.Text).
 				Color(itemInfoWidgetColor(run.Color)).
-				LineHeight(itemInfoLineH/rotheme.Default.Typography.TextSize),
+				LineHeight(float32(itemInfoLineH)/rotheme.Default.Typography.TextSize),
 		)
 	}
 	if len(runs) == 0 {
 		return rotheme.Text(" ").
 			Color(itemInfoWidgetColor(inventoryTextColor)).
-			LineHeight(itemInfoLineH / rotheme.Default.Typography.TextSize)
+			LineHeight(float32(itemInfoLineH) / rotheme.Default.Typography.TextSize)
 	}
 	return primitives.HBox(runs...).
 		CrossAlign(primitives.CrossAxisStart).
-		Height(itemInfoLineH)
+		Height(float32(itemInfoLineH))
 }
 
 func (w *ItemInfoWindow) cardSlotsFooter(ctx Context) []widget.Widget {
@@ -277,7 +277,7 @@ func (w *ItemInfoWindow) showCardTooltip(ctx Context, cardID uint32) {
 		return
 	}
 	card := session.InventoryItem{ItemID: cardID, Type: db.ItemTypeCard, Identified: true}
-	w.tooltip.Show(ctx, inventoryItemDisplayName(ctx.Resources, card), ctx.Input.MouseX, ctx.Input.MouseY+18, ctx.Input.MouseY-6)
+	w.tooltip.Show(ctx, inventoryItemDisplayName(ctx.Resources, card), ctx.Input.MouseX, ctx.Input.MouseY+itemInfoTooltipBelow, ctx.Input.MouseY-itemInfoTooltipAbove)
 }
 
 func (w *ItemInfoWindow) openCard(ctx Context, cardID uint32, mouseX, mouseY int) {
@@ -395,7 +395,11 @@ func (w *ItemInfoWindow) wrappedLines(maxRunes int) []itemInfoTextLine {
 }
 
 func itemInfoDescriptionRunes() int {
-	return maxInt(10, (itemInfoDescriptionW-18)/7)
+	runes := (itemInfoDescriptionW - itemInfoDescInset) / itemInfoRuneW
+	if runes < 10 {
+		return 10
+	}
+	return runes
 }
 
 func itemInfoShowsCardSlots(ctx Context, item session.InventoryItem) bool {
@@ -461,8 +465,8 @@ func parseItemInfoTextLine(text string) itemInfoTextLine {
 		current = current[:0]
 	}
 	for i := 0; i < len(runes); i++ {
-		if runes[i] == '^' && i+6 < len(runes) {
-			if parsed, ok := rotheme.ParseColorCode(string(runes[i : i+7])); ok {
+		if runes[i] == '^' && i+6 < len(runes) { // theme:ok ^RRGGBB color code length
+			if parsed, ok := rotheme.ParseColorCode(string(runes[i : i+7])); ok { // theme:ok ^RRGGBB color code length
 				flush()
 				currentColor = parsed
 				i += 6
@@ -620,7 +624,12 @@ func runeLen(text string) int {
 }
 
 func itemInfoWidgetColor(c color.RGBA) widget.Color {
-	return widget.RGBA8(c.R, c.G, c.B, c.A)
+	return widget.Color{
+		R: float32(c.R) / 255,
+		G: float32(c.G) / 255,
+		B: float32(c.B) / 255,
+		A: float32(c.A) / 255,
+	}
 }
 
 type itemInfoCardSlotWidget struct {

@@ -16,21 +16,11 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	emoteWindowWidth      = 250
-	emoteWindowHeight     = 330
-	emoteCols             = 5
-	emoteRows             = 6
-	emoteIconsPerPage     = emoteCols * emoteRows
-	emoteCellSize         = 40
-	emoteCellGap          = 4
-	emoteContentPadX      = 10
-	emoteContentPadY      = 6
-	emoteNavHeight        = 24
-	emoteDefaultX         = 600
-	emoteDefaultY         = 200
-	emoteDoubleClickDelay = 360
-)
+const emoteDoubleClickDelay = 360 // theme:ok double-click interval in milliseconds
+
+func emoteIconsPerPage() int {
+	return emoteCols * emoteRows
+}
 
 type EmoteWindow struct {
 	Window
@@ -58,6 +48,10 @@ func (w *EmoteWindow) OpenWindow(ctx Context, console *ChatConsole) {
 	x, y := emoteDefaultPosition(ctx)
 	w.SetAutoPosition(x, y)
 	w.Open(ctx, w.widgetTree(ctx, console))
+	w.OnLayoutReload(func() {
+		w.SetSize(emoteWindowWidth, emoteWindowHeight)
+		w.SetContent(w.widgetTree(w.ctx, console))
+	})
 	w.Publish(ctx)
 }
 
@@ -93,14 +87,14 @@ func (w *EmoteWindow) widgetTree(ctx Context, console *ChatConsole) widget.Widge
 		Title("Emotion icon List"),
 		CloseButton(true),
 		OnClose(w.Close),
-		Size(emoteWindowWidth, emoteWindowHeight),
+		Size(float32(emoteWindowWidth), float32(emoteWindowHeight)),
 		Content(
 			primitives.Box(
 				w.gridWidget(ctx, console),
 				w.navWidget(ctx, console),
 			).
-				PaddingXY(emoteContentPadX, emoteContentPadY).
-				Gap(4).
+				PaddingXY(float32(emoteContentPadX), float32(emoteContentPadY)).
+				Gap(float32(emoteSectionGap)).
 				CrossAlign(primitives.CrossAxisCenter),
 		),
 	)
@@ -109,8 +103,8 @@ func (w *EmoteWindow) widgetTree(ctx Context, console *ChatConsole) widget.Widge
 func (w *EmoteWindow) gridWidget(ctx Context, console *ChatConsole) widget.Widget {
 	emotes := db.EmotionList()
 	page := clampEmotePage(w.page)
-	start := page * emoteIconsPerPage
-	end := minInt(len(emotes), start+emoteIconsPerPage)
+	start := page * emoteIconsPerPage()
+	end := minInt(len(emotes), start+emoteIconsPerPage())
 	rows := make([]widget.Widget, 0, emoteRows)
 	for row := 0; row < emoteRows; row++ {
 		cells := make([]widget.Widget, 0, emoteCols)
@@ -131,18 +125,18 @@ func (w *EmoteWindow) gridWidget(ctx Context, console *ChatConsole) widget.Widge
 				))
 				continue
 			}
-			cells = append(cells, primitives.Box().Width(emoteCellSize).Height(emoteCellSize))
+			cells = append(cells, primitives.Box().Width(float32(emoteCellSize)).Height(float32(emoteCellSize)))
 		}
 		rows = append(rows,
 			primitives.HBox(cells...).
-				Gap(emoteCellGap).
+				Gap(float32(emoteCellGap)).
 				CrossAlign(primitives.CrossAxisStretch),
 		)
 	}
 	return primitives.Box(rows...).
 		Width(float32(emoteCols*emoteCellSize + (emoteCols-1)*emoteCellGap)).
 		Height(float32(emoteRows*emoteCellSize + (emoteRows-1)*emoteCellGap)).
-		Gap(emoteCellGap).
+		Gap(float32(emoteCellGap)).
 		CrossAlign(primitives.CrossAxisStretch)
 }
 
@@ -153,21 +147,21 @@ func (w *EmoteWindow) navWidget(ctx Context, console *ChatConsole) widget.Widget
 	return primitives.HBox(
 		rotheme.ButtonDisabled("Prev", page <= 0, func() {
 			w.movePage(ctx, console, -1)
-		}).Width(48).Height(22),
+		}).Width(float32(emoteNavButtonW)).Height(float32(emoteNavControlH)),
 		primitives.Box(
 			rotheme.Text(fmt.Sprintf("%d / %d", page+1, total)).
 				MaxLines(1),
 		).
-			Width(56).
-			Height(22).
-			PaddingTop(4).
+			Width(float32(emoteNavLabelW)).
+			Height(float32(emoteNavControlH)).
+			PaddingTop(float32(emoteNavLabelPad)).
 			CrossAlign(primitives.CrossAxisCenter),
 		rotheme.ButtonDisabled("Next", page >= total-1, func() {
 			w.movePage(ctx, console, 1)
-		}).Width(48).Height(22),
+		}).Width(float32(emoteNavButtonW)).Height(float32(emoteNavControlH)),
 	).
-		Height(emoteNavHeight).
-		Gap(8).
+		Height(float32(emoteNavHeight)).
+		Gap(float32(emoteNavGap)).
 		CrossAlign(primitives.CrossAxisCenter)
 }
 
@@ -233,7 +227,7 @@ func emoteDefaultPosition(ctx Context) (int, int) {
 
 func emotePageCount() int {
 	count := len(db.EmotionList())
-	pages := (count + emoteIconsPerPage - 1) / emoteIconsPerPage
+	pages := (count + emoteIconsPerPage() - 1) / emoteIconsPerPage()
 	if pages < 1 {
 		return 1
 	}
@@ -275,7 +269,7 @@ func newEmoteCellWidget(emote db.Emotion, icon image.Image, onSelect, onPlay fun
 }
 
 func (w *emoteCellWidget) Layout(_ widget.Context, constraints geometry.Constraints) geometry.Size {
-	size := constraints.Constrain(geometry.Sz(emoteCellSize, emoteCellSize))
+	size := constraints.Constrain(geometry.Sz(float32(emoteCellSize), float32(emoteCellSize)))
 	w.SetBounds(geometry.FromPointSize(w.Position(), size))
 	return size
 }
@@ -286,8 +280,8 @@ func (w *emoteCellWidget) Draw(_ widget.Context, canvas widget.Canvas) {
 	}
 	bounds := w.Bounds()
 	if w.hovered {
-		canvas.DrawRoundRect(bounds, rotheme.Default.Colors.PanelBody, 5)
-		canvas.StrokeRoundRect(bounds, rotheme.Default.Colors.FooterLine, 5, 1)
+		canvas.DrawRoundRect(bounds, rotheme.Default.Colors.PanelBody, emoteHoverRadius)
+		canvas.StrokeRoundRect(bounds, rotheme.Default.Colors.FooterLine, emoteHoverRadius, emoteHoverBorder)
 	}
 	if w.icon != nil {
 		imgBounds := w.icon.Bounds()
@@ -460,7 +454,7 @@ func (s *emoteSpriteSet) composeIcon(frame int) image.Image {
 	if len(action.Animations) == 0 {
 		return nil
 	}
-	motion := len(action.Animations) / 5
+	motion := len(action.Animations) / 5 // theme:ok sprite motion frame index
 	if motion < 0 || motion >= len(action.Animations) {
 		motion = 0
 	}
@@ -491,7 +485,7 @@ func (s *emoteSpriteSet) composeIcon(frame int) image.Image {
 
 func emoteIconAnchor(first res.ACTLayer) (float64, float64) {
 	return float64(emoteCellSize/2) - float64(first.X),
-		float64(emoteCellSize) - float64(first.Y) - uiSpriteRendererMidCellY
+		float64(emoteCellSize) - float64(first.Y) - float64(uiSpriteRendererMidCellY)
 }
 
 func (s *emoteSpriteSet) frameImage(index int32, sprType int32) *render.Image {

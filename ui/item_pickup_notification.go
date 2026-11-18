@@ -10,29 +10,11 @@ import (
 	"github.com/kivutar/goro/render"
 	"github.com/kivutar/goro/res"
 	"github.com/kivutar/goro/session"
+	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	itemPickupNotificationTopY     = 72
-	itemPickupNotificationH        = 36
-	itemPickupNotificationIconSize = 24
-	itemPickupNotificationIconGap  = 5
-	itemPickupNotificationMargin   = 8
-	itemPickupNotificationOuter    = 3
-	itemPickupNotificationBorderW  = 1
-	itemPickupNotificationPadX     = 5
-	itemPickupNotificationPadRight = 14
-	itemPickupNotificationTextH    = 20
-	itemPickupNotificationRadius   = 4
-	itemPickupNotificationLife     = 5 * time.Second
-)
-
-var (
-	itemPickupNotificationOutline = color.RGBA{R: 255, G: 255, B: 255, A: 245}
-	itemPickupNotificationBorder  = color.RGBA{R: 74, G: 138, B: 202, A: 245}
-	itemPickupNotificationFill    = color.RGBA{R: 255, G: 255, B: 255, A: 245}
-	itemPickupNotificationText    = color.RGBA{R: 30, G: 34, B: 40, A: 255}
-)
+// theme:ok notification lifetime
+const itemPickupNotificationLife = 5 * time.Second
 
 type ItemPickupNotification struct {
 	item    session.InventoryItem
@@ -71,7 +53,7 @@ func (n *ItemPickupNotification) Draw(screen *render.Frame, ctx Context, assets 
 	iconY := y + (h-itemPickupNotificationIconSize)/2
 	assets.DrawInventoryItemIcon(screen, ctx.Resources, n.item, iconX, iconY)
 	textX := iconX + itemPickupNotificationIconSize + itemPickupNotificationIconGap
-	textY := y + (h-itemPickupNotificationTextH)/2 - 2
+	textY := y + (h-itemPickupNotificationTextH)/2 - itemPickupNotificationTextNudge
 	render.DrawUITextAt(screen, text, float64(textX), float64(textY), itemPickupNotificationText)
 }
 
@@ -155,7 +137,10 @@ func itemPickupNotificationMaxTextWidth(screenW int) int {
 		itemPickupNotificationIconGap
 }
 
-var itemPickupNotificationSurfaceCache = map[int]*render.Image{}
+var (
+	itemPickupNotificationSurfaceCache = map[int]*render.Image{}
+	itemPickupNotificationSurfaceGen   uint64
+)
 
 func drawItemPickupNotificationSurface(screen *render.Frame, x, y, w, h int) {
 	if screen == nil || w <= 0 || h <= 0 {
@@ -175,11 +160,15 @@ func cachedItemPickupNotificationSurface(w, h int) *render.Image {
 	if w <= 0 || h <= 0 {
 		return nil
 	}
+	if gen := rotheme.Generation(); gen != itemPickupNotificationSurfaceGen {
+		itemPickupNotificationSurfaceCache = map[int]*render.Image{}
+		itemPickupNotificationSurfaceGen = gen
+	}
 	if img := itemPickupNotificationSurfaceCache[w]; img != nil && img.Bounds().Dy() == h {
 		return img
 	}
 	img := render.NewImage(w, h)
-	DrawRoundedSurface(img, 0, 0, w, h, itemPickupNotificationOutline, color.RGBA{}, itemPickupNotificationRadius)
+	DrawRoundedSurface(img, 0, 0, w, h, itemPickupNotificationOutline, color.RGBA{}, float32(itemPickupNotificationRadius))
 	blueInset := itemPickupNotificationOuter
 	DrawRoundedSurface(
 		img,

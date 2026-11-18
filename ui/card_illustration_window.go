@@ -9,11 +9,9 @@ import (
 	"github.com/kivutar/goro/res"
 )
 
-const (
-	cardIllustrationWidth        = 300
-	cardIllustrationHeight       = 400
-	cardIllustrationWindowHeight = ROWindowTitleHeight + cardIllustrationHeight
-)
+func cardIllustrationWindowHeight() int {
+	return ROWindowTitleHeight + cardIllustrationHeight
+}
 
 type CardIllustrationWindow struct {
 	Window
@@ -39,9 +37,13 @@ func (w *CardIllustrationWindow) Open(ctx Context, itemID uint32, title string) 
 		w.title = fmt.Sprintf("Card #%d", itemID)
 	}
 	w.image = img
-	w.EnsureWindow(cardIllustrationWidth, cardIllustrationWindowHeight)
-	w.SetSize(cardIllustrationWidth, cardIllustrationWindowHeight)
+	w.EnsureWindow(cardIllustrationWidth, cardIllustrationWindowHeight())
+	w.SetSize(cardIllustrationWidth, cardIllustrationWindowHeight())
 	w.Window.Open(ctx, w.widgetTree(ctx))
+	w.OnLayoutReload(func() {
+		w.SetSize(cardIllustrationWidth, cardIllustrationWindowHeight())
+		w.SetContent(w.widgetTree(w.ctx))
+	})
 	w.Publish(ctx)
 	return nil
 }
@@ -72,7 +74,7 @@ func (w *CardIllustrationWindow) widgetTree(ctx Context) widget.Widget {
 			w.Close()
 			w.Publish(ctx)
 		}),
-		Size(cardIllustrationWidth, cardIllustrationWindowHeight),
+		Size(float32(cardIllustrationWidth), float32(cardIllustrationWindowHeight())),
 		Content(newStaticImageWidget(w.image, cardIllustrationWidth, cardIllustrationHeight)),
 	)
 }

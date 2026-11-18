@@ -6,10 +6,7 @@ import (
 	"github.com/kivutar/goro/session"
 )
 
-const (
-	guildMemberContextMenuWidth = 128
-	guildMemberPermissionExpel  = 0x10
-)
+const guildMemberPermissionExpel = 0x10 // theme:ok guild expel permission bit
 
 type GuildMemberActionKind uint8
 
@@ -53,6 +50,10 @@ func (m *GuildMemberContextMenu) Open(ctx Context, x, y int, member session.Guil
 	x = clampWindowInt(x, windowScreenMargin, maxInt(windowScreenMargin, screenW-guildMemberContextMenuWidth-windowScreenMargin))
 	y = clampWindowInt(y, windowScreenMargin, maxInt(windowScreenMargin, screenH-height-windowScreenMargin))
 	m.OpenAt(x, y, m.widgetTree())
+	m.claimLayoutReload(func() {
+		m.SetSize(guildMemberContextMenuWidth, m.height())
+		m.SetContent(m.widgetTree())
+	})
 	m.Publish(ctx)
 }
 
@@ -78,7 +79,12 @@ func (m *GuildMemberContextMenu) Rebind(ctx Context) {
 		return
 	}
 	m.ctx = ctx
+	m.SetSize(guildMemberContextMenuWidth, m.height())
 	m.SetContent(m.widgetTree())
+	m.claimLayoutReload(func() {
+		m.SetSize(guildMemberContextMenuWidth, m.height())
+		m.SetContent(m.widgetTree())
+	})
 	m.Publish(ctx)
 }
 

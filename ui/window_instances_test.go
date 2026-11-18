@@ -355,7 +355,7 @@ func TestNewWindowPlacementStaysOnScreen(t *testing.T) {
 		w.Open(ctx, primitives.Box())
 		w.Publish(ctx)
 		bounds := geometry.NewRect(float32(w.x), float32(w.y), float32(w.width), float32(w.height))
-		if bounds.Min.X < windowScreenMargin || bounds.Min.Y < windowScreenMargin || bounds.Max.X > float32(ctx.ScreenW-windowScreenMargin) || bounds.Max.Y > float32(ctx.ScreenH-windowScreenMargin) {
+		if bounds.Min.X < float32(windowScreenMargin) || bounds.Min.Y < float32(windowScreenMargin) || bounds.Max.X > float32(ctx.ScreenW-windowScreenMargin) || bounds.Max.Y > float32(ctx.ScreenH-windowScreenMargin) {
 			t.Fatalf("window escaped screen bounds: %v", bounds)
 		}
 	}
