@@ -35,6 +35,8 @@ import (
 )
 
 type WorldMode struct {
+	// previewWindows are sample windows the offline preview opens once.
+	previewWindows    []string
 	petSystem         pet.System
 	battleSystem      battle.System
 	actorSystem       actors.System
@@ -508,6 +510,7 @@ func (m *WorldMode) Update(ctx client.Context) (Mode, error) {
 	if !ctx.Config.Headless {
 		m.restoreUISettings(ctx)
 		m.rebuildUIAfterLayoutReload(ctx)
+		m.openPreviewWindows(ctx)
 	}
 	// Status presentation must follow server updates even when a window or
 	// modal consumes input for the rest of the frame.
