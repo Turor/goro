@@ -21,23 +21,26 @@ import (
 )
 
 const (
-	shortcutCols       = 9
-	shortcutMaxRows    = network.HotkeyListSlots2008 / shortcutCols
+	// shortcutTotalSlots is the 2008 hotkey list length; it sizes the slot array.
 	shortcutTotalSlots = network.HotkeyListSlots2008
-	shortcutMinRows    = 1
-	shortcutControlGap = 0
-	shortcutControlPad = 2
 	shortcutControlW   = int(rotheme.IconButtonSize)
-	shortcutGripWidth  = 10
 )
 
-// Hotbar geometry is a layout token (see layout_tokens.go).
-var (
-	shortcutSlot   = 34
-	shortcutGap    = 2
-	shortcutRowGap = 2
-	shortcutPad    = 3
-)
+// shortcutMaxRows is the 2008 hotkey list divided by the column token.
+var shortcutMaxRows = hotbarMaxRows(shortcutCols)
+
+func hotbarMaxRows(cols int) int {
+	if cols < 1 {
+		cols = 1
+	}
+	rows := network.HotkeyListSlots2008 / cols
+	if rows < 1 {
+		return 1
+	}
+	return rows
+}
+
+func recomputeHotbarRows() { shortcutMaxRows = hotbarMaxRows(shortcutCols) }
 
 var shortcutFunctionKeys = [...]input.Key{
 	input.KeyF1, input.KeyF2, input.KeyF3, input.KeyF4, input.KeyF5, input.KeyF6, input.KeyF7, input.KeyF8, input.KeyF9,
@@ -164,7 +167,7 @@ func (b *ShortcutBar) Publish(ctx Context, actions GameActions, assets AssetProv
 		x, y := b.bounds(ctx)
 		b.window.SetAutoPosition(x, y)
 		b.window.SetSize(w, h)
-		b.window.dragBounds = geometry.NewRect(0, 0, shortcutGripWidth, float32(h))
+		b.window.dragBounds = geometry.NewRect(0, 0, float32(shortcutGripWidth), float32(h))
 		b.window.keepOnScreen(ctx)
 		if !b.window.IsOpen() {
 			b.window.Open(ctx, b.widgetTree())
@@ -235,11 +238,18 @@ func (b *ShortcutBar) rebuild(ctx Context) {
 }
 
 func clampShortcutRows(rows int) int {
-	if rows < shortcutMinRows {
-		return shortcutMinRows
+	low, high := shortcutMinRows, shortcutMaxRows
+	if low < 1 {
+		low = 1
 	}
-	if rows > shortcutMaxRows {
-		return shortcutMaxRows
+	if high < low {
+		high = low
+	}
+	if rows < low {
+		return low
+	}
+	if rows > high {
+		return high
 	}
 	return rows
 }
@@ -437,10 +447,10 @@ func (b *ShortcutBar) widgetTree() widget.Widget {
 			primitives.HBox(
 				primitives.Box(
 					primitives.Expanded(primitives.Box()),
-					primitives.Box().Width(2).Height(24).Background(rotheme.Default.Colors.ButtonBorder).Rounded(1),
+					primitives.Box().Width(float32(shortcutGripMarkW)).Height(float32(shortcutGripMarkH)).Background(rotheme.Default.Colors.ButtonBorder).Rounded(shortcutGripMarkRadius),
 					primitives.Expanded(primitives.Box()),
 				).
-					Width(shortcutGripWidth).
+					Width(float32(shortcutGripWidth)).
 					Height(float32(shortcutBarHeightForRows(visibleRows))).
 					CrossAlign(primitives.CrossAxisCenter),
 				primitives.Box(rows...).
@@ -450,7 +460,7 @@ func (b *ShortcutBar) widgetTree() widget.Widget {
 					CrossAlign(primitives.CrossAxisStretch),
 				b.rowControls(visibleRows),
 			).
-				Gap(shortcutControlGap).
+				Gap(float32(shortcutControlGap)).
 				CrossAlign(primitives.CrossAxisStart),
 		),
 	)
@@ -466,7 +476,7 @@ func (b *ShortcutBar) rowControls(visibleRows int) widget.Widget {
 		}),
 	).
 		Width(float32(shortcutControlW)).
-		Gap(shortcutControlGap).
+		Gap(float32(shortcutControlGap)).
 		PaddingTop(float32(shortcutPad))
 }
 
@@ -517,13 +527,13 @@ func (w *shortcutSlotButton) drawContent(canvas widget.Canvas, bounds geometry.R
 			item = live
 		}
 		if icon := w.bar.itemIconImage(w.bar.ctx.Resources, item); icon != nil {
-			canvas.DrawImage(icon, geometry.Pt(bounds.Min.X+5, bounds.Min.Y+5))
+			canvas.DrawImage(icon, geometry.Pt(bounds.Min.X+float32(shortcutIconInset), bounds.Min.Y+float32(shortcutIconInset)))
 		}
 		if item.Amount > 1 {
 			rotheme.DrawText(
 				canvas,
 				fmt.Sprintf("%d", item.Amount),
-				geometry.NewRect(bounds.Min.X+1, bounds.Max.Y-15, float32(shortcutSlot-3), 12),
+				geometry.NewRect(bounds.Min.X+1, bounds.Max.Y-float32(shortcutAmountBottom), float32(shortcutSlot-shortcutAmountInset), float32(shortcutLabelH)),
 				rotheme.Default.Typography.TextSize,
 				rotheme.Default.Colors.Text,
 				false,
@@ -537,14 +547,14 @@ func (w *shortcutSlotButton) drawContent(canvas widget.Canvas, bounds geometry.R
 		}
 		if w.bar.assets != nil {
 			if icon := w.bar.assets.SkillIconImage(w.bar.ctx.Resources, skill); icon != nil {
-				canvas.DrawImage(icon, geometry.Pt(bounds.Min.X+5, bounds.Min.Y+5))
+				canvas.DrawImage(icon, geometry.Pt(bounds.Min.X+float32(shortcutIconInset), bounds.Min.Y+float32(shortcutIconInset)))
 			}
 		}
 		if skill.Level > 0 {
 			rotheme.DrawText(
 				canvas,
 				fmt.Sprintf("Lv%d", maxInt(1, skill.Level)),
-				geometry.NewRect(bounds.Min.X+3, bounds.Min.Y+1, float32(shortcutSlot-6), 12),
+				geometry.NewRect(bounds.Min.X+float32(shortcutSkillLabelX), bounds.Min.Y+1, float32(shortcutSlot-shortcutSkillLabelInset), float32(shortcutLabelH)),
 				rotheme.Default.Typography.TextSize,
 				Color(TitleTextColor),
 				false,
@@ -602,7 +612,7 @@ func (b *ShortcutBar) showTooltip(slot int) {
 		return
 	}
 	barX, barY := b.bounds(b.ctx)
-	b.tooltip.Show(b.ctx, text, barX+shortcutBarWidth()/2, barY+shortcutBarHeightForRows(b.visibleRowCount())+2, barY-2)
+	b.tooltip.Show(b.ctx, text, barX+shortcutBarWidth()/2, barY+shortcutBarHeightForRows(b.visibleRowCount())+shortcutTooltipGap, barY-shortcutTooltipGap)
 }
 
 func (b *ShortcutBar) tooltipText(slot int) string {
