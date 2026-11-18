@@ -31,15 +31,6 @@ func init() {
 	rotheme.RegisterFloat("status", "section_gap", &statsSectionGap, 0, 48, "gap between the status window's stat columns")
 	rotheme.OnLayoutApplied(recomputeStatsWindowMetrics)
 
-	rotheme.RegisterInt("npc_dialog", "width", &npcDialogWidth, 260, 800, "NPC dialog width")
-	rotheme.RegisterInt("npc_dialog", "height", &npcDialogHeight, 130, 600, "NPC dialog height")
-	rotheme.RegisterInt("npc_dialog", "padding", &npcDialogPad, 0, 32, "NPC dialog text padding")
-	rotheme.RegisterInt("npc_dialog", "line_height", &npcDialogLineH, 10, 32, "NPC dialog line height")
-	rotheme.RegisterInt("npc_dialog", "button_width", &npcDialogButtonW, 40, 200, "NPC dialog Next/Close button width")
-	rotheme.RegisterInt("npc_dialog", "menu_width", &npcMenuWidth, 220, 600, "NPC menu width")
-	rotheme.RegisterInt("npc_dialog", "menu_row_height", &npcMenuRowH, 14, 40, "NPC menu row height")
-	rotheme.RegisterInt("npc_dialog", "menu_padding", &npcMenuPad, 0, 32, "NPC menu padding")
-
 	rotheme.RegisterRGBA("theme", "hp_bar", &PlayerHPBarColor, "player HP bar")
 	rotheme.RegisterRGBA("theme", "sp_bar", &PlayerSPBarColor, "player SP bar")
 	rotheme.RegisterRGBA("theme", "hunger_bar", &HungerBarColor, "pet and homunculus hunger bar")
