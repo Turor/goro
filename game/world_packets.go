@@ -71,6 +71,9 @@ func (m *WorldMode) handleNetworkPacket(ctx client.Context, pkt network.Packet, 
 	if m.handleInstancePacket(ctx, pkt) {
 		return nil, false
 	}
+	if m.handleWarpraPacket(ctx, pkt) {
+		return nil, false
+	}
 	if m.social().HandleMailPacket(ctx, pkt, now, m.ui.disconnectDialog.IsOpen()) {
 		return nil, false
 	}

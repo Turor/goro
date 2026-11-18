@@ -40,6 +40,7 @@ func (u *worldUI) windowPositions(s *config.UISettings) []windowPositionBinding 
 		{&u.social.GuildWindow, &s.GuildPosition},
 		{&u.cartWindow, &s.CartPosition},
 		{&u.worldMap, &s.WorldMapPosition},
+		{&u.warpra, &s.WarpraPosition},
 		{&u.emoteWindow, &s.EmotesPosition},
 		{&u.chatShortcuts, &s.ChatShortcutsPosition},
 		{&u.settingsWindow, &s.SettingsPosition},
@@ -114,6 +115,9 @@ func (m *WorldMode) restoreUISettings(ctx client.Context) {
 				glog.Warnf("restore world map window: %v", err)
 			}
 		}
+		if s.WarpraOpen {
+			m.ui.warpra.OpenWindow(ctx)
+		}
 		p.last = m.uiSettings()
 		p.zoomTarget = p.last.CameraZoom
 	}
@@ -169,6 +173,7 @@ func (m *WorldMode) uiSettings() config.UISettings {
 		GuildOpen:            u.social.GuildWindow.IsOpen() || p.GuildOpen,
 		CartOpen:             u.cartWindow.IsOpen() || p.CartOpen,
 		WorldMapOpen:         u.worldMap.IsOpen(),
+		WarpraOpen:           u.warpra.IsOpen(),
 		EmotesOpen:           u.emoteWindow.IsOpen(),
 		ChatShortcutsOpen:    u.chatShortcuts.IsOpen(),
 		SettingsOpen:         u.settingsWindow.IsOpen(),

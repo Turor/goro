@@ -397,7 +397,7 @@ Currently implemented (not a claim of complete reference-client parity):
    * Classic Battle Mode (`/bm`), direct typing, and F12 shortcut-bar switching
    * Console
    * Minimap with player, NPC, party, and guild markers
-   * Classic world map with player/party locations and minimap previews
+   * Classic world map with player/party locations, minimap previews, and Warpra explore marks (red X / green check)
    * Quest journal with descriptions, hunt progress, and time limits
    * Items with vertical category tabs
    * Equipment
