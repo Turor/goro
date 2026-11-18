@@ -16,12 +16,11 @@ import (
 	gameui "github.com/kivutar/goro/ui"
 )
 
-const (
-	charSelectPreviewDirection = 4
-	charSelectPreviewScale     = 0.92
-	charSelectPreviewFeetLift  = 10
-	charDeleteKeyMaxBytes      = 40
-)
+const charSelectPreviewDirection = 4 // theme:ok sprite facing index
+
+const charDeleteKeyMaxBytes = 40 // theme:ok delete email length limit
+
+const defaultCharSlots = 9 // theme:ok protocol default character slot count
 
 func (m *Screen) updateCharacterSelectInput(ctx client.Context) {
 	if ctx.Input != nil && ctx.Input.JustPressed(input.KeyEscape) {
@@ -109,9 +108,10 @@ func (m *Screen) activateCharacterSelectSlot(ctx client.Context, slot int, now t
 }
 
 func (m *Screen) characterSelectPreviewImages(ctx client.Context, opts gameui.CharacterSelectWindowOptions) map[int]image.Image {
-	images := make(map[int]image.Image, 3)
-	pageStart := gameui.CharacterSelectPage(opts.SelectedSlot) * 3
-	for localSlot := 0; localSlot < 3; localSlot++ {
+	pageSize := gameui.CharacterSelectPageSize()
+	images := make(map[int]image.Image, pageSize)
+	pageStart := gameui.CharacterSelectPage(opts.SelectedSlot) * pageSize
+	for localSlot := 0; localSlot < pageSize; localSlot++ {
 		slot := pageStart + localSlot
 		character, ok := characterBySlot(opts.Characters, slot)
 		if !ok {
@@ -227,7 +227,7 @@ func (m *Screen) cancelCharacterSelect(ctx client.Context) {
 }
 
 func (m *Screen) prepareCharacterSelectFromSession(ctx client.Context) {
-	m.maxSlots = 9
+	m.maxSlots = defaultCharSlots
 	m.selectedSlot = 0
 	if ctx.Session == nil || len(ctx.Session.Characters) == 0 {
 		return
@@ -291,7 +291,7 @@ func (m *Screen) drawCharacterPreview(screen characterPreviewTarget, ctx client.
 		return
 	}
 	var opts render.DrawImageOptions
-	scale := charSelectPreviewScale
+	scale := float64(charSelectPreviewScale)
 	if db.IsBabyJob(int(character.Job)) {
 		scale *= scene.BabyPlayerBodyScale
 	}
@@ -311,8 +311,9 @@ func (m *Screen) characterPreviewImage(ctx client.Context, character session.Cha
 	if img := m.charPreviewImages[character.ID]; img != nil {
 		return img
 	}
-	img := render.NewImage(139, 144)
-	m.drawCharacterPreview(img, ctx, character, 139/2, 144-15-charSelectPreviewFeetLift)
+	slotW, slotH := gameui.CharacterSelectSlotSize()
+	img := render.NewImage(slotW, slotH)
+	m.drawCharacterPreview(img, ctx, character, slotW/2, slotH-charSelectPreviewBottomInset-charSelectPreviewFeetLift)
 	m.charPreviewImages[character.ID] = img.RGBA()
 	return m.charPreviewImages[character.ID]
 }
@@ -331,14 +332,15 @@ func (m *Screen) loadCharacterSelectSkin(ctx client.Context) {
 }
 
 func charSelectMaxSlots(characters []session.Character) int {
-	maxSlots := 9
+	maxSlots := defaultCharSlots
 	for _, character := range characters {
 		if int(character.Slot)+1 > maxSlots {
 			maxSlots = int(character.Slot) + 1
 		}
 	}
-	if maxSlots%3 != 0 {
-		maxSlots += 3 - maxSlots%3
+	page := gameui.CharacterSelectPageSize()
+	if maxSlots%page != 0 {
+		maxSlots += page - maxSlots%page
 	}
 	return maxSlots
 }
@@ -358,7 +360,7 @@ func firstOccupiedCharacterSlot(characters []session.Character) int {
 
 func firstEmptyCharacterSlot(characters []session.Character, maxSlots int) (int, bool) {
 	if maxSlots <= 0 {
-		maxSlots = 9
+		maxSlots = defaultCharSlots
 	}
 	occupied := make(map[int]struct{}, len(characters))
 	for _, character := range characters {
