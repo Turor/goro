@@ -17,6 +17,7 @@ import (
 func loadUILayout(cfg config.Config) {
 	path := cfg.UILayoutPath()
 	applied, warnings, err := rotheme.LoadLayoutFile(path)
+	// ParseLayout already caps warnings at MaxLayoutWarnings plus a total.
 	for _, warning := range warnings {
 		glog.Warnf("ui layout: %s", warning)
 	}

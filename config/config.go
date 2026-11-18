@@ -380,8 +380,14 @@ func applyINIFile(cfg *Config, path string, explicit bool) error {
 	}
 	defer file.Close()
 
+	layoutBefore := cfg.UILayout.Path
 	if err := applyINI(cfg, file); err != nil {
 		return fmt.Errorf("read config %s: %w", path, err)
+	}
+	// A relative [ui_layout] file is relative to the INI that names it, not
+	// to the working directory. --ui-layout stays relative to the CWD.
+	if layout := cfg.UILayout.Path; layout != layoutBefore && layout != "" && !filepath.IsAbs(layout) {
+		cfg.UILayout.Path = filepath.Join(filepath.Dir(path), layout)
 	}
 	return nil
 }

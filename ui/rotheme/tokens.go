@@ -220,6 +220,14 @@ func formatHex(r, g, b, a uint8) string {
 	return fmt.Sprintf("#%02x%02x%02x%02x", r, g, b, a)
 }
 
+const (
+	// MaxLayoutFileSize bounds what a layout file may cost at startup. The
+	// full default dump is about 3 KiB.
+	MaxLayoutFileSize = 256 << 10
+	// MaxLayoutWarnings bounds unknown-key warnings; the rest are counted.
+	MaxLayoutWarnings = 20
+)
+
 // Layout is a validated set of overrides, keyed by token, ready to apply.
 type Layout struct {
 	values map[*token]tokenValue
@@ -249,6 +257,7 @@ func (e *LayoutError) Error() string {
 func ParseLayout(r io.Reader, path string) (Layout, []string, error) {
 	layout := Layout{values: map[*token]tokenValue{}}
 	var warnings []string
+	unknown := 0
 	scanner := bufio.NewScanner(r)
 	section := ""
 	lineNo := 0
@@ -279,6 +288,10 @@ func ParseLayout(r io.Reader, path string) (Layout, []string, error) {
 		value = strings.Trim(value, `"'`)
 		t := tokenIndex[tokenID(section, key)]
 		if t == nil {
+			unknown++
+			if unknown > MaxLayoutWarnings {
+				continue
+			}
 			warnings = append(warnings, (&LayoutError{Path: path, Line: lineNo, Msg: fmt.Sprintf("unknown key [%s] %s (ignored)", section, strings.TrimSpace(key))}).Error())
 			continue
 		}
@@ -287,6 +300,9 @@ func ParseLayout(r io.Reader, path string) (Layout, []string, error) {
 			return Layout{}, warnings, &LayoutError{Path: path, Line: lineNo, Msg: err.Error()}
 		}
 		layout.values[t] = v
+	}
+	if unknown > MaxLayoutWarnings {
+		warnings = append(warnings, fmt.Sprintf("%d unknown keys in total; only the first %d are listed", unknown, MaxLayoutWarnings))
 	}
 	if err := scanner.Err(); err != nil {
 		return Layout{}, warnings, &LayoutError{Path: path, Msg: err.Error()}
@@ -320,18 +336,35 @@ func ResetLayout() {
 
 // LoadLayoutFile parses path and, if it is valid, applies it. A missing file
 // is not an error: it reports applied=false and leaves values untouched.
+// Only regular files up to MaxLayoutFileSize are read, so a FIFO or device at
+// the path cannot block startup and a huge file cannot exhaust memory.
 func LoadLayoutFile(path string) (applied bool, warnings []string, err error) {
-	file, err := os.Open(path)
+	info, err := os.Stat(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return false, nil, nil
 		}
 		return false, nil, &LayoutError{Path: path, Msg: err.Error()}
 	}
+	if !info.Mode().IsRegular() {
+		return false, nil, &LayoutError{Path: path, Msg: "not a regular file"}
+	}
+	if info.Size() > MaxLayoutFileSize {
+		return false, nil, &LayoutError{Path: path, Msg: fmt.Sprintf("file is %d bytes; the limit is %d", info.Size(), MaxLayoutFileSize)}
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return false, nil, &LayoutError{Path: path, Msg: err.Error()}
+	}
 	defer file.Close()
-	layout, warnings, err := ParseLayout(file, path)
+	// The file may grow between Stat and Open: never read past the limit.
+	limited := &io.LimitedReader{R: file, N: MaxLayoutFileSize + 1}
+	layout, warnings, err := ParseLayout(limited, path)
 	if err != nil {
 		return false, warnings, err
+	}
+	if limited.N <= 0 {
+		return false, nil, &LayoutError{Path: path, Msg: fmt.Sprintf("file is over the %d byte limit", MaxLayoutFileSize)}
 	}
 	layout.Apply()
 	return true, warnings, nil
