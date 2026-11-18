@@ -115,6 +115,8 @@ type gpuRenderer struct {
 	lightingBuf             *wgpu.Buffer
 	shadowTex               *wgpu.Texture
 	shadowView              *wgpu.TextureView
+	shadowColorTex          *wgpu.Texture
+	shadowColorView         *wgpu.TextureView
 	shadowUniform           *wgpu.Buffer
 	shadowBGL               *wgpu.BindGroupLayout
 	shadowLayout            *wgpu.PipelineLayout
