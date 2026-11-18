@@ -11,10 +11,9 @@ import (
 )
 
 const (
-	speechBubbleBaseDuration = 3500 * time.Millisecond
-	speechBubblePerRune      = 40 * time.Millisecond
-	speechBubbleMaxDuration  = 8500 * time.Millisecond
-	speechBubbleMaxWidth     = 220
+	speechBubbleBaseDuration = 3500 * time.Millisecond // theme:ok timer
+	speechBubblePerRune      = 40 * time.Millisecond   // theme:ok timer
+	speechBubbleMaxDuration  = 8500 * time.Millisecond // theme:ok timer
 )
 
 type SpeechBubble struct {
@@ -102,8 +101,6 @@ func speechBubbleText(text string) string {
 	}
 	return text
 }
-
-const actorSpeechBubbleGap = 6.0
 
 func ActorSpeechBubbleBottomY(baseY, scale float64) float64 {
 	return ActorSpriteTopY(baseY, scale) - actorSpeechBubbleGap

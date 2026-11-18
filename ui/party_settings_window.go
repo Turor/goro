@@ -11,11 +11,6 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	partySettingsW       = 286
-	partySettingsContent = 132
-)
-
 type PartySettingsWindow struct {
 	Window
 	expShare      uint32
@@ -23,17 +18,25 @@ type PartySettingsWindow struct {
 }
 
 func (w *PartySettingsWindow) Open(ctx Context) {
-	w.EnsureWindow(partySettingsW, ROWindowTitleHeight+partySettingsContent+ROWindowFooterHeight)
+	w.EnsureWindow(partySettingsW, partySettingsHeight())
 	w.ctx = ctx
 	party := sessionParty(ctx.Session)
 	w.expShare = party.ExpShare
 	w.refuseInvites = party.RefuseInvites
 	w.Window.Open(ctx, w.widgetTree(ctx))
+	w.bindLayoutReload()
 	w.Publish(ctx)
 }
 
+func (w *PartySettingsWindow) bindLayoutReload() {
+	w.claimLayoutReload(func() {
+		w.SetSize(partySettingsW, partySettingsHeight())
+		w.SetContent(w.widgetTree(w.ctx))
+	})
+}
+
 func (w *PartySettingsWindow) Update(ctx Context) bool {
-	w.EnsureWindow(partySettingsW, ROWindowTitleHeight+partySettingsContent+ROWindowFooterHeight)
+	w.EnsureWindow(partySettingsW, partySettingsHeight())
 	w.ctx = ctx
 	if !w.IsOpen() {
 		return false
@@ -48,6 +51,8 @@ func (w *PartySettingsWindow) Rebind(ctx Context) {
 		return
 	}
 	w.ctx = ctx
+	w.SetSize(partySettingsW, partySettingsHeight())
+	w.bindLayoutReload()
 	w.RebindContent(ctx, w.widgetTree(ctx))
 }
 
@@ -56,7 +61,7 @@ func (w *PartySettingsWindow) widgetTree(ctx Context) widget.Widget {
 		Title("Party Settings"),
 		CloseButton(true),
 		OnClose(w.Close),
-		Size(partySettingsW, ROWindowTitleHeight+partySettingsContent+ROWindowFooterHeight),
+		Size(float32(partySettingsW), float32(partySettingsHeight())),
 		Content(
 			primitives.Box(
 				rotheme.Label("EXP"),
@@ -78,8 +83,8 @@ func (w *PartySettingsWindow) widgetTree(ctx Context) widget.Widget {
 					}),
 				),
 			).
-				Padding(14).
-				Gap(8),
+				Padding(float32(partySettingsPad)).
+				Gap(float32(partySettingsGap)),
 		),
 		Footer(
 			primitives.Expanded(primitives.Box()),

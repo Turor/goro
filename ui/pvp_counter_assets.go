@@ -8,22 +8,19 @@ import (
 	"github.com/kivutar/goro/glog"
 	"github.com/kivutar/goro/render"
 	"github.com/kivutar/goro/res"
-)
-
-const (
-	pvpRankBaseline = 52
-	pvpRankStep     = 28
+	"github.com/kivutar/goro/ui/rotheme"
 )
 
 type pvpRankSpriteSet struct {
-	manager *res.Manager
-	act     *res.ACT
-	spr     *res.SPR
-	frames  map[pvpRankFrameKey]*render.Image
-	cached  image.Image
-	rank    int
-	total   int
-	miss    bool
+	manager   *res.Manager
+	act       *res.ACT
+	spr       *res.SPR
+	frames    map[pvpRankFrameKey]*render.Image
+	cached    image.Image
+	rank      int
+	total     int
+	miss      bool
+	layoutGen uint64
 }
 
 type pvpRankFrameKey struct {
@@ -34,6 +31,10 @@ type pvpRankFrameKey struct {
 func (s *pvpRankSpriteSet) image(manager *res.Manager, rank, total int) image.Image {
 	if s.manager != manager {
 		*s = pvpRankSpriteSet{manager: manager}
+	}
+	if gen := rotheme.Generation(); gen != s.layoutGen {
+		s.cached = nil
+		s.layoutGen = gen
 	}
 	if manager == nil || rank <= 0 || total <= 0 {
 		return nil
@@ -144,7 +145,7 @@ func (s *pvpRankSpriteSet) compose(rank, total int) image.Image {
 	target := render.NewImage(pvpCounterWidth, pvpCounterHeight)
 
 	for _, ch := range rankText {
-		if !s.drawAction(target, int(ch-'0'), x, pvpRankBaseline-6) {
+		if !s.drawAction(target, int(ch-'0'), x, pvpRankBaseline-pvpRankDigitShift) {
 			return nil
 		}
 		x += pvpRankStep
@@ -154,7 +155,7 @@ func (s *pvpRankSpriteSet) compose(rank, total int) image.Image {
 	}
 	x += pvpRankStep
 	for _, ch := range totalText {
-		if !s.drawAction(target, int(ch-'0'), x, pvpRankBaseline+6) {
+		if !s.drawAction(target, int(ch-'0'), x, pvpRankBaseline+pvpRankDigitShift) {
 			return nil
 		}
 		x += pvpRankStep
@@ -180,7 +181,7 @@ func (s *pvpRankSpriteSet) drawAction(target *render.Image, actionIndex, x, y in
 		if frame == nil {
 			continue
 		}
-		drawUISpriteLayer(target, frame, layer, float64(x), float64(y)-uiSpriteRendererMidCellY)
+		drawUISpriteLayer(target, frame, layer, float64(x), float64(y)-float64(uiSpriteRendererMidCellY))
 		drawn = true
 	}
 	return drawn

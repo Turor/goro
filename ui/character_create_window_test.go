@@ -83,7 +83,7 @@ func TestCharacterSelectInfoPanelFitsSixRowsAndPreservesMargins(t *testing.T) {
 	}}).widgetTree()
 	tree.Layout(
 		widget.NewContext(),
-		geometry.Tight(geometry.Sz(characterSelectWindowW, characterSelectWindowH)),
+		geometry.Tight(geometry.Sz(float32(characterSelectWindowW), float32(characterSelectWindowH))),
 	)
 
 	windowChildren := tree.Children()
@@ -97,15 +97,15 @@ func TestCharacterSelectInfoPanelFitsSixRowsAndPreservesMargins(t *testing.T) {
 	}
 	panel := contentChildren[2]
 	panelBounds := panel.(interface{ Bounds() geometry.Rect }).Bounds()
-	if math.Abs(float64(panelBounds.Width()-characterSelectInfoPanelW)) > 0.001 || math.Abs(float64(panelBounds.Height()-characterSelectInfoPanelH)) > 0.001 {
+	if math.Abs(float64(panelBounds.Width()-float32(characterSelectInfoPanelW))) > 0.001 || math.Abs(float64(panelBounds.Height()-float32(characterSelectInfoPanelH))) > 0.001 {
 		t.Fatalf("character info panel size = %.1fx%.1f, want %dx%d", panelBounds.Width(), panelBounds.Height(), characterSelectInfoPanelW, characterSelectInfoPanelH)
 	}
 	if len(panel.Children()) != 1 {
 		t.Fatal("character info table is missing")
 	}
 	tableBounds := panel.Children()[0].(interface{ Bounds() geometry.Rect }).Bounds()
-	if math.Abs(float64(tableBounds.Min.X-characterSelectInfoPanelPad)) > 0.001 || math.Abs(float64(tableBounds.Min.Y-characterSelectInfoPanelPad)) > 0.001 ||
-		math.Abs(float64(tableBounds.Width()-(characterSelectInfoPanelW-2*characterSelectInfoPanelPad))) > 0.001 || math.Abs(float64(tableBounds.Height()-characterSelectInfoTableH)) > 0.001 {
+	if math.Abs(float64(tableBounds.Min.X-float32(characterSelectInfoPanelPad))) > 0.001 || math.Abs(float64(tableBounds.Min.Y-float32(characterSelectInfoPanelPad))) > 0.001 ||
+		math.Abs(float64(tableBounds.Width()-float32(characterSelectInfoPanelW-2*characterSelectInfoPanelPad))) > 0.001 || math.Abs(float64(tableBounds.Height()-float32(characterSelectInfoTableH))) > 0.001 {
 		t.Fatalf("character info table bounds = %v, want padded %dpx inside panel", tableBounds, characterSelectInfoPanelPad)
 	}
 	contentBounds := content.(interface{ Bounds() geometry.Rect }).Bounds()
@@ -118,7 +118,7 @@ func TestCharacterSelectArrowHitboxesKeepFullWidth(t *testing.T) {
 	tree := (&CharacterSelectWindow{opts: CharacterSelectWindowOptions{MaxSlots: 9}}).widgetTree()
 	tree.Layout(
 		widget.NewContext(),
-		geometry.Tight(geometry.Sz(characterSelectWindowW, characterSelectWindowH)),
+		geometry.Tight(geometry.Sz(float32(characterSelectWindowW), float32(characterSelectWindowH))),
 	)
 
 	windowChildren := tree.Children()
@@ -146,7 +146,7 @@ func TestCharacterSelectArrowHitboxesKeepFullWidth(t *testing.T) {
 }
 
 func TestCharacterCreateHairControlsFrameHead(t *testing.T) {
-	bounds := geometry.NewRect(13, 21, characterCreatePanelW, characterCreatePanelH)
+	bounds := geometry.NewRect(13, 21, float32(characterCreatePanelW), float32(characterCreatePanelH))
 	left := characterCreatePreviewButtonRect(bounds, 0)
 	color := characterCreatePreviewButtonRect(bounds, 1)
 	right := characterCreatePreviewButtonRect(bounds, 2)
@@ -188,7 +188,7 @@ func TestCharacterCreateStatButtonsSitOutsideHexagon(t *testing.T) {
 	tree := (&CharacterCreateWindow{}).widgetTree()
 	tree.Layout(
 		widget.NewContext(),
-		geometry.Tight(geometry.Sz(characterCreateWindowW, characterCreateWindowH)),
+		geometry.Tight(geometry.Sz(float32(characterCreateWindowW), float32(characterCreateWindowH))),
 	)
 
 	var findGraph func(widget.Widget) *characterCreateStatGraph
@@ -208,12 +208,12 @@ func TestCharacterCreateStatButtonsSitOutsideHexagon(t *testing.T) {
 		t.Fatal("character creation stat graph is missing from widget tree")
 	}
 	bounds := graph.Bounds()
-	if bounds.Width() != characterCreateGraphW || bounds.Height() != characterCreateGraphH {
+	if bounds.Width() != float32(characterCreateGraphW) || bounds.Height() != float32(characterCreateGraphH) {
 		t.Fatalf("stat graph size = %.1fx%.1f, want %dx%d", bounds.Width(), bounds.Height(), characterCreateGraphW, characterCreateGraphH)
 	}
 	cx := bounds.Min.X + bounds.Width()/2
 	cy := bounds.Min.Y + bounds.Height()/2
-	hexagon := characterCreateWidgetGraphPoints(cx, cy, characterCreateGraphOuterRadius)
+	hexagon := characterCreateWidgetGraphPoints(cx, cy, float32(characterCreateGraphOuterRadius))
 
 	for stat := 0; stat < CharacterCreateStatCount; stat++ {
 		rect := characterCreateStatButtonRect(bounds, stat)
@@ -233,7 +233,7 @@ func TestCharacterCreateStatButtonsSitOutsideHexagon(t *testing.T) {
 
 func TestCharacterCreateStatButtonsUseLabelStyle(t *testing.T) {
 	graph := newCharacterCreateStatGraph([CharacterCreateStatCount]uint8{}, nil)
-	graph.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(characterCreateGraphW, characterCreateGraphH)))
+	graph.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(float32(characterCreateGraphW), float32(characterCreateGraphH))))
 	canvas := &uitest.MockCanvas{}
 	graph.Draw(widget.NewContext(), canvas)
 
@@ -259,7 +259,7 @@ func TestCharacterCreatePreviewCenterAlignsWithStatGraph(t *testing.T) {
 	tree := window.widgetTree()
 	tree.Layout(
 		widget.NewContext(),
-		geometry.Tight(geometry.Sz(characterCreateWindowW, characterCreateWindowH)),
+		geometry.Tight(geometry.Sz(float32(characterCreateWindowW), float32(characterCreateWindowH))),
 	)
 
 	var preview *characterCreatePreview
@@ -297,10 +297,10 @@ func TestCharacterCreatePreviewCenterAlignsWithStatGraph(t *testing.T) {
 }
 
 func TestCharacterCreateStatFillIsCenteredOnGraph(t *testing.T) {
-	graphBounds := geometry.NewRect(13, 21, characterCreateGraphW, characterCreateGraphH)
+	graphBounds := geometry.NewRect(13, 21, float32(characterCreateGraphW), float32(characterCreateGraphH))
 	cx := graphBounds.Min.X + graphBounds.Width()/2
 	cy := graphBounds.Min.Y + graphBounds.Height()/2
-	fillBounds := characterCreateStatFillBounds(cx, cy, characterCreateGraphOuterRadius)
+	fillBounds := characterCreateStatFillBounds(cx, cy, float32(characterCreateGraphOuterRadius))
 
 	fillCenterX := fillBounds.Min.X + fillBounds.Width()/2
 	fillCenterY := fillBounds.Min.Y + fillBounds.Height()/2
@@ -339,8 +339,8 @@ func TestCharacterCreateStatTableUsesLabelAndValueCellStyles(t *testing.T) {
 func TestCharacterCreateStatTablePanelFitsTable(t *testing.T) {
 	panel := characterCreateStatTablePanel([CharacterCreateStatCount]uint8{})
 	size := panel.Layout(widget.NewContext(), geometry.Loose(geometry.Sz(1000, 1000)))
-	wantWidth := characterCreateStatLabelW + characterCreateStatValueW + rotheme.TableGap + 2*characterCreateStatPanelPad
-	wantHeight := CharacterCreateStatCount*characterCreateStatRowH + (CharacterCreateStatCount-1)*rotheme.TableGap + 2*characterCreateStatPanelPad
+	wantWidth := float32(characterCreateStatLabelW+characterCreateStatValueW+2*characterCreateStatPanelPad) + rotheme.TableGap
+	wantHeight := float32(CharacterCreateStatCount*characterCreateStatRowH+2*characterCreateStatPanelPad) + float32(CharacterCreateStatCount-1)*rotheme.TableGap
 	if wantWidth != 132 {
 		t.Fatalf("stat table panel configured width = %.1f, want preserved width 132", wantWidth)
 	}
@@ -353,7 +353,7 @@ func TestCharacterCreateStatTablePanelAlignsTopRight(t *testing.T) {
 	tree := (&CharacterCreateWindow{}).widgetTree()
 	tree.Layout(
 		widget.NewContext(),
-		geometry.Tight(geometry.Sz(characterCreateWindowW, characterCreateWindowH)),
+		geometry.Tight(geometry.Sz(float32(characterCreateWindowW), float32(characterCreateWindowH))),
 	)
 
 	windowChildren := tree.Children()

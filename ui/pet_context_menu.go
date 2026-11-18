@@ -5,8 +5,6 @@ import (
 	"github.com/kivutar/goro/input"
 )
 
-const petContextMenuWidth = 140
-
 type PetContextActionKind uint8
 
 const (
@@ -35,6 +33,10 @@ func (m *PetContextMenu) Open(ctx Context, x, y int) {
 	x = clampWindowInt(x, windowScreenMargin, maxInt(windowScreenMargin, screenW-petContextMenuWidth-windowScreenMargin))
 	y = clampWindowInt(y, windowScreenMargin, maxInt(windowScreenMargin, screenH-m.height()-windowScreenMargin))
 	m.OpenAt(x, y, m.widgetTree())
+	m.claimLayoutReload(func() {
+		m.SetSize(petContextMenuWidth, m.height())
+		m.SetContent(m.widgetTree())
+	})
 	m.Publish(ctx)
 }
 

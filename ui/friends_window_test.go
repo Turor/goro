@@ -93,7 +93,7 @@ func TestFriendsWindowListStartsBelowTabs(t *testing.T) {
 	var window FriendsWindow
 	root := window.widgetTree(Context{Session: &session.Session{}})
 
-	root.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(friendsWindowWidth, friendsWindowHeight)))
+	root.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(float32(friendsWindowWidth), float32(friendsWindowHeight))))
 	rootChildren := root.Children()
 	if len(rootChildren) < 2 {
 		t.Fatalf("window children = %d, want title and content", len(rootChildren))

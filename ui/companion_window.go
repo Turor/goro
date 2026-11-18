@@ -14,32 +14,6 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	companionWindowDefaultW    = 560
-	companionWindowDefaultH    = 380
-	companionWindowTabDefaultW = 92
-	companionWindowTabDefaultH = 23
-	companionWindowPadDefault  = 10
-	companionWindowRowH        = 22
-	companionDetailLabelW      = 78
-)
-
-var (
-	companionWindowW    = companionWindowDefaultW
-	companionWindowH    = companionWindowDefaultH
-	companionWindowTabW = companionWindowTabDefaultW
-	companionWindowTabH = companionWindowTabDefaultH
-	companionWindowPad  = companionWindowPadDefault
-)
-
-func init() {
-	rotheme.RegisterInt("companion", "width", &companionWindowW, 400, 900, "companion window width")
-	rotheme.RegisterInt("companion", "height", &companionWindowH, 280, 800, "companion window height")
-	rotheme.RegisterInt("companion", "tab_width", &companionWindowTabW, 60, 160, "companion tab width")
-	rotheme.RegisterInt("companion", "tab_height", &companionWindowTabH, 16, 40, "companion tab height")
-	rotheme.RegisterInt("companion", "padding", &companionWindowPad, 0, 32, "companion tab content padding")
-}
-
 type CompanionTab int
 
 const (
@@ -262,8 +236,8 @@ func (w *CompanionWindow) tabFrame(ctx Context) widget.Widget {
 				CrossAlign(primitives.CrossAxisStretch),
 		),
 	).
-		Gap(2).
-		Background(widget.RGBA8(255, 255, 255, 255)).
+		Gap(float32(companionFrameGap)).
+		Background(Color(companionFrameBackground)).
 		CrossAlign(primitives.CrossAxisStretch)
 }
 
@@ -325,13 +299,13 @@ func (w *CompanionWindow) tabFooter() []widget.Widget {
 			buttons = append(buttons,
 				rotheme.Button("Feed", func() {
 					w.emit(CompanionWindowAction{Kind: CompanionActionPetClassicFeed})
-				}).Width(72),
+				}).Width(float32(companionButtonW)),
 				rotheme.Button("Perform", func() {
 					w.emit(CompanionWindowAction{Kind: CompanionActionPetPerformance})
-				}).Width(72),
+				}).Width(float32(companionButtonW)),
 				rotheme.Button("To egg", func() {
 					w.emit(CompanionWindowAction{Kind: CompanionActionPetToEgg, PetID: w.petList.ActivePetID})
-				}).Width(72),
+				}).Width(float32(companionButtonW)),
 			)
 		}
 	case CompanionTabHomunculus:
@@ -339,13 +313,13 @@ func (w *CompanionWindow) tabFooter() []widget.Widget {
 			buttons = append(buttons,
 				rotheme.Button("Skill", func() {
 					w.emit(CompanionWindowAction{Kind: CompanionActionHomunculusSkill})
-				}).Width(72),
+				}).Width(float32(companionButtonW)),
 				rotheme.Button("Feed", func() {
 					w.emit(CompanionWindowAction{Kind: CompanionActionHomunculusFeed})
-				}).Width(72),
+				}).Width(float32(companionButtonW)),
 				rotheme.Button("Store", func() {
 					w.emit(CompanionWindowAction{Kind: CompanionActionHomunculusStore})
-				}).Width(72),
+				}).Width(float32(companionButtonW)),
 			)
 		}
 	case CompanionTabMercenary:
@@ -353,23 +327,23 @@ func (w *CompanionWindow) tabFooter() []widget.Widget {
 			buttons = append(buttons,
 				rotheme.Button("Skill", func() {
 					w.emit(CompanionWindowAction{Kind: CompanionActionMercenarySkill})
-				}).Width(72),
+				}).Width(float32(companionButtonW)),
 				rotheme.Button("Dismiss", func() {
 					w.emit(CompanionWindowAction{Kind: CompanionActionMercenaryDelete})
-				}).Width(72),
+				}).Width(float32(companionButtonW)),
 			)
 		}
 	case CompanionTabStable:
 		buttons = append(buttons,
 			rotheme.Button("Store pet", func() {
 				w.emit(CompanionWindowAction{Kind: CompanionActionPetStore})
-			}).Width(88),
+			}).Width(float32(companionStorePetButtonW)),
 			rotheme.Button("Store homun", func() {
 				w.emit(CompanionWindowAction{Kind: CompanionActionHomunculusStore})
-			}).Width(100),
+			}).Width(float32(companionWideButtonW)),
 			rotheme.Button("Refresh", func() {
 				w.emit(CompanionWindowAction{Kind: CompanionActionRequestLists})
-			}).Width(72),
+			}).Width(float32(companionButtonW)),
 		)
 	}
 	return buttons
@@ -397,7 +371,7 @@ func (w *CompanionWindow) petTab(ctx Context) widget.Widget {
 			rows = append(rows, rotheme.Text("Evolution uses the Stable tab once recipes are available.").Color(rotheme.Default.Colors.MutedText))
 		}
 	}
-	return primitives.Box(rows...).Gap(6)
+	return primitives.Box(rows...).Gap(float32(companionStatRowGap))
 }
 
 func (w *CompanionWindow) homunculusTab(_ Context) widget.Widget {
@@ -416,8 +390,8 @@ func (w *CompanionWindow) homunculusTab(_ Context) widget.Widget {
 			h.barRow("Hunger", w.homunculus.Hunger, 100, Color(HungerBarFillColor(w.homunculus.Hunger, 100)), true),
 			companionInfoRow("Intimacy", HomunculusIntimacyText(w.homunculus.Intimacy)),
 			companionInfoRow("Skill Pt", fmt.Sprintf("%d", w.homunculus.Skills.Points)),
-		).Gap(homunculusInfoRowGap),
-	).Gap(homunculusInfoColumnGap).CrossAlign(primitives.CrossAxisStart)
+		).Gap(float32(homunculusInfoRowGap)),
+	).Gap(float32(homunculusInfoColumnGap)).CrossAlign(primitives.CrossAxisStart)
 
 	children := []widget.Widget{info, rotheme.Text("Lineage swap").Color(rotheme.Default.Colors.MutedText)}
 	if len(w.homunList.List) == 0 {
@@ -451,8 +425,8 @@ func (w *CompanionWindow) mercenaryTab(_ Context) widget.Widget {
 			companionInfoRow("Left", formatMercenaryExpireDate(w.mercenary.ExpireTick)),
 			h.barRow("Kills", int(w.mercenary.Kills%50), 50, Color(mercenaryInfoKillsColor), true),
 			companionInfoRow("Faith", fmt.Sprintf("%d", w.mercenary.Faith)),
-		).Gap(homunculusInfoRowGap),
-	).Gap(homunculusInfoColumnGap).CrossAlign(primitives.CrossAxisStart)
+		).Gap(float32(homunculusInfoRowGap)),
+	).Gap(float32(homunculusInfoColumnGap)).CrossAlign(primitives.CrossAxisStart)
 }
 
 func (w *CompanionWindow) stableTab(ctx Context) widget.Widget {
@@ -495,15 +469,15 @@ func (w *CompanionWindow) homunculusRow(row network.StableHomunculusEntry) widge
 	label := primitives.Box(
 		rotheme.Text(fmt.Sprintf("%s  (%s)", name, badge)),
 		rotheme.Text(meta).Color(rotheme.Default.Colors.MutedText),
-	).Gap(2)
+	).Gap(float32(companionRowTextGap))
 	rowWidgets := []widget.Widget{primitives.Expanded(label)}
 	if !active {
 		id := row.HomunID
 		rowWidgets = append(rowWidgets, rotheme.Button("Swap in", func() {
 			w.emit(CompanionWindowAction{Kind: CompanionActionHomunculusSwap, HomunculusID: id})
-		}).Width(72))
+		}).Width(float32(companionButtonW)))
 	}
-	return primitives.HBox(rowWidgets...).Gap(8).CrossAlign(primitives.CrossAxisCenter).Height(float32(companionWindowRowH + 8))
+	return primitives.HBox(rowWidgets...).Gap(float32(companionRowGap)).CrossAlign(primitives.CrossAxisCenter).Height(float32(companionListRowH))
 }
 
 func (w *CompanionWindow) petRow(_ Context, row network.StablePetEntry) widget.Widget {
@@ -521,7 +495,7 @@ func (w *CompanionWindow) petRow(_ Context, row network.StablePetEntry) widget.W
 	label := primitives.Box(
 		rotheme.Text(title),
 		rotheme.Text(sub).Color(rotheme.Default.Colors.MutedText),
-	).Gap(2)
+	).Gap(float32(companionRowTextGap))
 	bg := rotheme.Default.Colors.WindowBody
 	if selected {
 		bg = rotheme.Default.Colors.ButtonHover
@@ -533,11 +507,11 @@ func (w *CompanionWindow) petRow(_ Context, row network.StablePetEntry) widget.W
 		rotheme.Button("Details", func() {
 			w.selectedPetID = id
 			w.refresh(w.ctx)
-		}).Width(72),
+		}).Width(float32(companionButtonW)),
 	).
-		Gap(8).
+		Gap(float32(companionRowGap)).
 		CrossAlign(primitives.CrossAxisCenter).
-		Height(float32(companionWindowRowH + 8)).
+		Height(float32(companionListRowH)).
 		Background(bg)
 }
 
@@ -566,37 +540,37 @@ func (w *CompanionWindow) petDetail(ctx Context, row network.StablePetEntry) wid
 		id := row.PetID
 		actions = append(actions, rotheme.Button("Deposit egg", func() {
 			w.emit(CompanionWindowAction{Kind: CompanionActionPetDepositEgg, PetID: id})
-		}).Width(100))
+		}).Width(float32(companionWideButtonW)))
 	} else if !active {
 		id := row.PetID
 		actions = append(actions, rotheme.Button("Summon", func() {
 			w.emit(CompanionWindowAction{Kind: CompanionActionPetSummon, PetID: id})
-		}).Width(80))
+		}).Width(float32(companionMediumButtonW)))
 	}
 	if !egg {
 		id := row.PetID
 		actions = append(actions, rotheme.Button("To egg", func() {
 			w.emit(CompanionWindowAction{Kind: CompanionActionPetToEgg, PetID: id})
-		}).Width(72))
+		}).Width(float32(companionButtonW)))
 	}
 	if !egg && active {
 		id := row.PetID
 		actions = append(actions, rotheme.Button("Feed", func() {
 			w.emit(CompanionWindowAction{Kind: CompanionActionPetFeed, PetID: id})
-		}).Width(72))
+		}).Width(float32(companionButtonW)))
 		if row.Equip != 0 {
 			actions = append(actions, rotheme.Button("Unequip", func() {
 				w.emit(CompanionWindowAction{Kind: CompanionActionPetUnequip, PetID: id})
-			}).Width(80))
+			}).Width(float32(companionMediumButtonW)))
 		}
 		if row.Intimate >= 900 {
 			actions = append(actions, rotheme.Button("Evolve", func() {
 				w.emit(CompanionWindowAction{Kind: CompanionActionPetEvolve, PetID: id})
-			}).Width(72))
+			}).Width(float32(companionButtonW)))
 		}
 	}
 	if len(actions) > 0 {
-		children = append(children, primitives.HBox(actions...).Gap(6))
+		children = append(children, primitives.HBox(actions...).Gap(float32(companionActionGap)))
 	}
 	if len(w.owned) > 0 {
 		children = append(children, rotheme.Text("Owned evolution materials (inventory + storage)").Color(rotheme.Default.Colors.MutedText))
@@ -604,13 +578,13 @@ func (w *CompanionWindow) petDetail(ctx Context, row network.StablePetEntry) wid
 			children = append(children, companionInfoRow(companionItemName(ctx, entry.ItemID), fmt.Sprintf("%d", entry.Owned)))
 		}
 	}
-	return primitives.Box(children...).Gap(4).Padding(6).Background(Color(PanelAltColor))
+	return primitives.Box(children...).Gap(float32(companionDetailGap)).Padding(float32(companionDetailPad)).Background(Color(PanelAltColor))
 }
 
 func (w *CompanionWindow) scrollBox(children ...widget.Widget) widget.Widget {
 	w.ensureScroll()
 	return scrollview.New(
-		primitives.Box(children...).Gap(8).CrossAlign(primitives.CrossAxisStretch),
+		primitives.Box(children...).Gap(float32(companionListGap)).CrossAlign(primitives.CrossAxisStretch),
 		scrollview.DirectionOpt(scrollview.Vertical),
 		scrollview.ScrollbarOpt(scrollview.ScrollbarAuto),
 		scrollview.ScrollYSignal(w.scrollY),
@@ -663,13 +637,13 @@ func (w *CompanionWindow) stateSnapshot() string {
 
 func companionInfoRow(label, value string) widget.Widget {
 	return primitives.HBox(
-		primitives.Box(rotheme.Text(label).Color(rotheme.Default.Colors.MutedText)).Width(companionDetailLabelW),
+		primitives.Box(rotheme.Text(label).Color(rotheme.Default.Colors.MutedText)).Width(float32(companionDetailLabelW)),
 		rotheme.Text(value),
-	).Gap(8).CrossAlign(primitives.CrossAxisCenter).Height(float32(companionWindowRowH))
+	).Gap(float32(companionRowGap)).CrossAlign(primitives.CrossAxisCenter).Height(float32(companionWindowRowH))
 }
 
 func companionEmptyText(text string) widget.Widget {
-	return primitives.Box(rotheme.Text(text).Color(rotheme.Default.Colors.MutedText)).Padding(4)
+	return primitives.Box(rotheme.Text(text).Color(rotheme.Default.Colors.MutedText)).Padding(float32(companionEmptyPad))
 }
 
 func CompanionClassName(classID int) string {

@@ -17,19 +17,7 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	storageTabW         = 32
-	storageTabH         = 40
-	storageTabOver      = 1
-	storageTabRailW     = storageTabW + storageTabOver*2
-	storageTableViewW   = 312
-	storageWindowWidth  = storageTabRailW + verticalTabDividerW + storageTableViewW
-	storageWindowTitleH = ROWindowTitleHeight
-	storageRowH         = 32
-	storageRows         = 9
-	storageTableViewH   = storageRows * storageRowH
-	storageWindowHeight = storageWindowTitleH + storageTableViewH + ROWindowFooterHeight
-)
+const storageTabOver = 1
 
 type StorageWindow struct {
 	Window
@@ -69,6 +57,7 @@ func (w *StorageWindow) SetOpen(open bool) {
 
 func (w *StorageWindow) OpenWindow(ctx Context) {
 	w.EnsureWindow(storageWindowWidth, storageWindowHeight)
+	w.SetSize(storageWindowWidth, storageWindowHeight)
 	w.updateCategoryCounts(ctx.Session)
 	w.selectFirstNonEmptyTab(ctx.Session)
 	w.ClampScroll(ctx.Session)
@@ -81,6 +70,10 @@ func (w *StorageWindow) OpenWindow(ctx Context) {
 	} else {
 		w.SetContent(w.widgetTree(ctx, w.itemInfo))
 	}
+	w.OnLayoutReload(func() {
+		w.SetSize(storageWindowWidth, storageWindowHeight)
+		w.SetContent(w.widgetTree(ctx, w.itemInfo))
+	})
 	w.Publish(ctx)
 }
 
@@ -197,12 +190,12 @@ func (w *StorageWindow) widgetTree(ctx Context, itemInfo *ItemWindows) widget.Wi
 			w.close(ctx)
 			w.Publish(ctx)
 		}),
-		Size(storageWindowWidth, storageWindowHeight),
+		Size(float32(storageWindowWidth), float32(storageWindowHeight)),
 		Content(
 			verticalTabFrame(
 				w.tabColumn(ctx),
 				primitives.Box(w.storageTableWidget(ctx)).
-					Width(storageTableViewW).
+					Width(float32(storageTableViewW)).
 					Height(storageTableViewHeight()).
 					Background(rotheme.Default.Colors.PanelBody),
 			),
@@ -219,9 +212,9 @@ func (w *StorageWindow) storageTableWidget(ctx Context) *rotheme.TableViewWidget
 	rows := w.storageRows(ctx, items)
 	icons := w.storageItemIcons(ctx, items)
 	return rotheme.TableView(
-		rotheme.TableViewColumns(storageTableColumns),
+		rotheme.TableViewColumns(storageTableColumns()),
 		rotheme.TableViewRowCount(len(rows)),
-		rotheme.TableViewRowHeight(storageRowH),
+		rotheme.TableViewRowHeight(float32(storageRowH)),
 		rotheme.TableViewShowHeader(false),
 		rotheme.TableViewEmptyText("No items"),
 		rotheme.TableViewScrollYSignal(w.ensureScrollSignal()),
@@ -279,12 +272,13 @@ func (w *StorageWindow) tabColumn(ctx Context) widget.Widget {
 		}))
 	}
 	return primitives.Box(tabs...).
-		Width(storageTabRailW).
-		Height(storageTableViewH).
+		Width(float32(storageTabRailW)).
+		Height(float32(storageTableViewH)).
 		Gap(-storageTabOver)
 }
 
 func (w *StorageWindow) refresh(ctx Context, itemInfo *ItemWindows) {
+	w.SetSize(storageWindowWidth, storageWindowHeight)
 	w.updateCategoryCounts(ctx.Session)
 	w.ClampScroll(ctx.Session)
 	w.snapshot = w.storageSnapshot(ctx.Session)
@@ -576,16 +570,18 @@ func (w *StorageWindow) itemAt(s *session.Session, mx, my int) (session.Inventor
 
 func storageDefaultPosition(ctx Context) (int, int) {
 	width, _ := ctx.ScreenSize()
-	return maxInt(windowScreenMargin, width-storageWindowWidth-windowScreenMargin), 118
+	return maxInt(windowScreenMargin, width-storageWindowWidth-windowScreenMargin), storageScreenTop
 }
 
 func storageTableViewHeight() float32 {
-	return storageTableViewH
+	return float32(storageTableViewH)
 }
 
-var storageTableColumns = []rotheme.TableViewColumn{
-	{Key: "item", Title: "Item", Flex: 1, MinWidth: 120},
-	{Key: "amount", Title: "Qty", Width: 76, Align: widget.TextAlignRight},
+func storageTableColumns() []rotheme.TableViewColumn {
+	return []rotheme.TableViewColumn{
+		{Key: "item", Title: "Item", Flex: 1, MinWidth: storageItemMinW},
+		{Key: "amount", Title: "Qty", Width: storageAmountW, Align: widget.TextAlignRight},
+	}
 }
 
 func storageTableViewRowAt(mx, my, tableX, tableY, tableW, tableH, rowCount int, scrollY float32) (int, bool) {

@@ -11,14 +11,6 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	escapeMenuWidth        = 252
-	escapeMenuHeight       = 200
-	escapeMenuReviveHeight = 238
-	escapeMenuPad          = 16
-	escapeMenuGap          = 8
-)
-
 type EscapeMenu struct {
 	Window
 	action        EscapeMenuAction
@@ -55,7 +47,13 @@ func (m *EscapeMenu) Toggle(ctx client.Context) {
 	}
 	m.CloseOnEsc = true
 	m.Window.Open(ctx, m.widgetTree(ctx))
+	m.OnLayoutReload(m.reloadForLayout)
 	m.Publish(ctx)
+}
+
+func (m *EscapeMenu) reloadForLayout() {
+	m.SetSize(escapeMenuWidth, m.menuHeight(m.ctx))
+	m.SetContent(m.widgetTree(m.ctx))
 }
 
 // OpenDeath switches the regular escape menu to its death variant and opens it.
@@ -68,6 +66,7 @@ func (m *EscapeMenu) OpenDeath(ctx client.Context) {
 	m.pending = false
 	m.pendingAction = EscapeMenuActionNone
 	m.CloseOnEsc = true
+	m.OnLayoutReload(m.reloadForLayout)
 	if m.IsOpen() {
 		m.SetContent(m.widgetTree(ctx))
 	} else {
@@ -275,7 +274,7 @@ func (m *EscapeMenu) widgetTree(ctx client.Context) widget.Widget {
 	return Win(
 		Title("Menu"),
 		CloseButton(false),
-		Size(escapeMenuWidth, escapeMenuHeight),
+		Size(float32(escapeMenuWidth), float32(escapeMenuHeight)),
 		Content(
 			primitives.Box(
 				rotheme.LargeButtonDisabled("Character Select", m.pending, func() {
@@ -293,8 +292,8 @@ func (m *EscapeMenu) widgetTree(ctx client.Context) widget.Widget {
 					m.RequestQuitGame(ctx)
 				}),
 			).
-				Padding(escapeMenuPad).
-				Gap(escapeMenuGap).
+				Padding(float32(escapeMenuPad)).
+				Gap(float32(escapeMenuGap)).
 				CrossAlign(primitives.CrossAxisStretch),
 		),
 	)
@@ -327,11 +326,11 @@ func (m *EscapeMenu) deathWidgetTree(ctx client.Context) widget.Widget {
 	return Win(
 		Title("Menu"),
 		CloseButton(false),
-		Size(escapeMenuWidth, float32(m.menuHeight(ctx))),
+		Size(float32(escapeMenuWidth), float32(m.menuHeight(ctx))),
 		Content(
 			primitives.Box(buttons...).
-				Padding(escapeMenuPad).
-				Gap(escapeMenuGap).
+				Padding(float32(escapeMenuPad)).
+				Gap(float32(escapeMenuGap)).
 				CrossAlign(primitives.CrossAxisStretch),
 		),
 	)

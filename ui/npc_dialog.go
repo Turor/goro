@@ -20,33 +20,10 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	npcDialogMaxMessages = 32
-	npcMenuMinRows       = 4
-	npcMenuMaxRows       = 5
-	npcInputNumberWidth  = 174
-	npcInputTextWidth    = 274
-	npcInputTextHeight   = 32
-	npcInputNumberHeight = 52
-	npcInputMaxLength    = 80
-)
-
-// NPC dialog and menu geometry are layout tokens (see layout_tokens.go).
-var (
-	npcDialogWidth   = 360
-	npcDialogHeight  = 260
-	npcDialogPad     = 12
-	npcDialogButtonW = 78
-	npcDialogLineH   = 14
-	npcMenuWidth     = 260
-	npcMenuRowH      = 20
-	npcMenuPad       = 8
-)
-
-var (
-	npcDialogTextColor  = TextColor
-	npcDialogMutedColor = MutedTextColor
-)
+const npcDialogMaxMessages = 32   // theme:ok dialog message history cap
+const npcInputMaxLength = 80      // theme:ok input character limit
+const npcDialogColorCodeLen = 7   // theme:ok color code byte length
+const npcDialogHexLetterBase = 10 // theme:ok hex letter value
 
 type npcDialogAction int
 
@@ -273,8 +250,8 @@ func (d *NPCDialog) Control(ctx Context, action string) bool {
 			rowH := float32(npcMenuRowH)
 			if top < scroll.Get() {
 				scroll.Set(top)
-			} else if bottom := top + rowH; bottom > scroll.Get()+npcMenuMaxRows*rowH {
-				scroll.Set(bottom - npcMenuMaxRows*rowH)
+			} else if bottom := top + rowH; bottom > scroll.Get()+float32(npcMenuMaxRows)*rowH {
+				scroll.Set(bottom - float32(npcMenuMaxRows)*rowH)
 			}
 			d.dirty = true
 			d.refresh(ctx)
@@ -495,11 +472,29 @@ func (d *NPCDialog) openWindows(ctx Context) bool {
 		changed = true
 	}
 	d.dirty = false
+	d.bindLayoutReload(ctx)
 	if changed {
 		d.focusInput()
 		d.publish(ctx)
 	}
 	return changed
+}
+
+func (d *NPCDialog) bindLayoutReload(ctx Context) {
+	reload := func() {
+		d.layoutGen = rotheme.Generation()
+		d.dirty = true
+		d.openWindows(ctx)
+	}
+	if d.dialogWindow.IsOpen() {
+		d.dialogWindow.OnLayoutReload(reload)
+	}
+	if d.menuWindow.IsOpen() {
+		d.menuWindow.OnLayoutReload(reload)
+	}
+	if d.inputWindow.IsOpen() {
+		d.inputWindow.OnLayoutReload(reload)
+	}
 }
 
 func (d *NPCDialog) closeWindows() {
@@ -567,7 +562,7 @@ func (d *NPCDialog) dialogTree(ctx Context, width, height int) widget.Widget {
 		lines = append(lines, rotheme.Text(""))
 	}
 	if d.status != "" {
-		lines = append(lines, rotheme.Text(trimRunes(d.status, 64)).Color(npcDialogWidgetColor(ErrorTextColor)))
+		lines = append(lines, rotheme.Text(trimRunes(d.status, 64)).Color(npcDialogWidgetColor(ErrorTextColor))) // theme:ok status length limit
 	} else if d.action == npcDialogActionNone {
 		lines = append(lines,
 			primitives.Box(
@@ -583,7 +578,7 @@ func (d *NPCDialog) dialogTree(ctx Context, width, height int) widget.Widget {
 		Content(
 			primitives.Box(lines...).
 				Padding(float32(npcDialogPad)).
-				Gap(2),
+				Gap(float32(npcDialogLineGap)),
 		),
 	}
 	if footer != nil {
@@ -603,35 +598,35 @@ func (d *NPCDialog) inputTree(ctx Context, width, height int) widget.Widget {
 	if d.action == npcDialogActionNumberInput {
 		label = "Input number"
 	}
-	children := make([]widget.Widget, 0, 2)
+	children := make([]widget.Widget, 0, 2) // theme:ok input child capacity
 	if label != "" {
-		children = append(children, rotheme.Text(label).Color(npcDialogWidgetColor(TextColor)))
+		children = append(children, rotheme.Text(label).Color(npcDialogWidgetColor(npcDialogTextColor)))
 	}
 	children = append(children,
 		primitives.HBox(
 			primitives.Expanded(
 				primitives.Box(d.inputWidget(ctx)).
-					Height(22).
+					Height(float32(npcInputFieldH)).
 					CrossAlign(primitives.CrossAxisStretch),
 			),
 			rotheme.Button("OK", func() {
 				d.submitInput(ctx)
-			}).Width(42),
+			}).Width(float32(npcInputButtonW)),
 		).
-			Gap(8).
+			Gap(float32(npcInputRowGap)).
 			CrossAlign(primitives.CrossAxisCenter),
 	)
 	return primitives.Box(
 		primitives.Box(children...).
-			PaddingXY(10, 5).
-			Gap(3).
+			PaddingXY(float32(npcInputPadX), float32(npcInputPadY)).
+			Gap(float32(npcInputGap)).
 			CrossAlign(primitives.CrossAxisStretch),
 	).
 		Width(float32(width)).
 		Height(float32(height)).
-		Background(widget.RGBA8(255, 255, 255, 255)).
-		BorderStyle(1, widget.RGBA8(193, 198, 194, 255)).
-		Rounded(5)
+		Background(npcInputBg).
+		BorderStyle(npcInputBorderW, npcInputBorder).
+		Rounded(npcInputRadius)
 }
 
 func (d *NPCDialog) inputWidget(ctx Context) *textfield.Widget {
@@ -664,8 +659,8 @@ func (d *NPCDialog) focusInput() {
 }
 
 func (d *NPCDialog) dialogLineWidgets(width, contentHeight int) []widget.Widget {
-	lineMax := maxInt(12, (width-2*npcDialogPad)/7)
-	maxLines := maxInt(1, (contentHeight-2*npcDialogPad)/npcDialogLineH)
+	lineMax := maxInt(npcDialogMinRunes, (width-npcDialogPad*2)/npcDialogRuneW)
+	maxLines := maxInt(1, (contentHeight-npcDialogPad*2)/npcDialogLineH)
 	wrapped := wrapNPCDialogLines(d.lines, lineMax)
 	if len(wrapped) > maxLines {
 		wrapped = wrapped[len(wrapped)-maxLines:]
@@ -716,7 +711,7 @@ func (d *NPCDialog) menuList(ctx Context) widget.Widget {
 			// Item clicks arrive before the list updates its selection.
 			d.menuRow = index
 			now := time.Now()
-			if lastClickRow == index && now.Sub(lastClickAt) <= 360*time.Millisecond {
+			if lastClickRow == index && now.Sub(lastClickAt) <= 360*time.Millisecond { // theme:ok double-click interval
 				lastClickRow = -1
 				lastClickAt = time.Time{}
 				d.chooseSelected(ctx)
@@ -730,7 +725,7 @@ func (d *NPCDialog) menuList(ctx Context) widget.Widget {
 				return rotheme.SelectListRow("", true, float32(npcMenuRowH))
 			}
 			label := fmt.Sprintf("%d. %s", item.Index+1, npcDialogRunsPlainText(npcDialogTextRuns(d.options[item.Index], npcDialogTextColor)))
-			return rotheme.SelectListRow(trimRunes(label, 34), true, float32(npcMenuRowH))
+			return rotheme.SelectListRow(trimRunes(label, 34), true, float32(npcMenuRowH)) // theme:ok menu label length limit
 		}),
 	)
 	lv.SetFocused(true)
@@ -769,7 +764,7 @@ func npcDialogRunsPlainText(runs []npcDialogTextRun) string {
 }
 
 func npcDialogWidgetColor(c color.RGBA) widget.Color {
-	return widget.RGBA8(c.R, c.G, c.B, c.A)
+	return Color(c)
 }
 
 type npcDialogTextLineWidget struct {
@@ -836,12 +831,12 @@ func npcDialogTextSegments(runs []npcDialogTextRun, measure func(string) float32
 }
 
 func npcDialogEstimatedTextWidth(text string) float32 {
-	return float32(utf8.RuneCountInString(text)) * rotheme.Default.Typography.TextSize * 0.6
+	return float32(utf8.RuneCountInString(text)) * rotheme.Default.Typography.TextSize * npcDialogCharWidth
 }
 
 func npcDialogBounds(width, height int) (int, int, int, int) {
-	w := minInt(npcDialogWidth, maxInt(260, width-2*windowScreenMargin))
-	h := minInt(npcDialogHeight, maxInt(130, height-2*windowScreenMargin))
+	w := minInt(npcDialogWidth, maxInt(npcDialogMinW, width-windowScreenMargin*2))
+	h := minInt(npcDialogHeight, maxInt(npcDialogMinH, height-windowScreenMargin*2))
 	x := (width - w) / 2
 	y := (height - h) / 2
 	if x < windowScreenMargin {
@@ -854,11 +849,11 @@ func npcDialogBounds(width, height int) (int, int, int, int) {
 }
 
 func (d *NPCDialog) menuBounds(width, height, dialogX, dialogY, dialogW, dialogH int) (int, int, int, int) {
-	w := minInt(npcMenuWidth, maxInt(220, width-2*windowScreenMargin))
+	w := minInt(npcMenuWidth, maxInt(npcMenuMinW, width-windowScreenMargin*2))
 	rows := maxInt(npcMenuMinRows, minInt(len(d.options), npcMenuMaxRows))
 	h := ROWindowTitleHeight + npcMenuPad*2 + maxInt(npcMenuMinRows, rows)*npcMenuRowH + ROWindowFooterHeight
 	x := dialogX + (dialogW-w)/2
-	y := dialogY + dialogH + 8
+	y := dialogY + dialogH + npcPromptGap
 	x = clampWindowInt(x, windowScreenMargin, maxInt(windowScreenMargin, width-w-windowScreenMargin))
 	y = clampWindowInt(y, windowScreenMargin, maxInt(windowScreenMargin, height-h-windowScreenMargin))
 	return x, y, w, h
@@ -871,9 +866,9 @@ func (d *NPCDialog) inputBounds(width, height, dialogX, dialogY, dialogW, dialog
 		w = npcInputNumberWidth
 		h = npcInputNumberHeight
 	}
-	w = minInt(w, maxInt(140, width-2*windowScreenMargin))
+	w = minInt(w, maxInt(npcInputMinW, width-windowScreenMargin*2))
 	x := dialogX + (dialogW-w)/2
-	y := dialogY + dialogH + 8
+	y := dialogY + dialogH + npcPromptGap
 	x = clampWindowInt(x, windowScreenMargin, maxInt(windowScreenMargin, width-w-windowScreenMargin))
 	y = clampWindowInt(y, windowScreenMargin, maxInt(windowScreenMargin, height-h-windowScreenMargin))
 	return x, y, w, h
@@ -893,8 +888,8 @@ func (d *NPCDialog) title(ctx Context) string {
 }
 
 func wrapNPCDialogLines(lines []string, maxRunes int) [][]npcDialogTextRun {
-	if maxRunes < 8 {
-		maxRunes = 8
+	if maxRunes < npcDialogWrapMin {
+		maxRunes = npcDialogWrapMin
 	}
 	var out [][]npcDialogTextRun
 	for _, line := range lines {
@@ -925,7 +920,7 @@ func npcDialogTextRuns(text string, base color.RGBA) []npcDialogTextRun {
 		if c, ok := parseNPCDialogColorCode(text, i, base); ok {
 			flush()
 			current = c
-			i += 7
+			i += npcDialogColorCodeLen
 			continue
 		}
 		r, size := utf8.DecodeRuneInString(text[i:])
@@ -937,7 +932,7 @@ func npcDialogTextRuns(text string, base color.RGBA) []npcDialogTextRun {
 }
 
 func parseNPCDialogColorCode(text string, at int, base color.RGBA) (color.RGBA, bool) {
-	if at+7 > len(text) || text[at] != '^' {
+	if at+npcDialogColorCodeLen > len(text) || text[at] != '^' {
 		return color.RGBA{}, false
 	}
 	var value [6]byte
@@ -951,12 +946,12 @@ func parseNPCDialogColorCode(text string, at int, base color.RGBA) (color.RGBA, 
 	if strings.EqualFold(string(value[:]), "000000") {
 		return base, true
 	}
-	return color.RGBA{
-		R: npcDialogHexByte(value[0], value[1]),
-		G: npcDialogHexByte(value[2], value[3]),
-		B: npcDialogHexByte(value[4], value[5]),
-		A: 255,
-	}, true
+	parsed := color.RGBA{}
+	parsed.R = npcDialogHexByte(value[0], value[1])
+	parsed.G = npcDialogHexByte(value[2], value[3])
+	parsed.B = npcDialogHexByte(value[4], value[5])
+	parsed.A = uint8(npcDialogColorCodeA)
+	return parsed, true
 }
 
 func isNPCDialogHex(c byte) bool {
@@ -972,9 +967,9 @@ func npcDialogHexNibble(c byte) uint8 {
 	case c >= '0' && c <= '9':
 		return c - '0'
 	case c >= 'A' && c <= 'F':
-		return c - 'A' + 10
+		return c - 'A' + npcDialogHexLetterBase
 	case c >= 'a' && c <= 'f':
-		return c - 'a' + 10
+		return c - 'a' + npcDialogHexLetterBase
 	default:
 		return 0
 	}

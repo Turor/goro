@@ -15,14 +15,6 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	makingArrowWindowWidth  = 312
-	makingArrowTableHeaderH = 24
-	makingArrowRowH         = 32
-	makingArrowRows         = 6
-	makingArrowWindowHeight = ROWindowTitleHeight + makingArrowTableHeaderH + makingArrowRows*makingArrowRowH + ROWindowFooterHeight
-)
-
 type MakingArrowWindow struct {
 	Window
 	scrollY      state.Signal[float32]
@@ -36,6 +28,7 @@ type MakingArrowWindow struct {
 
 func (w *MakingArrowWindow) OpenList(ctx Context, list network.MakingArrowList) {
 	w.EnsureWindow(makingArrowWindowWidth, makingArrowWindowHeight)
+	w.SetSize(makingArrowWindowWidth, makingArrowWindowHeight)
 	w.itemIDs = append(w.itemIDs[:0], list.ItemIDs...)
 	w.selectedRow = 0
 	w.lastClickRow = -1
@@ -48,6 +41,10 @@ func (w *MakingArrowWindow) OpenList(ctx Context, list network.MakingArrowList) 
 		return
 	}
 	w.Open(ctx, w.widgetTree(ctx))
+	w.OnLayoutReload(func() {
+		w.SetSize(makingArrowWindowWidth, makingArrowWindowHeight)
+		w.SetContent(w.widgetTree(ctx))
+	})
 	w.Publish(ctx)
 }
 
@@ -65,7 +62,7 @@ func (w *MakingArrowWindow) Update(ctx Context) bool {
 	consumed := w.Window.Update(ctx)
 	keyboardConsumed := false
 	if w.IsOpen() {
-		keyboardConsumed = updateSelectionTableKeyboard(ctx, &w.selectedRow, len(w.itemIDs), makingArrowRows, makingArrowRowH, w.ensureScrollSignal(), func() {
+		keyboardConsumed = updateSelectionTableKeyboard(ctx, &w.selectedRow, len(w.itemIDs), makingArrowRows, float32(makingArrowRowH), w.ensureScrollSignal(), func() {
 			w.confirm(ctx)
 		})
 		if keyboardConsumed && w.IsOpen() {
@@ -87,7 +84,7 @@ func (w *MakingArrowWindow) widgetTree(ctx Context) widget.Widget {
 			w.cancel(ctx)
 			w.Publish(ctx)
 		}),
-		Size(makingArrowWindowWidth, makingArrowWindowHeight),
+		Size(float32(makingArrowWindowWidth), float32(makingArrowWindowHeight)),
 		Content(
 			primitives.Box(w.tableWidget(ctx)).
 				Height(makingArrowTableHeight()).
@@ -112,8 +109,8 @@ func (w *MakingArrowWindow) tableWidget(ctx Context) *rotheme.TableViewWidget {
 	return itemTableView(
 		w.itemTableRows(ctx, ids),
 		"Item",
-		makingArrowRowH,
-		makingArrowTableHeaderH,
+		float32(makingArrowRowH),
+		float32(makingArrowTableHeaderH),
 		"No arrow materials",
 		w.ensureScrollSignal(),
 		w.selectedRow,
@@ -157,7 +154,7 @@ func (w *MakingArrowWindow) rowAtMouse(mouseX, mouseY int) (int, bool) {
 	if !pointInRect(mouseX, mouseY, tableX, rowY, scrollbarSafeIntWidth(makingArrowWindowWidth), makingArrowRows*makingArrowRowH) {
 		return 0, false
 	}
-	row := int((float32(mouseY-rowY) + w.ensureScrollSignal().Get()) / makingArrowRowH)
+	row := int((float32(mouseY-rowY) + w.ensureScrollSignal().Get()) / float32(makingArrowRowH))
 	if row < 0 || row >= len(w.itemIDs) {
 		return 0, false
 	}
@@ -223,5 +220,5 @@ func (w *MakingArrowWindow) ensureScrollSignal() state.Signal[float32] {
 }
 
 func makingArrowTableHeight() float32 {
-	return makingArrowTableHeaderH + makingArrowRows*makingArrowRowH
+	return float32(makingArrowTableHeaderH + makingArrowRows*makingArrowRowH)
 }

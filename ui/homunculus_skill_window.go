@@ -17,22 +17,25 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	homunculusSkillWindowWidth  = 360
-	homunculusSkillWindowHeight = 300
-	homunculusSkillTableViewH   = homunculusSkillWindowHeight - ROWindowTitleHeight - ROWindowFooterHeight
-	homunculusSkillTableBodyH   = homunculusSkillTableViewH - skillHeaderH
-)
+func homunculusSkillTableViewH() int {
+	return homunculusSkillWindowHeight - ROWindowTitleHeight - ROWindowFooterHeight
+}
 
-var companionSkillTableColumns = []rotheme.TableViewColumn{
-	{Key: "icon", Width: 34},
-	{Key: "type", Width: 16},
-	{Key: "name", Title: "Name", Width: 142},
-	{Key: "level", Title: "Lv", Width: 40, Align: widget.TextAlignCenter},
-	{Key: "sp", Title: "SP", Width: 38},
-	{Key: "range", Title: "Range", Width: 56},
-	{Key: "levelup", Width: 22},
-	{Key: "fill", Flex: 1},
+func homunculusSkillTableBodyH() int {
+	return homunculusSkillTableViewH() - skillHeaderH
+}
+
+func companionSkillTableColumns() []rotheme.TableViewColumn {
+	return []rotheme.TableViewColumn{
+		{Key: "icon", Width: float32(homunculusSkillColIcon)},
+		{Key: "type", Width: float32(homunculusSkillColType)},
+		{Key: "name", Title: "Name", Width: float32(homunculusSkillColName)},
+		{Key: "level", Title: "Lv", Width: float32(homunculusSkillColLevel), Align: widget.TextAlignCenter},
+		{Key: "sp", Title: "SP", Width: float32(homunculusSkillColSP)},
+		{Key: "range", Title: "Range", Width: float32(homunculusSkillColRange)},
+		{Key: "levelup", Width: float32(homunculusSkillColLevelUp)},
+		{Key: "fill", Flex: 1},
+	}
 }
 
 type HomunculusSkillWindow struct {
@@ -196,7 +199,7 @@ func (w *HomunculusSkillWindow) UpdateDrag(ctx Context, shortcuts *ShortcutBar) 
 }
 
 func (w *HomunculusSkillWindow) DrawDragGhost(screen *render.Frame, ctx Context, assets AssetProvider) {
-	if w.dragActive && screen != nil && ctx.Input != nil && time.Since(w.dragFrom) > 80*time.Millisecond && assets != nil {
+	if w.dragActive && screen != nil && ctx.Input != nil && time.Since(w.dragFrom) > 80*time.Millisecond && assets != nil { // theme:ok drag ghost delay
 		assets.DrawSkillIcon(screen, ctx.Resources, w.dragSkill, ctx.Input.MouseX-skillIconSize/2, ctx.Input.MouseY-skillIconSize/2, skillIconSize)
 	}
 }
@@ -228,6 +231,10 @@ func (w *HomunculusSkillWindow) openAtDefault(ctx Context) {
 	w.snapshot = w.skillSnapshot(ctx.Session)
 	w.SetAutoPosition(x, y)
 	w.Window.Open(ctx, w.widgetTree(ctx, w.actions))
+	w.OnLayoutReload(func() {
+		w.SetSize(homunculusSkillWindowWidth, homunculusSkillWindowHeight)
+		w.SetContent(w.widgetTree(w.ctx, w.actions))
+	})
 	w.Publish(ctx)
 }
 
@@ -260,12 +267,12 @@ func (w *HomunculusSkillWindow) widgetTreeWithAssets(ctx Context, assets AssetPr
 		OnClose(func() {
 			w.close(ctx)
 		}),
-		Size(homunculusSkillWindowWidth, homunculusSkillWindowHeight),
+		Size(float32(homunculusSkillWindowWidth), float32(homunculusSkillWindowHeight)),
 		Content(
 			primitives.Box(
 				w.skillTableWidget(ctx, assets, actions),
 			).
-				Height(homunculusSkillTableViewH).
+				Height(float32(homunculusSkillTableViewH())).
 				Background(rotheme.Default.Colors.PanelBody),
 		),
 		Footer(
@@ -286,10 +293,10 @@ func (w *HomunculusSkillWindow) widgetTreeWithAssets(ctx Context, assets AssetPr
 func (w *HomunculusSkillWindow) skillTableWidget(ctx Context, assets AssetProvider, actions GameActions) *rotheme.TableViewWidget {
 	skills := w.visibleSkills(ctx)
 	return rotheme.TableView(
-		rotheme.TableViewColumns(companionSkillTableColumns),
+		rotheme.TableViewColumns(companionSkillTableColumns()),
 		rotheme.TableViewRowCount(len(skills)),
-		rotheme.TableViewRowHeight(skillRowH),
-		rotheme.TableViewHeaderHeight(skillHeaderH),
+		rotheme.TableViewRowHeight(float32(skillRowH)),
+		rotheme.TableViewHeaderHeight(float32(skillHeaderH)),
 		rotheme.TableViewEmptyText(fmt.Sprintf("No %s skills received from server yet.", w.kindLabelLower())),
 		rotheme.TableViewScrollYSignal(w.ensureScrollSignal()),
 		rotheme.TableViewDispatchHoverToCells(false),
@@ -321,7 +328,7 @@ func (w *HomunculusSkillWindow) skillTableCell(ctx Context, assets AssetProvider
 		}
 	case "name":
 		return rotheme.TableViewSimpleCell{
-			Text:  trimRunes(skillDisplayName(ctx.Resources, display), 18),
+			Text:  trimRunes(skillDisplayName(ctx.Resources, display), 18), // theme:ok skill name length limit
 			Color: nameColor,
 		}
 	case "level":
@@ -405,7 +412,7 @@ func (w *HomunculusSkillWindow) pressSkill(ctx Context, actions GameActions, ski
 		return
 	}
 	now := time.Now()
-	if w.lastClick == skill.ID && now.Sub(w.lastClickAt) <= 360*time.Millisecond {
+	if w.lastClick == skill.ID && now.Sub(w.lastClickAt) <= 360*time.Millisecond { // theme:ok double-click window
 		w.lastClick = 0
 		w.lastClickAt = time.Time{}
 		if actions == nil {
@@ -509,9 +516,8 @@ func (w *HomunculusSkillWindow) showTooltip(ctx Context, skill session.Skill, mx
 		w.hideTooltip()
 		return
 	}
-	const tooltipW = 292
 	text := skillTooltipText(ctx, skill)
-	w.tooltip.ShowColoredBox(ctx, text, mx+16+tooltipW/2, my+18, tooltipW, 0)
+	w.tooltip.ShowColoredBox(ctx, text, mx+homunculusSkillTooltipDX+homunculusSkillTooltipW/2, my+homunculusSkillTooltipDY, float64(homunculusSkillTooltipW), 0)
 }
 
 func (w *HomunculusSkillWindow) updateTooltipHover(ctx Context) {
@@ -527,10 +533,10 @@ func (w *HomunculusSkillWindow) updateTooltipHover(ctx Context) {
 
 func (w *HomunculusSkillWindow) skillAtMouse(ctx Context, mouseX, mouseY int) (session.Skill, bool) {
 	x, y := w.skillTableBodyOrigin()
-	if !pointInRect(mouseX, mouseY, x, y, scrollbarSafeIntWidth(homunculusSkillWindowWidth), homunculusSkillTableBodyH) {
+	if !pointInRect(mouseX, mouseY, x, y, scrollbarSafeIntWidth(homunculusSkillWindowWidth), homunculusSkillTableBodyH()) {
 		return session.Skill{}, false
 	}
-	row := int((float32(mouseY-y) + w.ensureScrollSignal().Get()) / skillRowH)
+	row := int((float32(mouseY-y) + w.ensureScrollSignal().Get()) / float32(skillRowH))
 	skills := w.visibleSkills(ctx)
 	if row < 0 || row >= len(skills) {
 		return session.Skill{}, false
@@ -578,7 +584,7 @@ func (w *HomunculusSkillWindow) clampScroll(ctx Context) {
 }
 
 func (w *HomunculusSkillWindow) clampScrollCount(skillCount int) {
-	maxScroll := float32(maxInt(0, skillCount*skillRowH-homunculusSkillTableBodyH))
+	maxScroll := float32(maxInt(0, skillCount*skillRowH-homunculusSkillTableBodyH()))
 	scroll := w.ensureScrollSignal()
 	switch value := scroll.Get(); {
 	case value < 0:
@@ -609,8 +615,8 @@ func (w *HomunculusSkillWindow) visibleSkills(ctx Context) []session.Skill {
 
 func homunculusSkillDefaultPosition(ctx Context) (int, int) {
 	width, height := ctx.ScreenSize()
-	x := minInt(characterWindowX+characterWindowWidth+12, maxInt(windowScreenMargin, width-homunculusSkillWindowWidth-windowScreenMargin))
-	y := minInt(characterWindowY+32, maxInt(windowScreenMargin, height-homunculusSkillWindowHeight-windowScreenMargin))
+	x := minInt(characterWindowX+characterWindowWidth+homunculusSkillPosGapX, maxInt(windowScreenMargin, width-homunculusSkillWindowWidth-windowScreenMargin))
+	y := minInt(characterWindowY+homunculusSkillPosGapY, maxInt(windowScreenMargin, height-homunculusSkillWindowHeight-windowScreenMargin))
 	return maxInt(windowScreenMargin, x), maxInt(windowScreenMargin, y)
 }
 
@@ -651,7 +657,7 @@ func (w *HomunculusSkillWindow) companionSkillPoints(s *session.Session) int {
 }
 
 func companionSkillTableLevelUpButtonBounds(row int) geometry.Rect {
-	return skillTableButtonBoundsForColumns(companionSkillTableColumns, row, "levelup")
+	return skillTableButtonBoundsForColumns(companionSkillTableColumns(), row, "levelup")
 }
 
 func companionSkillByID(companion session.Companion, skillID uint16) (session.Skill, bool) {

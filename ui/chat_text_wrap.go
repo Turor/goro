@@ -128,14 +128,14 @@ func chatTextWidth(text string) int {
 func chatRuneWidth(r rune) int {
 	switch r {
 	case ' ', '\t':
-		return 4
+		return chatRuneSpaceW
 	case 'i', 'j', 'l', 'I', '.', ',', ':', ';', '!', '\'', '`', '|':
-		return 3
+		return chatRuneNarrowW
 	case 'm', 'w', 'M', 'W', '@', '#', '%', '&':
-		return 9
+		return chatRuneWideW
 	}
 	if r >= 0x1100 {
-		return 11
+		return chatRuneCJKW
 	}
-	return 7
+	return chatRuneDefaultW
 }

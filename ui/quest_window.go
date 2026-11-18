@@ -17,14 +17,9 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	questWindowW = 350
-	questWindowH = 310
-	questTabW    = 34
-	questBodyH   = questWindowH - ROWindowTitleHeight - ROWindowFooterHeight
-	questDetailW = 360
-	questDetailH = 390
-)
+func questBodyH() int {
+	return questWindowH - ROWindowTitleHeight - ROWindowFooterHeight
+}
 
 // QuestWindow owns the legacy journal and its separate detail window.
 // It displays session state; toggles only request a change from the server.
@@ -63,6 +58,10 @@ func (w *QuestWindow) OpenWindow(ctx Context) {
 	}
 	w.refreshRows(ctx)
 	w.Window.Open(ctx, w.widgetTree(ctx))
+	w.OnLayoutReload(func() {
+		w.SetSize(questWindowW, questWindowH)
+		w.SetContent(w.widgetTree(w.ctx))
+	})
 	w.Publish(ctx)
 }
 
@@ -159,7 +158,7 @@ func (w *QuestWindow) widgetTree(ctx Context) widget.Widget {
 	for tab, label := range []string{"Active", "Inactive", "All"} {
 		tabs = append(tabs, newTabWidget(tabWidgetConfig{
 			label: label, labelRotation: rotheme.TextRotationCounterClockwise,
-			active: tab == w.tab, width: questTabW, height: 70,
+			active: tab == w.tab, width: questTabW, height: questTabH,
 			onClick: func() {
 				if w.tab == tab {
 					return
@@ -172,10 +171,10 @@ func (w *QuestWindow) widgetTree(ctx Context) widget.Widget {
 			},
 		}))
 	}
-	return Win(Title("Quest"), CloseButton(true), OnClose(w.Close), Size(questWindowW, questWindowH),
+	return Win(Title("Quest"), CloseButton(true), OnClose(w.Close), Size(float32(questWindowW), float32(questWindowH)),
 		Content(verticalTabFrame(
-			primitives.Box(tabs...).Width(questTabW).Height(questBodyH).Gap(-1),
-			primitives.Box(w.questTable(ctx)).Width(questWindowW-questTabW-verticalTabDividerW).Height(questBodyH),
+			primitives.Box(tabs...).Width(float32(questTabW)).Height(float32(questBodyH())).Gap(float32(questTabOverlap)),
+			primitives.Box(w.questTable(ctx)).Width(float32(questWindowW-questTabW-verticalTabDividerW)).Height(float32(questBodyH())),
 		)),
 		Footer(primitives.Expanded(primitives.Box()),
 			rotheme.ButtonDisabledFn("View", func() bool { return w.selectedRow.Get() < 0 }, func() { w.openDetail(ctx, w.selectedID) }),
@@ -196,7 +195,7 @@ func (w *QuestWindow) questTable(ctx Context) widget.Widget {
 	}
 	return rotheme.TableView(
 		rotheme.TableViewColumns([]rotheme.TableViewColumn{{Key: "quest", Flex: 1}}),
-		rotheme.TableViewShowHeader(false), rotheme.TableViewRowCount(len(rows)), rotheme.TableViewRowHeight(32),
+		rotheme.TableViewShowHeader(false), rotheme.TableViewRowCount(len(rows)), rotheme.TableViewRowHeight(float32(questRowH)),
 		rotheme.TableViewEmptyText("No quests"), rotheme.TableViewScrollYSignal(w.scrollY), rotheme.TableViewSelectedRow(w.selectedRow),
 		rotheme.TableViewDispatchHoverToCells(false),
 		rotheme.TableViewBuildSimpleCell(func(cell rotheme.TableViewCellContext) rotheme.TableViewSimpleCell {
@@ -234,7 +233,7 @@ func (w *QuestWindow) openDetail(ctx Context, id uint32) {
 	}
 	w.detail.EnsureWindow(questDetailW, questDetailH)
 	if !w.detail.positioned {
-		w.detail.placeNew(ctx, w.x+w.width+8, w.y)
+		w.detail.placeNew(ctx, w.x+w.width+questDetailOffset, w.y)
 	}
 	if w.detailScrollY == nil {
 		w.detailScrollY = state.NewSignal[float32](0)
@@ -244,6 +243,18 @@ func (w *QuestWindow) openDetail(ctx Context, id uint32) {
 	}
 	w.detailID = id
 	w.detail.Open(ctx, w.detailTree(ctx, quest))
+	w.detail.OnLayoutReload(func() {
+		w.detail.SetSize(questDetailW, questDetailH)
+		ctx := w.detail.ctx
+		if ctx.Session == nil {
+			return
+		}
+		current, ok := ctx.Session.Quests.Entries[w.detailID]
+		if !ok {
+			return
+		}
+		w.detail.SetContent(w.detailTree(ctx, current))
+	})
 	w.detail.Publish(ctx)
 }
 
@@ -272,12 +283,12 @@ func (w *QuestWindow) detailTree(ctx Context, quest session.Quest) widget.Widget
 	if w.deadline != 0 {
 		content = append(content, rotheme.Text("").ContentSignal(w.deadlineText))
 	}
-	return Win(Title("Quest Details"), CloseButton(true), OnClose(w.detail.Close), Size(questDetailW, questDetailH),
+	return Win(Title("Quest Details"), CloseButton(true), OnClose(w.detail.Close), Size(float32(questDetailW), float32(questDetailH)),
 		Content(primitives.Box(scrollview.New(
-			primitives.Box(content...).Gap(8).PaddingRight(ROScrollbarGutter),
+			primitives.Box(content...).Gap(float32(questDetailGap)).PaddingRight(float32(ROScrollbarGutter)),
 			scrollview.DirectionOpt(scrollview.Vertical), scrollview.ScrollbarOpt(scrollview.ScrollbarAuto),
 			scrollview.ScrollYSignal(w.detailScrollY),
-		)).Padding(10)),
+		)).Padding(float32(questDetailPad))),
 		Footer(primitives.Expanded(primitives.Box()), rotheme.Button("Close", w.detail.Close)),
 	)
 }
@@ -326,8 +337,6 @@ func questDescription(text string) widget.Widget {
 	}
 	return primitives.Box(children...)
 }
-
-const questDescriptionRunes = 40
 
 func questObjectiveText(objective session.QuestObjective) string {
 	name := objective.Name

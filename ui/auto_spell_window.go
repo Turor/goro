@@ -13,14 +13,6 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	autoSpellWindowWidth  = 312
-	autoSpellTableHeaderH = 24
-	autoSpellRowH         = 32
-	autoSpellRows         = 7
-	autoSpellWindowHeight = ROWindowTitleHeight + autoSpellTableHeaderH + autoSpellRows*autoSpellRowH + ROWindowFooterHeight
-)
-
 type autoSpellChoice struct {
 	skillID uint16
 	name    string
@@ -40,6 +32,7 @@ type AutoSpellWindow struct {
 
 func (w *AutoSpellWindow) OpenList(ctx Context, list network.AutoSpellList, assets AssetProvider) {
 	w.EnsureWindow(autoSpellWindowWidth, autoSpellWindowHeight)
+	w.SetSize(autoSpellWindowWidth, autoSpellWindowHeight)
 	w.choices = make([]autoSpellChoice, 0, len(list.SkillIDs))
 	for _, skillID := range list.SkillIDs {
 		skill := session.Skill{ID: skillID}
@@ -64,6 +57,10 @@ func (w *AutoSpellWindow) OpenList(ctx Context, list network.AutoSpellList, asse
 		return
 	}
 	w.Open(ctx, w.widgetTree(ctx))
+	w.OnLayoutReload(func() {
+		w.SetSize(autoSpellWindowWidth, autoSpellWindowHeight)
+		w.SetContent(w.widgetTree(ctx))
+	})
 	w.Publish(ctx)
 }
 
@@ -79,7 +76,7 @@ func (w *AutoSpellWindow) Update(ctx Context) bool {
 	consumed := w.Window.Update(ctx)
 	keyboardConsumed := false
 	if w.IsOpen() {
-		keyboardConsumed = updateSelectionTableKeyboard(ctx, &w.selectedRow, len(w.choices), autoSpellRows, autoSpellRowH, w.ensureScrollSignal(), func() {
+		keyboardConsumed = updateSelectionTableKeyboard(ctx, &w.selectedRow, len(w.choices), autoSpellRows, float32(autoSpellRowH), w.ensureScrollSignal(), func() {
 			w.confirm(ctx)
 		})
 		if keyboardConsumed && w.IsOpen() {
@@ -120,7 +117,7 @@ func (w *AutoSpellWindow) widgetTree(ctx Context) widget.Widget {
 		OnClose(func() {
 			w.cancel(ctx)
 		}),
-		Size(autoSpellWindowWidth, autoSpellWindowHeight),
+		Size(float32(autoSpellWindowWidth), float32(autoSpellWindowHeight)),
 		Content(
 			primitives.Box(w.tableWidget()).
 				Height(autoSpellTableHeight()).
@@ -146,8 +143,8 @@ func (w *AutoSpellWindow) tableWidget() *rotheme.TableViewWidget {
 	return itemTableView(
 		rows,
 		"Skill",
-		autoSpellRowH,
-		autoSpellTableHeaderH,
+		float32(autoSpellRowH),
+		float32(autoSpellTableHeaderH),
 		"No spells available",
 		w.ensureScrollSignal(),
 		w.selectedRow,
@@ -202,7 +199,7 @@ func (w *AutoSpellWindow) rowAtMouse(mouseX, mouseY int) (int, bool) {
 	if !pointInRect(mouseX, mouseY, tableX, rowY, scrollbarSafeIntWidth(autoSpellWindowWidth), autoSpellRows*autoSpellRowH) {
 		return 0, false
 	}
-	row := int((float32(mouseY-rowY) + w.ensureScrollSignal().Get()) / autoSpellRowH)
+	row := int((float32(mouseY-rowY) + w.ensureScrollSignal().Get()) / float32(autoSpellRowH))
 	if row < 0 || row >= len(w.choices) {
 		return 0, false
 	}
@@ -217,5 +214,5 @@ func (w *AutoSpellWindow) ensureScrollSignal() state.Signal[float32] {
 }
 
 func autoSpellTableHeight() float32 {
-	return autoSpellTableHeaderH + autoSpellRows*autoSpellRowH
+	return float32(autoSpellTableHeaderH + autoSpellRows*autoSpellRowH)
 }

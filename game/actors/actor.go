@@ -308,13 +308,13 @@ func (m *System) removeOtherWarpPortalActorEffects(actorID uint32, keepEffectID 
 const (
 	ActorVanishOutOfSight = 0
 	ActorVanishDeath      = 1
-	ActorVanishLogout     = 2
-	ActorVanishTeleport   = 3
+	ActorVanishLogout     = 2 // theme:ok vanish type code
+	ActorVanishTeleport   = 3 // theme:ok vanish type code
 )
 
 const (
 	ActorVanishOutOfSightFadeDuration = time.Second
-	WarpPortalActorEffectLifetime     = 24 * time.Hour
+	WarpPortalActorEffectLifetime     = 24 * time.Hour // theme:ok timer
 )
 
 type VanishFade struct {
@@ -825,8 +825,8 @@ func ActorShadowFactor(world *worldstate.World, x, y float64) float64 {
 	}
 	shadowX, shadowY := maps.GNDShadowMapPoint(x, y)
 	total := 0
-	for dy := -3; dy < 3; dy++ {
-		for dx := -3; dx < 3; dx++ {
+	for dy := -3; dy < 3; dy++ { // theme:ok shadow map sample window
+		for dx := -3; dx < 3; dx++ { // theme:ok shadow map sample window
 			total += int(maps.GNDShadowMapAlpha(world.GND, shadowX+dx, shadowY+dy))
 		}
 	}
@@ -1032,18 +1032,18 @@ func titleASCIIWord(word string) string {
 
 func ActorNameLabelColor(actor worldstate.Actor, isPlayer bool) color.RGBA {
 	if actor.IsAdmin {
-		return color.RGBA{R: 255, G: 255, B: 0, A: 255}
+		return actorNameAdminColor
 	}
 	if isPlayer {
-		return color.RGBA{R: 255, G: 255, B: 255, A: 255}
+		return actorNamePlayerColor
 	}
 	switch {
 	case actor.HasObjectType && actor.ObjectType == scene.ActorObjectTypeNPC:
-		return color.RGBA{R: 148, G: 189, B: 247, A: 255}
+		return actorNameNPCColor
 	case scene.IsMonsterLikeHoverActor(actor):
-		return color.RGBA{R: 255, G: 198, B: 198, A: 255}
+		return actorNameMonsterColor
 	default:
-		return color.RGBA{R: 248, G: 248, B: 248, A: 255}
+		return actorNameOtherColor
 	}
 }
 
@@ -1055,7 +1055,7 @@ func DrawActorNameLabelsAtY(screen *render.Frame, labels []string, emblem *rende
 	if len(labels) == 0 {
 		return
 	}
-	render.DrawActorUILabels(screen, labels, emblem, centerX, labelY, foreground, color.RGBA{A: 196})
+	render.DrawActorUILabels(screen, labels, emblem, centerX, labelY, foreground, actorNameOutlineColor)
 }
 
 func actorVisibleNameLabels(labels []string) []string {
@@ -1084,15 +1084,15 @@ func ActorNameLabelY(baseY, scale float64) float64 {
 	if scale <= 0 || math.IsNaN(scale) || math.IsInf(scale, 0) {
 		scale = 1
 	}
-	return baseY + 13*scale
+	return baseY + actorNameLabelOffset*scale
 }
 
 func ActorLifeBarY(baseY, scale float64) float64 {
-	return ActorNameLabelY(baseY, scale) + 14
+	return ActorNameLabelY(baseY, scale) + actorLifeBarGap
 }
 
 func ActorCastBarY(baseY, scale float64) float64 {
-	return ActorSpriteTopY(baseY, scale) + 4
+	return ActorSpriteTopY(baseY, scale) + actorCastBarGap
 }
 
 func (m *System) drawActorSprite3D(screen *render.Frame, ctx client.Context, projection scene.Projection, entry scene.ActorDrawEntry, cameraYaw float64, shadow float64) bool {
@@ -1430,7 +1430,7 @@ func (m *System) DrawSpriteBillboardAlpha3D(screen *render.Frame, projection sce
 	options := scene.SpriteBillboardTriangleDrawOptions()
 	options.DepthWrite = true
 	options.Filter = render.FilterSprite
-	scene.DrawSpriteBillboardTintAlpha3DWithOptions(screen, projection, billboard, m.bindings.SpriteTexture(billboard.Image), worldX, worldY, worldZ, scale, alpha, shadow, color.RGBA{R: 255, G: 255, B: 255, A: 255}, options)
+	scene.DrawSpriteBillboardTintAlpha3DWithOptions(screen, projection, billboard, m.bindings.SpriteTexture(billboard.Image), worldX, worldY, worldZ, scale, alpha, shadow, color.RGBA{R: 255, G: 255, B: 255, A: 255}, options) // theme:ok untinted sprite
 }
 
 const actorNameRequestCooldown = time.Second

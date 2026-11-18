@@ -97,21 +97,23 @@ type loginFadeState struct {
 	enterWorld    bool
 }
 
-const loginTransitionDuration = 500 * time.Millisecond
+const loginTransitionDuration = 500 * time.Millisecond // theme:ok screen fade duration
+
+const loginPacketLogLimit = 8 // theme:ok packet log capacity
 
 const loginWorldHandoffFrames = 1
 
 const loginConfirmSFX = "버튼소리.wav"
 
-const loginServerPingInterval = 10 * time.Second
+const loginServerPingInterval = 10 * time.Second // theme:ok login server keepalive
 
-const charServerPingInterval = 10 * time.Second
+const charServerPingInterval = 10 * time.Second // theme:ok character server keepalive
 
 func New(bindings Bindings) *Screen {
 	if bindings.Console == nil {
 		bindings.Console = &gameui.ChatConsole{}
 	}
-	return &Screen{bindings: bindings, status: "select a server", maxSlots: 9}
+	return &Screen{bindings: bindings, status: "select a server", maxSlots: defaultCharSlots}
 }
 
 func NewCharacterSelect(ctx client.Context, bindings Bindings) *Screen {
@@ -282,7 +284,7 @@ func (m *Screen) Update(ctx client.Context) (bool, error) {
 				for _, character := range list.Characters {
 					m.packets = append(m.packets, fmt.Sprintf("char slot=%d gid=%d name=%s lv=%d job=%d", character.Slot, character.ID, character.Name, character.Level, character.Job))
 				}
-				m.maxSlots = 9
+				m.maxSlots = defaultCharSlots
 				m.selectedSlot = 0
 				if len(list.Characters) > 0 {
 					m.maxSlots = charSelectMaxSlots(ctx.Session.Characters)
@@ -380,8 +382,8 @@ func (m *Screen) Update(ctx client.Context) (bool, error) {
 				m.startWorldFade(time.Now())
 			}
 		}
-		if len(m.packets) > 8 {
-			m.packets = m.packets[len(m.packets)-8:]
+		if len(m.packets) > loginPacketLogLimit {
+			m.packets = m.packets[len(m.packets)-loginPacketLogLimit:]
 		}
 	}
 	networkErrors := ctx.Network.DrainErrors()
@@ -399,8 +401,8 @@ func (m *Screen) Update(ctx client.Context) (bool, error) {
 	for _, err := range networkErrors {
 		glog.Errorf("network frame error: %v", err)
 		m.packets = append(m.packets, "frame error: "+err.Error())
-		if len(m.packets) > 8 {
-			m.packets = m.packets[len(m.packets)-8:]
+		if len(m.packets) > loginPacketLogLimit {
+			m.packets = m.packets[len(m.packets)-loginPacketLogLimit:]
 		}
 	}
 
@@ -578,17 +580,17 @@ func (m *Screen) clearLoginWindows(ctx client.Context) {
 func (m *Screen) fadeAlpha(now time.Time) uint8 {
 	switch m.fade.phase {
 	case loginFadeHold:
-		return 255
+		return uint8(loginFadeAlpha)
 	case loginFadeOut:
 		if m.fade.started.IsZero() {
 			return 0
 		}
-		return scene.ClampColor(255 * clampUnit(float64(now.Sub(m.fade.started))/float64(loginTransitionDuration)))
+		return scene.ClampColor(float64(loginFadeAlpha) * clampUnit(float64(now.Sub(m.fade.started))/float64(loginTransitionDuration)))
 	case loginFadeIn:
 		if m.fade.started.IsZero() {
 			return 0
 		}
-		return scene.ClampColor(255 * (1 - clampUnit(float64(now.Sub(m.fade.started))/float64(loginTransitionDuration))))
+		return scene.ClampColor(float64(loginFadeAlpha) * (1 - clampUnit(float64(now.Sub(m.fade.started))/float64(loginTransitionDuration))))
 	default:
 		return 0
 	}
@@ -606,7 +608,7 @@ func (m *Screen) drawFade(ctx client.Context, screen *render.Frame, now time.Tim
 		return
 	}
 	width, height := ctx.ScreenSize()
-	render.DrawRect(screen, 0, 0, float64(width), float64(height), color.RGBA{A: alpha})
+	render.DrawRect(screen, 0, 0, float64(width), float64(height), loginFadeOverlay(alpha))
 }
 
 // Finish releases login UI and keepalives before entering the world.
@@ -677,7 +679,7 @@ func (m *Screen) drawBackground(ctx client.Context, screen *render.Frame) {
 		return
 	}
 	if m.background == nil {
-		render.DrawRect(screen, 0, 0, float64(width), float64(height), color.RGBA{R: 10, G: 13, B: 22, A: 255})
+		render.DrawRect(screen, 0, 0, float64(width), float64(height), loginFallbackBG)
 		return
 	}
 	b := m.background.Bounds()

@@ -71,8 +71,12 @@ func ActorCastBarProgress(bar CastBar, now time.Time) (float64, bool) {
 	return progress, true
 }
 
+func actorOverlayBarHeight() float64 {
+	return actorOverlayBarRowHeight + 2*actorOverlayBarFrame
+}
+
 func actorLifeBarHeight(life Life) float64 {
-	height := actorOverlayBarHeight
+	height := actorOverlayBarHeight()
 	if life.HasSP {
 		height += actorOverlayBarRowSpacing
 	}
@@ -83,15 +87,8 @@ func actorLifeBarHeight(life Life) float64 {
 }
 
 func ActorNameBelowLifeBarY(baseY, scale float64, life Life) float64 {
-	return actors.ActorLifeBarY(baseY, scale) + actorLifeBarHeight(life) + 3
+	return actors.ActorLifeBarY(baseY, scale) + actorLifeBarHeight(life) + actorNameBelowBarGap
 }
-
-const (
-	actorOverlayBarWidth      = 60.0
-	actorOverlayBarRowHeight  = 3.0
-	actorOverlayBarRowSpacing = 4.0
-	actorOverlayBarHeight     = actorOverlayBarRowHeight + 2
-)
 
 func actorOverlayBarX(centerX float64) float64 {
 	return math.Round(centerX - actorOverlayBarWidth/2)
@@ -108,7 +105,7 @@ func actorOverlayBarFillWidth(ratio float64) float64 {
 	if ratio > 1 {
 		ratio = 1
 	}
-	return math.Round((actorOverlayBarWidth - 2) * ratio)
+	return math.Round((actorOverlayBarWidth - 2*actorOverlayBarFrame) * ratio)
 }
 
 func (m *System) DrawActorLifeBar(screen *render.Frame, ctx client.Context, entry scene.ActorDrawEntry) {
@@ -121,36 +118,37 @@ func (m *System) DrawActorLifeBar(screen *render.Frame, ctx client.Context, entr
 	x := actorOverlayBarX(entry.ScreenX)
 	y := actorOverlayBarY(actors.ActorLifeBarY(entry.ScreenY, entry.Scale))
 	fillWidth := actorOverlayBarFillWidth(ratio)
-	fill := color.RGBA{R: 255, G: 0, B: 231, A: 255}
+	fill := actorBarMonsterFill
 	if life.Player || life.Friendly {
 		fill = gameui.PlayerHPBarColor
-		if ratio < 0.25 {
-			fill = color.RGBA{R: 255, G: 0, B: 0, A: 255}
+		if ratio < actorBarLowRatio {
+			fill = actorBarPlayerLowFill
 		}
-	} else if ratio < 0.25 {
-		fill = color.RGBA{R: 255, G: 255, B: 0, A: 255}
+	} else if ratio < actorBarLowRatio {
+		fill = actorBarMonsterLowFill
 	}
-	render.DrawRect(screen, x, y, actorOverlayBarWidth, height, color.RGBA{R: 16, G: 24, B: 156, A: 255})
-	render.DrawRect(screen, x+1, y+1, actorOverlayBarWidth-2, height-2, color.RGBA{R: 66, G: 66, B: 66, A: 255})
+	f := actorOverlayBarFrame
+	render.DrawRect(screen, x, y, actorOverlayBarWidth, height, actorBarFrameColor)
+	render.DrawRect(screen, x+f, y+f, actorOverlayBarWidth-f*2, height-f*2, actorBarTrackColor)
 	if fillWidth > 0 {
-		render.DrawRect(screen, x+1, y+1, fillWidth, actorOverlayBarRowHeight, fill)
+		render.DrawRect(screen, x+f, y+f, fillWidth, actorOverlayBarRowHeight, fill)
 	}
-	rowY := y + 1
+	rowY := y + f
 	if life.HasSP {
 		rowY += actorOverlayBarRowSpacing
 		spRatio := actorLifeRatio(life.SP, life.MaxSP)
-		render.DrawRect(screen, x, rowY-1, actorOverlayBarWidth, 1, color.RGBA{R: 16, G: 24, B: 156, A: 255})
+		render.DrawRect(screen, x, rowY-f, actorOverlayBarWidth, f, actorBarFrameColor)
 		if spWidth := actorOverlayBarFillWidth(spRatio); spWidth > 0 {
-			render.DrawRect(screen, x+1, rowY, spWidth, actorOverlayBarRowHeight, gameui.PlayerSPBarColor)
+			render.DrawRect(screen, x+f, rowY, spWidth, actorOverlayBarRowHeight, gameui.PlayerSPBarColor)
 		}
 	}
 	if life.HasHunger {
 		rowY += actorOverlayBarRowSpacing
 		hungerRatio := actorLifeRatio(life.Hunger, life.MaxHunger)
 		hungerFill := gameui.HungerBarFillColor(life.Hunger, life.MaxHunger)
-		render.DrawRect(screen, x+1, rowY-1, actorOverlayBarWidth-2, 1, color.RGBA{R: 66, G: 66, B: 66, A: 255})
+		render.DrawRect(screen, x+f, rowY-f, actorOverlayBarWidth-f*2, f, actorBarTrackColor)
 		if hungerWidth := actorOverlayBarFillWidth(hungerRatio); hungerWidth > 0 {
-			render.DrawRect(screen, x+1, rowY, hungerWidth, actorOverlayBarRowHeight, hungerFill)
+			render.DrawRect(screen, x+f, rowY, hungerWidth, actorOverlayBarRowHeight, hungerFill)
 		}
 	}
 }
@@ -188,14 +186,15 @@ func (m *System) DrawActorCastBar(screen *render.Frame, entry scene.ActorDrawEnt
 	x := actorOverlayBarX(entry.ScreenX)
 	y := actorOverlayBarY(actors.ActorCastBarY(entry.ScreenY, entry.Scale))
 	fillWidth := actorOverlayBarFillWidth(ratio)
-	render.DrawRect(screen, x, y, actorOverlayBarWidth, actorOverlayBarHeight, color.RGBA{R: 16, G: 24, B: 156, A: 255})
-	render.DrawRect(screen, x+1, y+1, actorOverlayBarWidth-2, actorOverlayBarHeight-2, color.RGBA{R: 66, G: 66, B: 66, A: 255})
+	f := actorOverlayBarFrame
+	render.DrawRect(screen, x, y, actorOverlayBarWidth, actorOverlayBarHeight(), actorBarFrameColor)
+	render.DrawRect(screen, x+f, y+f, actorOverlayBarWidth-f*2, actorOverlayBarHeight()-f*2, actorBarTrackColor)
 	if fillWidth > 0 {
 		fill := bar.Color
 		if fill.A == 0 {
-			fill = color.RGBA{R: 0, G: 255, B: 0, A: 255}
+			fill = actorCastBarFill
 		}
-		render.DrawRect(screen, x+1, y+1, fillWidth, actorOverlayBarRowHeight, fill)
+		render.DrawRect(screen, x+f, y+f, fillWidth, actorOverlayBarRowHeight, fill)
 	}
 }
 
@@ -383,7 +382,7 @@ func (m *System) StartActorCastBar(ctx client.Context, sourceID uint32, duration
 	bar := CastBar{
 		Started:  started,
 		Duration: duration,
-		Color:    color.RGBA{R: 0, G: 255, B: 0, A: 255},
+		Color:    actorCastBarFill,
 	}
 	m.setActorCastBar(sourceID, bar)
 	if ctx.Session == nil || !scene.IsLocalActor(ctx, sourceID) {
