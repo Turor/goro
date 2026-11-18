@@ -79,7 +79,7 @@ type InventoryBagWindow struct {
 }
 
 type inventoryBagIconKey struct {
-	itemID     uint16
+	itemID     uint32
 	identified bool
 }
 

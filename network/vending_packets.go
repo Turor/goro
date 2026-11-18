@@ -41,11 +41,11 @@ type VendingItem struct {
 	Amount     uint16
 	Index      uint16
 	Type       uint8
-	ItemID     uint16
+	ItemID     uint32
 	Identified bool
 	Damaged    bool
 	Refine     uint8
-	Cards      [4]uint16
+	Cards      [4]uint32
 }
 
 type VendingItemList struct {
@@ -147,15 +147,15 @@ func parseVendingItems(data []byte) []VendingItem {
 			Amount:     binary.LittleEndian.Uint16(data[offset+4 : offset+6]),
 			Index:      binary.LittleEndian.Uint16(data[offset+6 : offset+8]),
 			Type:       data[offset+8],
-			ItemID:     binary.LittleEndian.Uint16(data[offset+9 : offset+11]),
+			ItemID:     uint32(binary.LittleEndian.Uint16(data[offset+9 : offset+11])),
 			Identified: data[offset+11] != 0,
 			Damaged:    data[offset+12] != 0,
 			Refine:     data[offset+13],
-			Cards: [4]uint16{
-				binary.LittleEndian.Uint16(data[offset+14 : offset+16]),
-				binary.LittleEndian.Uint16(data[offset+16 : offset+18]),
-				binary.LittleEndian.Uint16(data[offset+18 : offset+20]),
-				binary.LittleEndian.Uint16(data[offset+20 : offset+22]),
+			Cards: [4]uint32{
+				uint32(binary.LittleEndian.Uint16(data[offset+14 : offset+16])),
+				uint32(binary.LittleEndian.Uint16(data[offset+16 : offset+18])),
+				uint32(binary.LittleEndian.Uint16(data[offset+18 : offset+20])),
+				uint32(binary.LittleEndian.Uint16(data[offset+20 : offset+22])),
 			},
 		})
 	}
@@ -170,15 +170,15 @@ func parseOwnVendingItems(data []byte) []VendingItem {
 			Index:      binary.LittleEndian.Uint16(data[offset+4 : offset+6]),
 			Amount:     binary.LittleEndian.Uint16(data[offset+6 : offset+8]),
 			Type:       data[offset+8],
-			ItemID:     binary.LittleEndian.Uint16(data[offset+9 : offset+11]),
+			ItemID:     uint32(binary.LittleEndian.Uint16(data[offset+9 : offset+11])),
 			Identified: data[offset+11] != 0,
 			Damaged:    data[offset+12] != 0,
 			Refine:     data[offset+13],
-			Cards: [4]uint16{
-				binary.LittleEndian.Uint16(data[offset+14 : offset+16]),
-				binary.LittleEndian.Uint16(data[offset+16 : offset+18]),
-				binary.LittleEndian.Uint16(data[offset+18 : offset+20]),
-				binary.LittleEndian.Uint16(data[offset+20 : offset+22]),
+			Cards: [4]uint32{
+				uint32(binary.LittleEndian.Uint16(data[offset+14 : offset+16])),
+				uint32(binary.LittleEndian.Uint16(data[offset+16 : offset+18])),
+				uint32(binary.LittleEndian.Uint16(data[offset+18 : offset+20])),
+				uint32(binary.LittleEndian.Uint16(data[offset+20 : offset+22])),
 			},
 		})
 	}

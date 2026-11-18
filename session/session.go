@@ -212,10 +212,10 @@ type Character struct {
 	Level     int16
 	JobLevel  int16
 	Job       int16
-	HP        int16
-	MaxHP     int16
-	SP        int16
-	MaxSP     int16
+	HP        int
+	MaxHP     int
+	SP        int
+	MaxSP     int
 	Str       uint8
 	Agi       uint8
 	Vit       uint8
@@ -368,7 +368,7 @@ type Cart struct {
 
 type InventoryItem struct {
 	Index        uint16
-	ItemID       uint16
+	ItemID       uint32
 	Type         uint8
 	Location     uint16 // Allowed equipment slots.
 	WearLocation uint16 // Occupied equipment slots, or zero when unequipped.
@@ -378,7 +378,7 @@ type InventoryItem struct {
 	Equipped     bool
 	Damaged      bool
 	Refine       uint8
-	Cards        [4]uint16
+	Cards        [4]uint32
 }
 
 type Stats struct {

@@ -39,7 +39,7 @@ type sceneItemDrawEntry struct {
 }
 
 type itemSpriteKey struct {
-	itemID     uint16
+	itemID     uint32
 	identified bool
 }
 
@@ -118,6 +118,7 @@ func (m *WorldMode) applyItemPickupAck(ctx client.Context, ack network.ItemPicku
 		Equip:      inventoryItemTypeIsEquipment(ack.Type),
 		Damaged:    ack.Damaged,
 		Refine:     ack.Refine,
+		Cards:      ack.Cards,
 	}
 	gained := item.Amount
 	if ack.Result == itemPickupResultReceive {
@@ -585,7 +586,7 @@ func (m *WorldMode) drawInventoryItemIcon(screen *render.Frame, manager *res.Man
 	screen.DrawTrianglesOwned(vertices, scene.QuadIndices012213, billboard.Image, &render.DrawTrianglesOptions{Filter: scene.SpriteDrawFilter(), Address: render.AddressClampToZero})
 }
 
-func (m *WorldMode) itemIconTexture(manager *res.Manager, itemID uint16, identified bool) *render.Image {
+func (m *WorldMode) itemIconTexture(manager *res.Manager, itemID uint32, identified bool) *render.Image {
 	if manager == nil || itemID == 0 {
 		return nil
 	}
@@ -616,7 +617,7 @@ func (m *WorldMode) itemIconTexture(manager *res.Manager, itemID uint16, identif
 	return texture
 }
 
-func (m *WorldMode) itemCollectionTexture(manager *res.Manager, itemID uint16, identified bool) *render.Image {
+func (m *WorldMode) itemCollectionTexture(manager *res.Manager, itemID uint32, identified bool) *render.Image {
 	if manager == nil || itemID == 0 {
 		return nil
 	}
@@ -712,7 +713,7 @@ func (m *WorldMode) drawFallbackInventoryItemIcon(screen *render.Frame, x, y int
 	screen.DrawImage(img, &opts)
 }
 
-func (m *WorldMode) itemSpriteView(manager *res.Manager, itemID uint16, identified bool) *scene.SpriteView {
+func (m *WorldMode) itemSpriteView(manager *res.Manager, itemID uint32, identified bool) *scene.SpriteView {
 	if manager == nil || itemID == 0 {
 		return nil
 	}

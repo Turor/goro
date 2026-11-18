@@ -3,6 +3,7 @@ package network
 import (
 	"encoding/binary"
 	"fmt"
+	"math"
 	"net"
 	"strings"
 )
@@ -30,10 +31,10 @@ type Character struct {
 	Level     int16
 	JobLevel  int16
 	Job       int16
-	HP        int16
-	MaxHP     int16
-	SP        int16
-	MaxSP     int16
+	HP        int
+	MaxHP     int
+	SP        int
+	MaxSP     int
 	Str       uint8
 	Agi       uint8
 	Vit       uint8
@@ -80,12 +81,38 @@ type CharServer struct {
 	Property  uint16
 }
 
+// PacketACAcceptLogin2 is AC_ACCEPT_LOGIN for PACKETVER >= 20170315: a
+// 64-byte header (auth token added) and 160-byte server rows.
+const PacketACAcceptLogin2 uint16 = 0x0AC4
+
+// AC_REFUSE_LOGIN_R2 / R3 carry a 32-bit error code (PACKETVER >= 20101123,
+// R3 from 20180627).
+const (
+	PacketACRefuseLoginR2 uint16 = 0x083E
+	PacketACRefuseLoginR3 uint16 = 0x0B02
+)
+
+// IsAccountAcceptLogin reports whether a packet is any AC_ACCEPT_LOGIN form.
+func IsAccountAcceptLogin(id uint16) bool {
+	return id == 0x0069 || id == PacketACAcceptLogin2
+}
+
+// IsAccountRefuseLogin reports whether a packet is any AC_REFUSE_LOGIN form.
+func IsAccountRefuseLogin(id uint16) bool {
+	return id == 0x006A || id == PacketACRefuseLoginR2 || id == PacketACRefuseLoginR3
+}
+
 func ParseAccountAcceptLogin(packet Packet) (AccountAcceptLogin, error) {
-	if packet.ID != 0x0069 {
+	header, serverSize := 47, 32
+	switch packet.ID {
+	case 0x0069:
+	case PacketACAcceptLogin2:
+		header, serverSize = 64, 160
+	default:
 		return AccountAcceptLogin{}, fmt.Errorf("unexpected packet 0x%04X", packet.ID)
 	}
-	if len(packet.Data) < 47 {
-		return AccountAcceptLogin{}, fmt.Errorf("AC_ACCEPT_LOGIN too short: %d", len(packet.Data))
+	if len(packet.Data) < header {
+		return AccountAcceptLogin{}, fmt.Errorf("AC_ACCEPT_LOGIN 0x%04X too short: %d", packet.ID, len(packet.Data))
 	}
 
 	packetLen := int(binary.LittleEndian.Uint16(packet.Data[2:4]))
@@ -106,13 +133,13 @@ func ParseAccountAcceptLogin(packet Packet) (AccountAcceptLogin, error) {
 		Sex:       sex,
 	}
 
-	serverBytes := packetLen - 47
+	serverBytes := packetLen - header
 	if serverBytes < 0 {
 		serverBytes = 0
 	}
-	serverCount := serverBytes / 32
+	serverCount := serverBytes / serverSize
 	for i := 0; i < serverCount; i++ {
-		base := 47 + i*32
+		base := header + i*serverSize
 		raw := packet.Data[base : base+32]
 		ip := net.IPv4(raw[0], raw[1], raw[2], raw[3])
 		out.CharServer = append(out.CharServer, CharServer{
@@ -129,6 +156,19 @@ func ParseAccountAcceptLogin(packet Packet) (AccountAcceptLogin, error) {
 }
 
 func ParseAccountRefuseLogin(packet Packet) (AccountRefuseLogin, error) {
+	if packet.ID == PacketACRefuseLoginR2 || packet.ID == PacketACRefuseLoginR3 {
+		if len(packet.Data) < 26 {
+			return AccountRefuseLogin{}, fmt.Errorf("AC_REFUSE_LOGIN 0x%04X too short: %d", packet.ID, len(packet.Data))
+		}
+		code := binary.LittleEndian.Uint32(packet.Data[2:6])
+		if code > 0xFF {
+			code = 0xFF
+		}
+		return AccountRefuseLogin{
+			ErrorCode:   uint8(code),
+			UnblockTime: fixedString(packet.Data[6:26]),
+		}, nil
+	}
 	if packet.ID != 0x006A {
 		return AccountRefuseLogin{}, fmt.Errorf("unexpected packet 0x%04X", packet.ID)
 	}
@@ -142,8 +182,50 @@ func ParseAccountRefuseLogin(packet Packet) (AccountRefuseLogin, error) {
 	}, nil
 }
 
+// PacketHCAckCharInfoPerPage is HC_ACK_CHARINFO_PER_PAGE for PACKETVER
+// >= 20201007 main: a 4-byte header and 175-byte CHARACTER_INFO rows. Hercules
+// sends an empty one as the paging terminator.
+const PacketHCAckCharInfoPerPage uint16 = 0x0B72
+
+// PacketHCAcceptMakeChar2025 is HC_ACCEPT_MAKECHAR with a 175-byte
+// CHARACTER_INFO (PACKETVER >= 20201007 main).
+const PacketHCAcceptMakeChar2025 uint16 = 0x0B6F
+
+// PacketHCNotifyZoneServer2 is HC_NOTIFY_ZONESVR with a 128-byte domain
+// (PACKETVER >= 20170315).
+const PacketHCNotifyZoneServer2 uint16 = 0x0AC5
+
+// PacketZCAcceptEnter2 is ZC_ACCEPT_ENTER with font and sex (PACKETVER
+// >= 20141022).
+const PacketZCAcceptEnter2 uint16 = 0x0A18
+
+// characterInfo2025Size is CHARACTER_INFO with 64-bit EXP, 64-bit HP/SP,
+// body, map name, robe, slot change, rename and sex (PACKETVER >= 20201007
+// main; Hercules char_mmo_char_tobuf, MAX_CHAR_BUF).
+const characterInfo2025Size = 175
+
+// IsCharList reports whether a packet carries a character list.
+func IsCharList(id uint16) bool {
+	return id == 0x006B || id == PacketHCAckCharInfoPerPage
+}
+
+// IsZoneServerNotify reports whether a packet is any HC_NOTIFY_ZONESVR form.
+func IsZoneServerNotify(id uint16) bool {
+	return id == 0x0071 || id == PacketHCNotifyZoneServer2
+}
+
+// IsMapAcceptEnter reports whether a packet is any ZC_ACCEPT_ENTER form.
+func IsMapAcceptEnter(id uint16) bool {
+	return id == 0x0073 || id == 0x02EB || id == PacketZCAcceptEnter2
+}
+
+// IsMakeCharacterAccept reports whether a packet is any HC_ACCEPT_MAKECHAR form.
+func IsMakeCharacterAccept(id uint16) bool {
+	return id == 0x006D || id == PacketHCAcceptMakeChar2025
+}
+
 func ParseCharList(packet Packet) (CharList, error) {
-	if packet.ID != 0x006B {
+	if !IsCharList(packet.ID) {
 		return CharList{}, fmt.Errorf("unexpected packet 0x%04X", packet.ID)
 	}
 	if len(packet.Data) < 4 {
@@ -154,17 +236,32 @@ func ParseCharList(packet Packet) (CharList, error) {
 		return CharList{}, fmt.Errorf("HC_ACCEPT_ENTER length %d exceeds data %d", packetLen, len(packet.Data))
 	}
 
-	layout, headerSize, recordSize, err := resolveCharListLayout(packetLen)
-	if err != nil {
-		return CharList{}, err
+	var (
+		layout                 string
+		headerSize, recordSize int
+		err                    error
+	)
+	if packet.ID == PacketHCAckCharInfoPerPage {
+		layout, headerSize, recordSize = "per_page_4_175", 4, characterInfo2025Size
+		if (packetLen-headerSize)%recordSize != 0 {
+			return CharList{}, fmt.Errorf("unsupported HC_ACK_CHARINFO_PER_PAGE length=%d", packetLen)
+		}
+	} else {
+		layout, headerSize, recordSize, err = resolveCharListLayout(packetLen)
+		if err != nil {
+			return CharList{}, err
+		}
 	}
 
 	out := CharList{Layout: layout}
 	for offset := headerSize; offset+recordSize <= packetLen; offset += recordSize {
 		var character Character
-		if recordSize == 106 {
+		switch recordSize {
+		case 106:
 			character = parseLegacyCharacter106(packet.Data[offset : offset+recordSize])
-		} else {
+		case characterInfo2025Size:
+			character = parseCharacter175(packet.Data[offset : offset+recordSize])
+		default:
 			character = parseCharacter108(packet.Data[offset : offset+recordSize])
 		}
 		out.Characters = append(out.Characters, character)
@@ -173,6 +270,12 @@ func ParseCharList(packet Packet) (CharList, error) {
 }
 
 func ParseMakeCharacterAccept(packet Packet) (Character, error) {
+	if packet.ID == PacketHCAcceptMakeChar2025 {
+		if len(packet.Data) < 2+characterInfo2025Size {
+			return Character{}, fmt.Errorf("HC_ACCEPT_MAKECHAR 0x0B6F too short: %d", len(packet.Data))
+		}
+		return parseCharacter175(packet.Data[2 : 2+characterInfo2025Size]), nil
+	}
 	if packet.ID != 0x006D {
 		return Character{}, fmt.Errorf("unexpected packet 0x%04X", packet.ID)
 	}
@@ -213,7 +316,7 @@ func ParseDeleteCharacterRefuse(packet Packet) (uint8, error) {
 }
 
 func ParseZoneServerNotify(packet Packet) (ZoneServerNotify, error) {
-	if packet.ID != 0x0071 {
+	if !IsZoneServerNotify(packet.ID) {
 		return ZoneServerNotify{}, fmt.Errorf("unexpected packet 0x%04X", packet.ID)
 	}
 	if len(packet.Data) < 28 {
@@ -231,7 +334,7 @@ func ParseZoneServerNotify(packet Packet) (ZoneServerNotify, error) {
 }
 
 func ParseMapAcceptEnter(packet Packet) (MapAcceptEnter, error) {
-	if packet.ID != 0x0073 && packet.ID != 0x02EB {
+	if !IsMapAcceptEnter(packet.ID) {
 		return MapAcceptEnter{}, fmt.Errorf("unexpected packet 0x%04X", packet.ID)
 	}
 	if len(packet.Data) < 9 {
@@ -253,6 +356,7 @@ func resolveCharListLayout(packetLen int) (layout string, headerSize int, record
 		record int
 	}
 	for _, c := range []candidate{
+		{name: "expanded_27_175", header: 27, record: characterInfo2025Size},
 		{name: "expanded_27_108", header: 27, record: 108},
 		{name: "legacy_24_108", header: 24, record: 108},
 		{name: "legacy_4_106", header: 4, record: 106},
@@ -270,10 +374,10 @@ func parseCharacter108(data []byte) Character {
 		Exp:       int64(int32(binary.LittleEndian.Uint32(data[4:8]))),
 		Money:     int64(int32(binary.LittleEndian.Uint32(data[8:12]))),
 		JobLevel:  int16(binary.LittleEndian.Uint32(data[16:20])),
-		HP:        int16(binary.LittleEndian.Uint16(data[42:44])),
-		MaxHP:     int16(binary.LittleEndian.Uint16(data[44:46])),
-		SP:        int16(binary.LittleEndian.Uint16(data[46:48])),
-		MaxSP:     int16(binary.LittleEndian.Uint16(data[48:50])),
+		HP:        int(int16(binary.LittleEndian.Uint16(data[42:44]))),
+		MaxHP:     int(int16(binary.LittleEndian.Uint16(data[44:46]))),
+		SP:        int(int16(binary.LittleEndian.Uint16(data[46:48]))),
+		MaxSP:     int(int16(binary.LittleEndian.Uint16(data[48:50]))),
 		Option:    binary.LittleEndian.Uint32(data[28:32]),
 		Job:       int16(binary.LittleEndian.Uint16(data[52:54])),
 		Hair:      int16(binary.LittleEndian.Uint16(data[54:56])),
@@ -297,16 +401,61 @@ func parseCharacter108(data []byte) Character {
 	}
 }
 
+// parseCharacter175 decodes the PACKETVER 20250716 CHARACTER_INFO.
+func parseCharacter175(data []byte) Character {
+	u16 := func(off int) int16 { return int16(binary.LittleEndian.Uint16(data[off : off+2])) }
+	clampInt := func(v int64) int {
+		if v > math.MaxInt32 {
+			return math.MaxInt32
+		}
+		if v < math.MinInt32 {
+			return math.MinInt32
+		}
+		return int(v)
+	}
+	i64 := func(off int) int64 { return int64(binary.LittleEndian.Uint64(data[off : off+8])) }
+	return Character{
+		ID:        binary.LittleEndian.Uint32(data[0:4]),
+		Exp:       i64(4),
+		Money:     int64(int32(binary.LittleEndian.Uint32(data[12:16]))),
+		JobLevel:  int16(binary.LittleEndian.Uint32(data[24:28])),
+		Option:    binary.LittleEndian.Uint32(data[36:40]),
+		HP:        clampInt(i64(50)),
+		MaxHP:     clampInt(i64(58)),
+		SP:        clampInt(i64(66)),
+		MaxSP:     clampInt(i64(74)),
+		Job:       u16(84),
+		Hair:      u16(86),
+		Weapon:    u16(90),
+		Level:     u16(92),
+		HeadLow:   u16(96),
+		Shield:    u16(98),
+		HeadTop:   u16(100),
+		HeadMid:   u16(102),
+		HairColor: uint8(binary.LittleEndian.Uint16(data[104:106])),
+		HeadPal:   u16(104),
+		BodyPal:   u16(106),
+		Name:      fixedString(data[108:132]),
+		Str:       data[132],
+		Agi:       data[133],
+		Vit:       data[134],
+		Int:       data[135],
+		Dex:       data[136],
+		Luk:       data[137],
+		Slot:      uint8(binary.LittleEndian.Uint16(data[138:140])),
+	}
+}
+
 func parseLegacyCharacter106(data []byte) Character {
 	character := Character{
 		ID:       binary.LittleEndian.Uint32(data[0:4]),
 		Exp:      int64(int32(binary.LittleEndian.Uint32(data[4:8]))),
 		Money:    int64(int32(binary.LittleEndian.Uint32(data[8:12]))),
 		JobLevel: int16(binary.LittleEndian.Uint32(data[16:20])),
-		HP:       int16(binary.LittleEndian.Uint16(data[42:44])),
-		MaxHP:    int16(binary.LittleEndian.Uint16(data[44:46])),
-		SP:       int16(binary.LittleEndian.Uint16(data[46:48])),
-		MaxSP:    int16(binary.LittleEndian.Uint16(data[48:50])),
+		HP:       int(int16(binary.LittleEndian.Uint16(data[42:44]))),
+		MaxHP:    int(int16(binary.LittleEndian.Uint16(data[44:46]))),
+		SP:       int(int16(binary.LittleEndian.Uint16(data[46:48]))),
+		MaxSP:    int(int16(binary.LittleEndian.Uint16(data[48:50]))),
 		Option:   binary.LittleEndian.Uint32(data[28:32]),
 		Job:      int16(binary.LittleEndian.Uint16(data[52:54])),
 		Hair:     int16(binary.LittleEndian.Uint16(data[54:56])),

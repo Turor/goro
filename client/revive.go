@@ -2,7 +2,7 @@ package client
 
 import "fmt"
 
-const TokenOfSiegfriedItemID uint16 = 7621
+const TokenOfSiegfriedItemID uint32 = 7621
 
 // AutoReviveAvailable reports whether the local player can offer the classic
 // Token of Siegfried resurrection action.

@@ -73,7 +73,7 @@ func (p MapProperty) PvPRankingEnabled() bool {
 
 type FloorItem struct {
 	ID         uint32
-	ItemID     uint16
+	ItemID     uint32
 	Identified bool
 	X          int
 	Y          int

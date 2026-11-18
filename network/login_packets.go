@@ -91,7 +91,14 @@ func BuildAccountLoginPacket(login AccountLogin) []byte {
 	w.Uint32(login.Version)
 	w.CString(login.Username, 24)
 	w.CString(login.Password, 24)
-	w.Uint8(login.ClientType)
+	clientType := login.ClientType
+	if len(login.Password) >= 24 {
+		// A 24-byte password leaves no NUL in the field. Hercules copies it
+		// with safestrncpy(passwd, password, 33), so it reads on into the
+		// client type byte and rejects the login unless that byte is 0.
+		clientType = 0
+	}
+	w.Uint8(clientType)
 	return w.Bytes()
 }
 
