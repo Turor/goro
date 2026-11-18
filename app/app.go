@@ -54,13 +54,14 @@ func NewWithResources(cfg config.Config, resource *res.Manager) *Game {
 		loadClientUIFont(resource)
 	}
 
+	clientDate := cfg.ResolvePacketClientDate(resource.ClientInfo.PacketVersionForSlot(cfg.Login.ServerSlot))
 	g := &Game{
 		cfg:      cfg,
 		input:    input.NewState(),
 		resource: resource,
 		session:  session.New(),
 		world:    world.New(),
-		network:  network.NewClient(cfg.Packet.ClientDate, cfg.Network.Trace),
+		network:  network.NewClient(clientDate, cfg.Network.Trace),
 		audio:    gameaudio.NewBGM(resource, cfg.Audio.BGM, cfg.Audio.BGMVolume, cfg.Audio.SFXVolume, cfg.Audio.Disabled),
 		runtime:  newRuntimeSettings(cfg),
 		ui:       gameui.NewManager(),

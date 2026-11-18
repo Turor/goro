@@ -45,8 +45,17 @@ type WindowConfig struct {
 
 type PacketConfig struct {
 	ClientDate int
-	Profile    int
+	// ClientDateExplicit is true when client_date came from a config file or
+	// --packet-client-date. When it is false, a data/clientinfo.xml
+	// <packet_version> is preferred over the fork default.
+	ClientDateExplicit bool
+	Profile            int
 }
+
+// DefaultPacketClientDate is this fork's packet profile when neither the
+// config nor data/clientinfo.xml selects a date. 20080910 remains available
+// via --packet-client-date or [packet] client_date.
+const DefaultPacketClientDate = 20250716
 
 type LoginConfig struct {
 	Username       string
@@ -302,7 +311,7 @@ func defaultConfig() Config {
 			Fullscreen: false,
 		},
 		Packet: PacketConfig{
-			ClientDate: 20080910,
+			ClientDate: DefaultPacketClientDate,
 			Profile:    23,
 		},
 		Login: LoginConfig{
@@ -413,6 +422,9 @@ func parseCLI(cfg *Config, args []string) error {
 		if (f.Name == "config" || f.Name == "data-dir") && f.Value.String() == "" {
 			pathErr = fmt.Errorf("--%s requires a non-empty path", f.Name)
 		}
+		if f.Name == "packet-client-date" {
+			cfg.Packet.ClientDateExplicit = true
+		}
 	})
 	if pathErr != nil {
 		return pathErr
@@ -496,7 +508,11 @@ func applyConfigValue(cfg *Config, section, key, value string) error {
 	case "window.fullscreen":
 		return setBool(value, &cfg.Window.Fullscreen)
 	case "packet.clientdate":
-		return setInt(value, &cfg.Packet.ClientDate)
+		if err := setInt(value, &cfg.Packet.ClientDate); err != nil {
+			return err
+		}
+		cfg.Packet.ClientDateExplicit = true
+		return nil
 	case "packet.profile":
 		return setInt(value, &cfg.Packet.Profile)
 	case "login.username":
@@ -587,6 +603,23 @@ func applyConfigValue(cfg *Config, section, key, value string) error {
 		return fmt.Errorf("unknown key %q in section %q", key, section)
 	}
 	return nil
+}
+
+// ResolvePacketClientDate returns the packet profile to use at startup.
+// An explicit config or --packet-client-date value wins. Otherwise a positive
+// clientinfo <packet_version> is used when present. The fork default is
+// 20250716; 20080910 is still available when selected explicitly.
+func (cfg Config) ResolvePacketClientDate(clientInfoPacketVersion int) int {
+	if cfg.Packet.ClientDateExplicit {
+		return cfg.Packet.ClientDate
+	}
+	if clientInfoPacketVersion > 0 {
+		return clientInfoPacketVersion
+	}
+	if cfg.Packet.ClientDate > 0 {
+		return cfg.Packet.ClientDate
+	}
+	return DefaultPacketClientDate
 }
 
 func validateConfig(cfg *Config) error {
