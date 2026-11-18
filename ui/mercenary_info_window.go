@@ -2,7 +2,6 @@ package ui
 
 import (
 	"fmt"
-	"image/color"
 	"strings"
 	"time"
 
@@ -12,16 +11,7 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	mercenaryInfoWindowW = homunculusInfoWindowW
-	mercenaryInfoWindowH = 272
-)
-
-var (
-	mercenaryInfoTimeColor  = WindowBorderColor
-	mercenaryInfoTimeLow    = color.RGBA{R: 0xFF, G: 0x1E, B: 0x00, A: 0xFF}
-	mercenaryInfoKillsColor = WindowBorderColor
-)
+func mercenaryInfoWindowW() int { return homunculusInfoWindowW }
 
 type MercenaryInfoActionKind uint8
 
@@ -43,15 +33,19 @@ type MercenaryInfoWindow struct {
 }
 
 func (w *MercenaryInfoWindow) OpenInfo(ctx Context, companion session.Companion) {
-	w.EnsureWindow(mercenaryInfoWindowW, mercenaryInfoWindowH)
+	w.EnsureWindow(mercenaryInfoWindowW(), mercenaryInfoWindowH)
 	w.companion = companion
 	w.snapshot = mercenaryInfoSnapshot(companion)
 	w.Window.Open(ctx, w.widgetTree(ctx))
+	w.OnLayoutReload(func() {
+		w.SetSize(mercenaryInfoWindowW(), mercenaryInfoWindowH)
+		w.SetContent(w.widgetTree(w.ctx))
+	})
 	w.Publish(ctx)
 }
 
 func (w *MercenaryInfoWindow) Update(ctx Context) bool {
-	w.EnsureWindow(mercenaryInfoWindowW, mercenaryInfoWindowH)
+	w.EnsureWindow(mercenaryInfoWindowW(), mercenaryInfoWindowH)
 	if !w.IsOpen() {
 		return false
 	}
@@ -95,15 +89,15 @@ func (w *MercenaryInfoWindow) widgetTree(ctx Context) widget.Widget {
 			w.Close()
 			w.Publish(ctx)
 		}),
-		Size(mercenaryInfoWindowW, mercenaryInfoWindowH),
+		Size(float32(mercenaryInfoWindowW()), float32(mercenaryInfoWindowH)),
 		Content(w.contentTree(ctx)),
 		Footer(
 			rotheme.Button("Skill", func() {
 				w.action = MercenaryInfoAction{Kind: MercenaryInfoActionSkill}
-			}).Width(72),
+			}).Width(float32(mercenaryInfoButtonW)),
 			rotheme.Button("Dismiss", func() {
 				w.action = MercenaryInfoAction{Kind: MercenaryInfoActionDelete}
-			}).Width(72),
+			}).Width(float32(mercenaryInfoButtonW)),
 		),
 	)
 }
@@ -113,9 +107,9 @@ func (w *MercenaryInfoWindow) contentTree(ctx Context) widget.Widget {
 		w.statsTable(),
 		w.detailsColumn(ctx),
 	).
-		Gap(homunculusInfoColumnGap).
+		Gap(float32(homunculusInfoColumnGap)).
 		CrossAlign(primitives.CrossAxisStart).
-		Padding(homunculusInfoContentPad)
+		Padding(float32(homunculusInfoContentPad))
 }
 
 func (w *MercenaryInfoWindow) statsTable() widget.Widget {
@@ -134,21 +128,21 @@ func (w *MercenaryInfoWindow) statsTable() widget.Widget {
 
 func (w *MercenaryInfoWindow) detailsColumn(ctx Context) widget.Widget {
 	timeFill := Color(mercenaryInfoTimeColor)
-	if mercenaryRemainingRatio(w.companion.ExpireTick) < 0.25 {
+	if mercenaryRemainingRatio(w.companion.ExpireTick) < float64(mercenaryInfoTimeLowRatio) {
 		timeFill = Color(mercenaryInfoTimeLow)
 	}
 	return primitives.Box(
 		w.infoRow("Name", displayMercenaryName(w.companion)),
 		w.infoRow("Level", fmt.Sprintf("%d", w.companion.Level)),
-		vitalsRow("HP", w.companion.HP, w.companion.MaxHP, homunculusInfoRightW),
-		vitalsRow("SP", w.companion.SP, w.companion.MaxSP, homunculusInfoRightW),
+		vitalsRow("HP", w.companion.HP, w.companion.MaxHP, homunculusInfoRightW()),
+		vitalsRow("SP", w.companion.SP, w.companion.MaxSP, homunculusInfoRightW()),
 		w.barRow("Time", mercenaryRemainingSeconds(w.companion.ExpireTick), mercenaryLifetimeSeconds, timeFill, false),
 		w.infoRow("Left", formatMercenaryExpireDate(w.companion.ExpireTick)),
-		w.barRow("Kills", int(w.companion.Kills%50), 50, Color(mercenaryInfoKillsColor), true),
+		w.barRow("Kills", int(w.companion.Kills%50), 50, Color(mercenaryInfoKillsColor), true), // theme:ok kills per faith cycle
 		w.infoRow("Faith", fmt.Sprintf("%d", w.companion.Faith)),
 	).
-		Width(homunculusInfoRightW).
-		Gap(homunculusInfoRowGap)
+		Width(homunculusInfoRightW()).
+		Gap(float32(homunculusInfoRowGap))
 }
 
 func (w *MercenaryInfoWindow) infoRow(label, value string) widget.Widget {
@@ -181,7 +175,7 @@ func mercenaryInfoSnapshot(companion session.Companion) string {
 		companion.SP,
 		companion.MaxSP,
 		companion.ExpireTick,
-		time.Now().Unix()/30,
+		time.Now().Unix()/30, // theme:ok snapshot refresh bucket
 		companion.Kills,
 		companion.Faith,
 		companion.Skills.Points,
@@ -193,9 +187,10 @@ func displayMercenaryName(companion session.Companion) string {
 	if name == "" {
 		return "Mercenary"
 	}
-	return trimRunes(name, 20)
+	return trimRunes(name, 20) // theme:ok name length limit
 }
 
+// theme:ok mercenary contract length in seconds
 const mercenaryLifetimeSeconds = 30 * 60
 
 func formatMercenaryExpireDate(timestamp uint32) string {
