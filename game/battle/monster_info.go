@@ -15,7 +15,7 @@ import (
 	worldstate "github.com/kivutar/goro/world"
 )
 
-const senseResponseTimeout = 5 * time.Second
+const senseResponseTimeout = 5 * time.Second // theme:ok network timeout
 
 type senseRequest struct {
 	targetID    uint32
@@ -53,7 +53,7 @@ func (m *System) ApplyMonsterInfo(ctx client.Context, info network.MonsterInfo, 
 		Info:    info,
 		Name:    monsterInfoDisplayName(ctx, actor, matched, info.Class),
 		MaxHP:   maximumHP,
-		Preview: m.bindings.MonsterPreview(ctx, info.Class, monsterInfoPreviewWidth, monsterInfoPreviewHeight),
+		Preview: m.bindings.MonsterPreview(ctx, info.Class, gameui.MonsterInfoPreviewWidth(), gameui.MonsterInfoPreviewHeight()),
 	}
 	m.bindings.Windows.MonsterInfo.OpenInfo(ctx, view)
 	glog.Debugf("monster info class=%d level=%d hp=%d max_hp=%d actor=%d", info.Class, info.Level, info.HP, maximumHP, actor.ID)
@@ -99,8 +99,3 @@ func monsterInfoDisplayName(ctx client.Context, actor worldstate.Actor, matched 
 	}
 	return fmt.Sprintf("Monster %d", class)
 }
-
-const (
-	monsterInfoPreviewWidth  = 110
-	monsterInfoPreviewHeight = 160
-)

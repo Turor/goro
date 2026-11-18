@@ -8,8 +8,6 @@ import (
 	"github.com/kivutar/goro/session"
 )
 
-const partyContextMenuWidth = 132
-
 type PartyContextMenu struct {
 	Window
 	member    session.PartyMember
@@ -35,6 +33,10 @@ func (m *PartyContextMenu) Open(ctx Context, x, y int, member session.PartyMembe
 	x = clampWindowInt(x, windowScreenMargin, maxInt(windowScreenMargin, screenW-partyContextMenuWidth-windowScreenMargin))
 	y = clampWindowInt(y, windowScreenMargin, maxInt(windowScreenMargin, screenH-height-windowScreenMargin))
 	m.OpenAt(x, y, m.widgetTree())
+	m.claimLayoutReload(func() {
+		m.SetSize(partyContextMenuWidth, m.height())
+		m.SetContent(m.widgetTree())
+	})
 	m.Publish(ctx)
 }
 
@@ -62,7 +64,12 @@ func (m *PartyContextMenu) Rebind(ctx Context) {
 		return
 	}
 	m.ctx = ctx
+	m.SetSize(partyContextMenuWidth, m.height())
 	m.SetContent(m.widgetTree())
+	m.claimLayoutReload(func() {
+		m.SetSize(partyContextMenuWidth, m.height())
+		m.SetContent(m.widgetTree())
+	})
 	m.Publish(ctx)
 }
 

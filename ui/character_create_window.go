@@ -15,7 +15,7 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const CharacterCreateStatCount = 6
+const CharacterCreateStatCount = 6 // theme:ok fixed stat count and array length
 
 const (
 	CharacterCreateStatStr = iota
@@ -24,32 +24,6 @@ const (
 	CharacterCreateStatInt
 	CharacterCreateStatDex
 	CharacterCreateStatLuk
-)
-
-const (
-	characterCreatePanelW           = 142
-	characterCreatePanelH           = 166
-	characterCreateGraphW           = 194
-	characterCreateGraphH           = 230
-	characterCreateColumnGap        = 18
-	characterCreateGraphTopPad      = 15
-	characterCreateNameColumnTopPad = 15
-	characterCreatePreviewTopPad    = (characterCreateGraphH - characterCreatePanelH) / 2
-	characterCreateNameLift         = characterCreatePreviewTopPad - characterCreateNameColumnTopPad
-	characterCreateNameLabelH       = 22
-	characterCreateNameGap          = 5
-	characterCreateNameTopPad       = 8
-	characterCreateNameInputH       = 22
-	characterCreateGraphOuterRadius = 58
-	characterCreateStatButtonRadius = 90
-	characterCreateStatButtonW      = 38
-	characterCreateStatButtonH      = 36
-	characterCreateStatLabelW       = 32
-	characterCreateStatValueW       = 95
-	characterCreateStatRowH         = 22
-	characterCreateStatPanelPad     = 2
-	characterCreateHairColorButtonY = 5
-	characterCreateHairStyleButtonY = 39
 )
 
 type CharacterCreateWindowOptions struct {
@@ -75,11 +49,6 @@ type CharacterCreateWindow struct {
 	name      *textfield.Widget
 }
 
-const (
-	characterCreateWindowW = 576
-	characterCreateWindowH = 342
-)
-
 func NewCharacterCreateWindow(ctx client.Context, opts CharacterCreateWindowOptions, callbacks CharacterCreateWindowCallbacks) *CharacterCreateWindow {
 	x, y, width, height := characterCreateWindowRect(ctx)
 	w := &CharacterCreateWindow{
@@ -88,7 +57,22 @@ func NewCharacterCreateWindow(ctx client.Context, opts CharacterCreateWindowOpti
 	}
 	w.Window = NewWindow(width, height)
 	w.OpenAt(x, y, w.widgetTree())
+	w.OnLayoutReload(w.reloadForLayout)
 	return w
+}
+
+func (w *CharacterCreateWindow) reloadForLayout() {
+	w.SetSize(characterCreateWindowW, characterCreateWindowH)
+	focused := w.name != nil && w.name.IsFocused()
+	w.SetContent(w.widgetTree())
+	if w.name != nil {
+		w.name.SetFocused(focused)
+	}
+}
+
+// CharacterCreatePreviewSize is the create-preview bitmap size, matching the panel.
+func CharacterCreatePreviewSize() (int, int) {
+	return characterCreatePanelW, characterCreatePanelH
 }
 
 func (w *CharacterCreateWindow) SetOptions(ctx client.Context, opts CharacterCreateWindowOptions) {
@@ -152,7 +136,7 @@ func (w *CharacterCreateWindow) widgetTree() widget.Widget {
 	return Win(
 		Title("Make Character"),
 		CloseButton(false),
-		Size(characterCreateWindowW, characterCreateWindowH),
+		Size(float32(characterCreateWindowW), float32(characterCreateWindowH)),
 		Content(
 			primitives.Box(
 				primitives.HBox(
@@ -163,39 +147,39 @@ func (w *CharacterCreateWindow) widgetTree() widget.Widget {
 								next:  w.callbacks.OnHairNext,
 								color: w.callbacks.OnHairColor,
 							}).
-								Width(characterCreatePanelW).
-								Height(characterCreatePanelH),
+								Width(float32(characterCreatePanelW)).
+								Height(float32(characterCreatePanelH)),
 							primitives.Box(
 								rotheme.Label("Name").
-									LineHeight(characterCreateNameLabelH/rotheme.Default.Typography.TextSize),
+									LineHeight(float32(characterCreateNameLabelH)/rotheme.Default.Typography.TextSize),
 								primitives.Box(name).
-									Width(characterCreatePanelW).
-									Height(characterCreateNameInputH),
+									Width(float32(characterCreatePanelW)).
+									Height(float32(characterCreateNameInputH)),
 							).
-								Gap(characterCreateNameGap).
-								PaddingTop(characterCreateNameTopPad),
+								Gap(float32(characterCreateNameGap)).
+								PaddingTop(float32(characterCreateNameTopPad)),
 						).
-							Width(characterCreatePanelW).
-							PaddingTop(characterCreatePreviewTopPad).
-							Gap(-characterCreateNameLift),
+							Width(float32(characterCreatePanelW)).
+							PaddingTop(float32(characterCreatePreviewTopPad)).
+							Gap(-float32(characterCreateNameLift)),
 						newCharacterCreateStatGraph(w.opts.Stats, func(stat int) {
 							if w.callbacks.OnStat != nil {
 								w.callbacks.OnStat(stat)
 							}
 						}).
-							Width(characterCreateGraphW).
-							Height(characterCreateGraphH),
+							Width(float32(characterCreateGraphW)).
+							Height(float32(characterCreateGraphH)),
 					).
-						Gap(characterCreateColumnGap).
+						Gap(float32(characterCreateColumnGap)).
 						CrossAlign(primitives.CrossAxisStart),
 					primitives.Expanded(primitives.Box()),
 					characterCreateStatTablePanel(w.opts.Stats),
 				).
 					CrossAlign(primitives.CrossAxisStart),
 			).
-				PaddingTop(characterCreateGraphTopPad).
-				PaddingLeft(32).
-				PaddingRight(32),
+				PaddingTop(float32(characterCreateGraphTopPad)).
+				PaddingLeft(float32(characterCreateContentPadX)).
+				PaddingRight(float32(characterCreateContentPadX)),
 		),
 		Footer(
 			primitives.Expanded(primitives.Box()),
@@ -216,23 +200,23 @@ func (w *CharacterCreateWindow) widgetTree() widget.Widget {
 func characterCreateStatList(stats [CharacterCreateStatCount]uint8) widget.Widget {
 	return rotheme.Table(
 		characterCreateStatRows(stats),
-		rotheme.TableRowHeightOpt(characterCreateStatRowH),
+		rotheme.TableRowHeightOpt(float32(characterCreateStatRowH)),
 	)
 }
 
 func characterCreateStatTablePanel(stats [CharacterCreateStatCount]uint8) *primitives.BoxWidget {
 	return primitives.Box(characterCreateStatList(stats)).
-		Padding(characterCreateStatPanelPad).
+		Padding(float32(characterCreateStatPanelPad)).
 		Background(rotheme.Default.Colors.PanelBody).
-		BorderStyle(1, rotheme.Default.Colors.WindowBorder)
+		BorderStyle(characterCreateBorderWidth, rotheme.Default.Colors.WindowBorder)
 }
 
 func characterCreateStatRows(stats [CharacterCreateStatCount]uint8) []rotheme.TableRow {
 	rows := make([]rotheme.TableRow, 0, CharacterCreateStatCount)
 	for stat, value := range stats {
 		rows = append(rows, rotheme.TableRow{
-			{Text: CharacterCreateStatLabels()[stat], Width: characterCreateStatLabelW, Align: widget.TextAlignLeft, Head: true},
-			{Text: fmt.Sprintf("%d", value), Width: characterCreateStatValueW, Align: widget.TextAlignRight},
+			{Text: CharacterCreateStatLabels()[stat], Width: float32(characterCreateStatLabelW), Align: widget.TextAlignLeft, Head: true},
+			{Text: fmt.Sprintf("%d", value), Width: float32(characterCreateStatValueW), Align: widget.TextAlignRight},
 		})
 	}
 	return rows
@@ -303,8 +287,8 @@ func newCharacterCreatePreview(img image.Image, callbacks characterCreatePreview
 		image:     img,
 		callbacks: callbacks,
 		hovered:   -1,
-		width:     characterCreatePanelW,
-		height:    characterCreatePanelH,
+		width:     float32(characterCreatePanelW),
+		height:    float32(characterCreatePanelH),
 	}
 	w.SetVisible(true)
 	w.SetEnabled(true)
@@ -406,11 +390,12 @@ func characterCreatePreviewButtonAt(bounds geometry.Rect, point geometry.Point) 
 
 func characterCreatePreviewButtonRect(bounds geometry.Rect, index int) geometry.Rect {
 	size := rotheme.IconButtonSize
-	xs := [...]float32{bounds.Min.X + 16, bounds.Min.X + bounds.Width()/2 - size/2, bounds.Max.X - 16 - size}
+	inset := float32(characterCreatePreviewButtonInset)
+	xs := [...]float32{bounds.Min.X + inset, bounds.Min.X + bounds.Width()/2 - size/2, bounds.Max.X - inset - size}
 	ys := [...]float32{
-		bounds.Min.Y + characterCreateHairStyleButtonY,
-		bounds.Min.Y + characterCreateHairColorButtonY,
-		bounds.Min.Y + characterCreateHairStyleButtonY,
+		bounds.Min.Y + float32(characterCreateHairStyleButtonY),
+		bounds.Min.Y + float32(characterCreateHairColorButtonY),
+		bounds.Min.Y + float32(characterCreateHairStyleButtonY),
 	}
 	if index < 0 || index >= len(xs) {
 		index = 0
@@ -423,8 +408,8 @@ func newCharacterCreateStatGraph(stats [CharacterCreateStatCount]uint8, onClick 
 		stats:   stats,
 		onClick: onClick,
 		hovered: -1,
-		width:   characterCreateGraphW,
-		height:  characterCreatePanelH,
+		width:   float32(characterCreateGraphW),
+		height:  float32(characterCreatePanelH),
 	}
 	w.SetVisible(true)
 	w.SetEnabled(true)
@@ -456,20 +441,20 @@ func (w *characterCreateStatGraph) Draw(_ widget.Context, canvas widget.Canvas) 
 	cx := bounds.Min.X + bounds.Width()/2
 	cy := bounds.Min.Y + bounds.Height()/2
 	outer := float32(characterCreateGraphOuterRadius)
-	inner := float32(29)
+	inner := float32(characterCreateGraphInnerRadius)
 	points := characterCreateWidgetGraphPoints(cx, cy, outer)
 	mid := characterCreateWidgetGraphPoints(cx, cy, inner)
 	order := CharacterCreateGraphDrawOrder()
 	for i := 0; i < CharacterCreateStatCount; i++ {
 		current := order[i]
 		next := order[(i+1)%CharacterCreateStatCount]
-		canvas.DrawLine(points[current], points[next], rotheme.Default.Colors.FooterLine, 1)
-		canvas.DrawLine(mid[current], mid[next], rotheme.Default.Colors.FooterLine, 1)
-		canvas.DrawLine(geometry.Pt(cx, cy), points[current], widget.RGBA8(185, 204, 224, 150), 1)
+		canvas.DrawLine(points[current], points[next], rotheme.Default.Colors.FooterLine, characterCreateBorderWidth)
+		canvas.DrawLine(mid[current], mid[next], rotheme.Default.Colors.FooterLine, characterCreateBorderWidth)
+		canvas.DrawLine(geometry.Pt(cx, cy), points[current], characterCreateGraphSpoke, characterCreateBorderWidth)
 	}
 	if filler, ok := canvas.(widget.SVGFiller); ok {
 		fillBounds := characterCreateStatFillBounds(cx, cy, outer)
-		filler.FillSVGPath(w.statPolygonSVG(outer, outer, outer, order), fillBounds.Width(), fillBounds, widget.RGBA8(36, 92, 154, 220))
+		filler.FillSVGPath(w.statPolygonSVG(outer, outer, outer, order), fillBounds.Width(), fillBounds, characterCreateGraphFill)
 	}
 
 	for stat := 0; stat < CharacterCreateStatCount; stat++ {
@@ -479,7 +464,7 @@ func (w *characterCreateStatGraph) Draw(_ widget.Context, canvas widget.Canvas) 
 			bg = rotheme.Default.Colors.ButtonHover
 		}
 		canvas.DrawRoundRect(rect, bg, rotheme.ButtonRadius)
-		canvas.StrokeRoundRect(rect, rotheme.Default.Colors.ButtonBorder, rotheme.ButtonRadius, 1)
+		canvas.StrokeRoundRect(rect, rotheme.Default.Colors.ButtonBorder, rotheme.ButtonRadius, characterCreateBorderWidth)
 		rotheme.DrawLabel(canvas, CharacterCreateStatLabels()[stat], rect, widget.TextAlignCenter)
 	}
 }
@@ -488,7 +473,7 @@ func (w *characterCreateStatGraph) statPolygonSVG(cx, cy, outer float32, order [
 	points := characterCreateWidgetGraphPoints(cx, cy, outer)
 	var b strings.Builder
 	for i, stat := range order {
-		scale := float32(0.22) + float32(w.stats[stat])/9*0.78
+		scale := characterCreateStatScaleMin + float32(w.stats[stat])/9*characterCreateStatScaleSpan
 		x := cx + (points[stat].X-cx)*scale
 		y := cy + (points[stat].Y-cy)*scale
 		if i == 0 {
@@ -565,11 +550,11 @@ func characterCreateStatButtonRect(bounds geometry.Rect, stat int) geometry.Rect
 	}
 	cx := bounds.Min.X + bounds.Width()/2
 	cy := bounds.Min.Y + bounds.Height()/2
-	centers := characterCreateWidgetGraphPoints(cx, cy, characterCreateStatButtonRadius)
+	centers := characterCreateWidgetGraphPoints(cx, cy, float32(characterCreateStatButtonRadius))
 	center := centers[stat]
-	x := float32(math.Round(float64(center.X - characterCreateStatButtonW/2)))
-	y := float32(math.Round(float64(center.Y - characterCreateStatButtonH/2)))
-	return geometry.NewRect(x, y, characterCreateStatButtonW, characterCreateStatButtonH)
+	x := float32(math.Round(float64(center.X - float32(characterCreateStatButtonW/2))))
+	y := float32(math.Round(float64(center.Y - float32(characterCreateStatButtonH/2))))
+	return geometry.NewRect(x, y, float32(characterCreateStatButtonW), float32(characterCreateStatButtonH))
 }
 
 func characterCreateStatFillBounds(cx, cy, radius float32) geometry.Rect {

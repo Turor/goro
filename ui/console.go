@@ -25,28 +25,18 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
+// theme:ok input length, command history, and stored message cap
 const (
-	consoleMargin     = windowScreenMargin
-	consoleWidth      = 480
-	consoleHeight     = 176
-	consoleMaxInput   = 120
-	consoleMaxHistory = 20
-	consoleFieldH     = 24
-	consoleLineH      = 14
-	doriDoriTurns     = 6
-	doriDoriMinSpan   = 1500 * time.Millisecond
-	doriDoriMaxSpan   = 3 * time.Second
+	consoleMaxInput    = 120
+	consoleMaxHistory  = 20
+	consoleMaxMessages = 80
 )
 
-var (
-	consoleBackground       = widget.RGBA8(14, 18, 24, 188)
-	consoleColorChat        = color.RGBA{R: 235, G: 242, B: 250, A: 255}
-	consoleColorSystem      = color.RGBA{R: 252, G: 221, B: 128, A: 255}
-	consoleColorBlue        = color.RGBA{R: 0, G: 255, B: 255, A: 255}
-	consoleColorGuildChat   = color.RGBA{R: 180, G: 255, B: 180, A: 255}
-	consoleColorGuild       = color.RGBA{R: 255, G: 255, B: 99, A: 255}
-	consoleColorError       = color.RGBA{R: 255, G: 132, B: 132, A: 255}
-	consoleColorPlaceholder = color.RGBA{R: 150, G: 165, B: 182, A: 255}
+// theme:ok doridori turn count and timing window
+const (
+	doriDoriTurns   = 6
+	doriDoriMinSpan = 1500 * time.Millisecond
+	doriDoriMaxSpan = 3 * time.Second
 )
 
 type ConsoleMessage struct {
@@ -94,6 +84,7 @@ type ChatConsole struct {
 	playerMarkerStableUpdates int
 	messageH                  int
 	messageW                  int
+	layoutGen                 uint64
 }
 
 func (c *ChatConsole) Active() bool {
@@ -267,10 +258,22 @@ func (c *ChatConsole) Rebind(ctx client.Context) {
 	if c.inputBinding != nil {
 		c.inputBinding.console = c
 	}
-	if c.window.IsOpen() {
-		c.window.RebindContent(ctx, c.widgetTree(c.window.width, c.window.baseHeight()))
-		c.setActive(c.active)
+	if !c.window.IsOpen() {
+		return
 	}
+	// RebindContent unpublishes before the new tree is installed. That drops
+	// the focus manager's pointer at the old tree, so setActive can put the
+	// caret back without the next frame treating the editor as removed.
+	screenW, screenH := ctx.ScreenSize()
+	_, _, width, height := consoleBounds(screenW, screenH)
+	c.layoutGen = rotheme.Generation()
+	c.window.SetBackground(consoleBackground)
+	c.window.SetSize(width, height)
+	c.window.keepOnScreen(ctx)
+	c.cacheKey = c.renderKey(width, height)
+	c.window.RebindContent(ctx, c.widgetTree(width, height))
+	c.window.OnLayoutReload(func() { c.applyConsoleLayout() })
+	c.setActive(c.active)
 }
 
 func (c *ChatConsole) Unpublish(ctx client.Context) {
@@ -291,31 +294,51 @@ func (c *ChatConsole) ensureWindow(ctx client.Context) {
 	if c.window.dragging {
 		return
 	}
+	c.ctx = ctx
 	screenW, screenH := ctx.ScreenSize()
-	x, y, width, height := consoleBounds(screenW, screenH)
-	key := c.renderKey(width, height)
+	_, _, width, height := consoleBounds(screenW, screenH)
 	if c.window.width == 0 {
 		c.window = NewWindow(width, height)
 		c.window.CloseOnEsc = false
 		c.window.titleHeight = 0
 		c.window.setTitleButtonCount(0)
-		c.window.SetBackground(consoleBackground)
 		c.window.SetFullRedraw(true)
 	}
+	if !c.window.IsOpen() || c.layoutGen != rotheme.Generation() || c.cacheKey == "" {
+		c.applyConsoleLayout()
+		if c.window.layoutRebuild == nil {
+			c.window.OnLayoutReload(func() { c.applyConsoleLayout() })
+		}
+		return
+	}
+	x, y, width, height := consoleBounds(screenW, screenH)
+	key := c.renderKey(width, height)
 	c.window.SetAutoPosition(x, y)
 	c.window.SetSize(width, height)
 	c.window.keepOnScreen(ctx)
-	if !c.window.IsOpen() {
-		content := c.widgetTree(width, height)
+	if c.cacheKey != key {
 		c.cacheKey = key
+		c.window.SetContent(c.widgetTree(width, height))
+	}
+}
+
+// applyConsoleLayout rebuilds the console from the current layout tokens.
+func (c *ChatConsole) applyConsoleLayout() {
+	ctx := c.ctx
+	screenW, screenH := ctx.ScreenSize()
+	x, y, width, height := consoleBounds(screenW, screenH)
+	c.layoutGen = rotheme.Generation()
+	c.window.SetBackground(consoleBackground)
+	c.window.SetAutoPosition(x, y)
+	c.window.SetSize(width, height)
+	c.window.keepOnScreen(ctx)
+	c.cacheKey = c.renderKey(width, height)
+	content := c.widgetTree(width, height)
+	if !c.window.IsOpen() {
 		c.window.Open(ctx, content)
 		return
 	}
-	if c.cacheKey != key {
-		content := c.widgetTree(width, height)
-		c.cacheKey = key
-		c.window.SetContent(content)
-	}
+	c.window.SetContent(content)
 }
 
 func (c *ChatConsole) AddMessage(format string, args ...any) {
@@ -363,9 +386,9 @@ func (c *ChatConsole) addMessageColor(messageColor color.RGBA, allowRepeat bool,
 	c.lastMessage = text
 	c.lastMessageAt = now
 	c.messages = append(c.messages, ConsoleMessage{Text: text, Color: messageColor})
-	if len(c.messages) > 80 {
-		copy(c.messages, c.messages[len(c.messages)-80:])
-		c.messages = c.messages[:80]
+	if len(c.messages) > consoleMaxMessages {
+		copy(c.messages, c.messages[len(c.messages)-consoleMaxMessages:])
+		c.messages = c.messages[:consoleMaxMessages]
 	}
 	c.messagesKeyDirty = true
 	c.scheduleMessageRedraw()
@@ -1021,8 +1044,8 @@ func (c *ChatConsole) widgetTree(width, height int) widget.Widget {
 	c.renderedMessagesKeyValid = true
 	c.pendingMessageRedraw = false
 	c.pendingMessageRedrawReady = false
-	contentWidth := maxInt(1, width-16)
-	c.messageW = maxInt(1, scrollbarSafeIntWidth(contentWidth)-4)
+	contentWidth := maxInt(1, width-consolePadX-consolePadX)
+	c.messageW = maxInt(1, scrollbarSafeIntWidth(contentWidth)-consoleTextInset)
 	wrappedLines := wrapConsoleMessages(c.visibleLines(), c.messageW)
 	messageWidgets := make([]widget.Widget, 0, len(wrappedLines))
 	for _, line := range wrappedLines {
@@ -1031,30 +1054,30 @@ func (c *ChatConsole) widgetTree(width, height int) widget.Widget {
 				rotheme.Text(line.text).
 					Color(Color(line.color)).
 					MaxLines(1),
-			).Height(consoleLineH),
+			).Height(float32(consoleLineH)),
 		)
 	}
 	field := primitives.Box(c.inputWidget()).
 		Width(float32(contentWidth)).
-		Height(consoleFieldH).
+		Height(float32(consoleFieldH)).
 		CrossAlign(primitives.CrossAxisStretch)
-	messageHeight := maxInt(20, height-16-consoleFieldH-4)
+	messageHeight := maxInt(consoleMinMessageH, height-consolePadY-consolePadY-consoleGap-consoleMessageSlack-consoleFieldH)
 	c.messageH = messageHeight
 	// Leave the input field and scrollbar available for editing and scrolling.
-	c.window.dragBounds = geometry.NewRect(0, 0, float32(width-8-ROScrollbarGutter), float32(6+messageHeight))
+	c.window.dragBounds = geometry.NewRect(0, 0, float32(width-consolePadX-ROScrollbarGutter), float32(consolePadY+messageHeight))
 	messageList := primitives.Box(messageWidgets...).
 		Width(float32(contentWidth)).
-		Gap(1).
+		Gap(float32(consoleLineGap)).
 		CrossAlign(primitives.CrossAxisStretch)
 	scrollY := consoleBottomScrollY(len(messageWidgets), messageHeight)
 	c.ensureScrollSignal().Set(scrollY)
 	messages := primitives.Box(
 		scrollview.New(
 			primitives.Box(messageList).
-				PaddingRight(ROScrollbarGutter),
+				PaddingRight(float32(ROScrollbarGutter)),
 			scrollview.ScrollbarOpt(scrollview.ScrollbarAuto),
 			scrollview.ScrollYSignal(c.ensureScrollSignal()),
-			scrollview.ScrollStep(float32(consoleLineH*3)),
+			scrollview.ScrollStep(float32(consoleLineH*consoleScrollLines)),
 		),
 	).
 		Width(float32(contentWidth)).
@@ -1063,10 +1086,10 @@ func (c *ChatConsole) widgetTree(width, height int) widget.Widget {
 	return primitives.Box(messages, field).
 		Width(float32(width)).
 		Height(float32(height)).
-		PaddingXY(8, 6).
-		Gap(4).
+		PaddingXY(float32(consolePadX), float32(consolePadY)).
+		Gap(float32(consoleGap)).
 		Background(consoleBackground).
-		BorderStyle(1, widget.RGBA8(180, 198, 218, 95)).
+		BorderStyle(consoleBorderWidth, consoleBorderColor).
 		Rounded(WindowRadius).
 		CrossAlign(primitives.CrossAxisStretch)
 }
@@ -1084,7 +1107,7 @@ func consoleBottomScrollY(lines int, viewportHeight int) float32 {
 	if lines <= 0 {
 		return 0
 	}
-	contentHeight := float32(lines*consoleLineH + maxInt(0, lines-1))
+	contentHeight := float32(lines*consoleLineH + maxInt(0, lines-1)*consoleLineGap)
 	scrollY := contentHeight - float32(viewportHeight)
 	if scrollY < 0 {
 		return 0
@@ -1301,9 +1324,10 @@ func (c *ChatConsole) Messages() []ConsoleMessage {
 }
 
 func consoleBounds(screenW, screenH int) (x, y, w, h int) {
-	w = minInt(consoleWidth, maxInt(260, screenW-2*consoleMargin))
-	h = minInt(consoleHeight, maxInt(128, screenH-2*consoleMargin))
-	x = consoleMargin
-	y = maxInt(consoleMargin, screenH-h-consoleMargin)
+	margin := windowScreenMargin
+	w = minInt(consoleWidth, maxInt(consoleMinWidth, screenW-margin-margin))
+	h = minInt(consoleHeight, maxInt(consoleMinHeight, screenH-margin-margin))
+	x = margin
+	y = maxInt(margin, screenH-h-margin)
 	return x, y, w, h
 }

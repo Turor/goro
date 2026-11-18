@@ -371,7 +371,7 @@ func TestMinimapCompassOnlyRedrawsWhenPresentationChanges(t *testing.T) {
 
 func TestMinimapDrawDoesNotPaintInnerMapChrome(t *testing.T) {
 	w := newMinimapWidget()
-	w.SetBounds(geometry.NewRect(0, 0, minimapWidth, minimapHeight-ROWindowTitleHeight))
+	w.SetBounds(geometry.NewRect(0, 0, float32(minimapWidth), float32(minimapHeight-ROWindowTitleHeight)))
 	canvas := &uitest.MockCanvas{}
 	w.Draw(widget.NewContext(), canvas)
 

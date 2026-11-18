@@ -11,11 +11,6 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	partyCreateW        = 306
-	partyCreateContentH = 158
-)
-
 type PartyCreateWindowAction struct {
 	Name         string
 	ItemPickup   uint8
@@ -32,19 +27,29 @@ type PartyCreateWindow struct {
 }
 
 func (w *PartyCreateWindow) Open(ctx Context) {
-	w.EnsureWindow(partyCreateW, ROWindowTitleHeight+partyCreateContentH+ROWindowFooterHeight)
+	w.EnsureWindow(partyCreateW, partyCreateHeight())
 	w.ctx = ctx
 	w.name = ""
 	w.itemPickup = 0
 	w.itemDivision = 0
 	w.nameField = nil
 	w.Window.Open(ctx, w.widgetTree(ctx))
+	w.bindLayoutReload()
 	w.focusName()
 	w.Publish(ctx)
 }
 
+func (w *PartyCreateWindow) bindLayoutReload() {
+	w.claimLayoutReload(func() {
+		w.SetSize(partyCreateW, partyCreateHeight())
+		w.nameField = nil
+		w.SetContent(w.widgetTree(w.ctx))
+		w.focusName()
+	})
+}
+
 func (w *PartyCreateWindow) Update(ctx Context) bool {
-	w.EnsureWindow(partyCreateW, ROWindowTitleHeight+partyCreateContentH+ROWindowFooterHeight)
+	w.EnsureWindow(partyCreateW, partyCreateHeight())
 	w.ctx = ctx
 	if !w.IsOpen() {
 		return false
@@ -63,9 +68,11 @@ func (w *PartyCreateWindow) Rebind(ctx Context) {
 		return
 	}
 	w.ctx = ctx
+	w.SetSize(partyCreateW, partyCreateHeight())
 	w.nameField = nil
 	content := w.widgetTree(ctx)
 	w.focusName()
+	w.bindLayoutReload()
 	w.RebindContent(ctx, content)
 }
 
@@ -80,12 +87,12 @@ func (w *PartyCreateWindow) widgetTree(ctx Context) widget.Widget {
 		Title("Create Party"),
 		CloseButton(true),
 		OnClose(w.Close),
-		Size(partyCreateW, ROWindowTitleHeight+partyCreateContentH+ROWindowFooterHeight),
+		Size(float32(partyCreateW), float32(partyCreateHeight())),
 		Content(
 			primitives.Box(
 				rotheme.Label("Party Name"),
 				primitives.Box(w.nameInput(ctx)).
-					Height(24).
+					Height(float32(partyCreateNameH)).
 					CrossAlign(primitives.CrossAxisStretch),
 				rotheme.Label("Item Pickup"),
 				rotheme.Radio(
@@ -110,8 +117,8 @@ func (w *PartyCreateWindow) widgetTree(ctx Context) widget.Widget {
 					}),
 				),
 			).
-				Padding(14).
-				Gap(6),
+				Padding(float32(partyCreatePad)).
+				Gap(float32(partyCreateGap)),
 		),
 		Footer(
 			primitives.Expanded(primitives.Box()),

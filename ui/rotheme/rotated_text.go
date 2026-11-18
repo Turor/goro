@@ -164,7 +164,7 @@ func rasterizeRotatedText(key rotatedTextImageKey, scale float32) *image.RGBA {
 	source := image.NewRGBA(image.Rect(0, 0, sourceWidth, sourceHeight))
 	drawer := font.Drawer{
 		Dst:  source,
-		Src:  image.NewUniform(color.RGBA{R: r, G: g, B: b, A: a}),
+		Src:  image.NewUniform(color.RGBA{R: r, G: g, B: b, A: a}), // theme:ok caller colour converted to image/color
 		Face: face,
 		Dot:  fixed.P(padding, padding+metrics.Ascent.Ceil()),
 	}

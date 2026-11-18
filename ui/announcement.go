@@ -9,12 +9,8 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	announcementLife     = 20 * time.Second
-	announcementTop      = 40
-	announcementMaxWidth = 500
-	announcementPadding  = 10
-)
+// theme:ok announcement lifetime
+const announcementLife = 20 * time.Second
 
 type AnnouncementStyle struct {
 	Y        int
@@ -55,7 +51,7 @@ func (a *Announcement) Show(text string, messageColor color.RGBA, style Announce
 	if style.FontSize <= 0 {
 		style.FontSize = int(rotheme.Default.Typography.TextSize)
 	} else {
-		style.FontSize = maxInt(8, minInt(style.FontSize, 32))
+		style.FontSize = maxInt(announcementFontMin, minInt(style.FontSize, announcementFontMax))
 	}
 	a.text = text
 	a.color = messageColor
@@ -85,6 +81,6 @@ func (a *Announcement) Draw(screen *render.Frame, now time.Time) {
 		return
 	}
 	screenW := screen.Bounds().Dx()
-	maxWidth := minInt(announcementMaxWidth+2*announcementPadding, screenW)
+	maxWidth := minInt(announcementMaxWidth+announcementPadding+announcementPadding, screenW)
 	render.DrawUITextBanner(screen, a.text, float64(screenW)/2, float64(a.y), float64(maxWidth), a.color, float32(a.fontSize), a.bold)
 }

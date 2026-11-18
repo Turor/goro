@@ -5,8 +5,6 @@ import (
 	"github.com/kivutar/goro/input"
 )
 
-const mercenaryContextMenuWidth = 120
-
 type MercenaryContextActionKind uint8
 
 const (
@@ -34,6 +32,10 @@ func (m *MercenaryContextMenu) Open(ctx Context, x, y int, aggressive bool) {
 	x = clampWindowInt(x, windowScreenMargin, maxInt(windowScreenMargin, screenW-mercenaryContextMenuWidth-windowScreenMargin))
 	y = clampWindowInt(y, windowScreenMargin, maxInt(windowScreenMargin, screenH-m.height()-windowScreenMargin))
 	m.OpenAt(x, y, m.widgetTree())
+	m.claimLayoutReload(func() {
+		m.SetSize(mercenaryContextMenuWidth, m.height())
+		m.SetContent(m.widgetTree())
+	})
 	m.Publish(ctx)
 }
 

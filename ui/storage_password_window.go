@@ -11,14 +11,10 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
+// theme:ok storage password length limits
 const (
-	storagePasswordWindowW  = 326
-	storagePasswordContentH = 116
-	storagePasswordWindowH  = ROWindowTitleHeight + storagePasswordContentH + ROWindowFooterHeight
-	storagePasswordLabelW   = 104
-	storagePasswordFieldH   = 24
-	storagePasswordMinLen   = 4
-	storagePasswordMaxLen   = 8
+	storagePasswordMinLen = 4
+	storagePasswordMaxLen = 8
 )
 
 type StoragePasswordMode uint8
@@ -66,8 +62,17 @@ func (w *StoragePasswordWindow) OpenPrompt(ctx Context, mode StoragePasswordMode
 	w.waiting = false
 	w.action = StoragePasswordAction{}
 	w.Window.Open(ctx, w.widgetTree(ctx))
+	w.OnLayoutReload(w.reloadForLayout)
 	w.focusFirstField()
 	w.Publish(ctx)
+}
+
+func (w *StoragePasswordWindow) reloadForLayout() {
+	w.SetSize(storagePasswordWindowW, storagePasswordWindowH)
+	w.passwordField = nil
+	w.confirmField = nil
+	w.SetContent(w.widgetTree(w.ctx))
+	w.focusFirstField()
 }
 
 func (w *StoragePasswordWindow) Update(ctx Context) bool {
@@ -120,7 +125,7 @@ func (w *StoragePasswordWindow) widgetTree(ctx Context) widget.Widget {
 		Title("Storage Password"),
 		CloseButton(true),
 		OnClose(func() { w.cancel(ctx) }),
-		Size(storagePasswordWindowW, storagePasswordWindowH),
+		Size(float32(storagePasswordWindowW), float32(storagePasswordWindowH)),
 		Content(w.content(ctx)),
 		Footer(w.footer(ctx)...),
 	)
@@ -140,15 +145,15 @@ func (w *StoragePasswordWindow) content(ctx Context) widget.Widget {
 	children = append(children, primitives.Expanded(primitives.Box()))
 	if w.message != "" {
 		children = append(children,
-			primitives.Box(rotheme.Text(w.message).MaxLines(2)).Height(30),
+			primitives.Box(rotheme.Text(w.message).MaxLines(2)).Height(float32(storagePasswordMessageH)),
 		)
 	}
 	if w.mode == StoragePasswordModeLocked {
 		children = append(children, primitives.Expanded(primitives.Box()))
 	}
 	return primitives.Box(children...).
-		PaddingXY(14, 12).
-		Gap(8).
+		PaddingXY(float32(storagePasswordPadX), float32(storagePasswordPadY)).
+		Gap(float32(storagePasswordGap)).
 		CrossAlign(primitives.CrossAxisStretch)
 }
 
@@ -166,16 +171,16 @@ func (w *StoragePasswordWindow) footer(ctx Context) []widget.Widget {
 func (w *StoragePasswordWindow) fieldRow(label string, field *textfield.Widget) widget.Widget {
 	return primitives.HBox(
 		primitives.Box(rotheme.Label(label)).
-			Width(storagePasswordLabelW).
-			Height(storagePasswordFieldH),
+			Width(float32(storagePasswordLabelW)).
+			Height(float32(storagePasswordFieldH)),
 		primitives.Expanded(
 			primitives.Box(field).
-				Height(storagePasswordFieldH),
+				Height(float32(storagePasswordFieldH)),
 		),
 	).
-		Gap(8).
+		Gap(float32(storagePasswordFieldGap)).
 		CrossAlign(primitives.CrossAxisCenter).
-		Height(storagePasswordFieldH)
+		Height(float32(storagePasswordFieldH))
 }
 
 func (w *StoragePasswordWindow) passwordInput(ctx Context) *textfield.Widget {
