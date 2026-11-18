@@ -39,6 +39,7 @@ type Game struct {
 	quitting          bool
 	pendingScreenshot string
 	uiLayout          *uiLayoutWatcher
+	skillData         *skillDataWatcher
 	uiTuner           *gameui.LayoutTuner
 	uiGen             uint64
 }
@@ -106,6 +107,7 @@ func NewWithResources(cfg config.Config, resource *res.Manager) *Game {
 		screenH:  cfg.Window.Height,
 	}
 	g.uiLayout = newUILayoutWatcher(cfg, time.Now())
+	g.skillData = newSkillDataWatcher(cfg.UILayout.Watch, resource, time.Now())
 	if g.uiLayout != nil {
 		g.uiTuner = gameui.NewLayoutTuner(g.uiLayout.path)
 	}
@@ -140,6 +142,10 @@ func (g *Game) Update() error {
 	defer g.input.EndFrame()
 	g.network.Pump()
 	g.uiLayout.Update(g.input, time.Now())
+	g.skillData.Update(g.input, time.Now())
+	// Changed data files queued by the streaming layer reload here, on the
+	// game thread; open skill windows rebuild from the new tree generation.
+	g.resource.ApplyDataInvalidations()
 	g.updateUITuner()
 	// The file watcher and the tuner both change layout values.
 	if gen := rotheme.Generation(); gen != g.uiGen {
