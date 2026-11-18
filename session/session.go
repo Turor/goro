@@ -63,6 +63,7 @@ type Session struct {
 	Movement             Movement
 	Homunculus           Companion
 	Mercenary            Companion
+	Warpra               WarpraCatalog
 }
 
 func New() *Session {
@@ -107,6 +108,7 @@ func (s *Session) SelectCharacter(character Character) {
 	s.Movement = Movement{}
 	s.Homunculus = Companion{}
 	s.Mercenary = Companion{}
+	s.Warpra = WarpraCatalog{}
 }
 
 func (s *Session) SelectedCharacter() Character {
