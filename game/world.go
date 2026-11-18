@@ -92,8 +92,10 @@ type WorldMode struct {
 
 type worldUI struct {
 	// layoutGen is the UI layout token generation the windows were built with.
-	layoutGen            uint64
-	layoutBound          bool
+	layoutGen   uint64
+	layoutBound bool
+	// layoutReloading is set while a layout reload rebuilds the windows.
+	layoutReloading      bool
 	preferences          windowPreferences
 	pet                  pet.Windows
 	battle               battle.Windows
@@ -433,7 +435,10 @@ func (m *WorldMode) rebindPersistentUI(ctx client.Context) {
 	m.ui.companions.HomunculusInfo.Rebind(ctx)
 	m.ui.companions.MercenaryInfo.Rebind(ctx)
 	m.ui.social.WhisperWindows.Rebind(ctx)
-	m.ui.shortcutBar.ResetOverlay(ctx)
+	if !m.ui.layoutReloading {
+		// The hotbar rebuilds itself after a layout reload and keeps its place.
+		m.ui.shortcutBar.ResetOverlay(ctx)
+	}
 }
 
 func (m *WorldMode) playMapBGM(ctx client.Context, rswName string) {
@@ -1638,6 +1643,8 @@ func (m *WorldMode) rebuildUIAfterLayoutReload(ctx client.Context) {
 		// Windows not bound to this mode yet are built fresh on map entry.
 		return
 	}
+	m.ui.layoutReloading = true
+	defer func() { m.ui.layoutReloading = false }()
 	if manager, ok := ctx.UIManager.(interface{ KeepOverlayOrder(func()) }); ok {
 		manager.KeepOverlayOrder(func() { m.rebindPersistentUI(ctx) })
 		return
