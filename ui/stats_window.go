@@ -26,11 +26,10 @@ var (
 const (
 	statsRowGap = rotheme.TableGap
 
-	statsPrimaryLabelWidth  float32 = 44
-	statsPrimaryValueWidth  float32 = 56
-	statsPrimaryCostWidth   float32 = 28
-	statsPrimaryButtonGap   float32 = 7
-	statsPrimaryColumnWidth         = statsPrimaryLabelWidth + statsPrimaryValueWidth + statsPrimaryCostWidth + rotheme.IconButtonSize + statsPrimaryButtonGap
+	statsPrimaryLabelWidth float32 = 44
+	statsPrimaryValueWidth float32 = 56
+	statsPrimaryCostWidth  float32 = 28
+	statsPrimaryButtonGap  float32 = 7
 
 	statsDerivedLabelWidth  float32 = 46
 	statsDerivedValueWidth  float32 = 62
@@ -38,6 +37,13 @@ const (
 	statsDerivedColumnWidth         = 2*(statsDerivedLabelWidth+statsDerivedValueWidth) + 3*rotheme.TableGap
 	statsPrimaryRows                = 6
 )
+
+// Follows icon_button.size; refreshed with the window metrics on layout reload.
+var statsPrimaryColumnWidth = statsPrimaryColumnWidthFor()
+
+func statsPrimaryColumnWidthFor() float32 {
+	return statsPrimaryLabelWidth + statsPrimaryValueWidth + statsPrimaryCostWidth + rotheme.IconButtonSize + statsPrimaryButtonGap
+}
 
 func statsWindowWidthFor(pad, sectionGap float32) int {
 	return int(2*pad + statsPrimaryColumnWidth + sectionGap + statsDerivedColumnWidth)
@@ -48,6 +54,7 @@ func statsWindowHeightFor(rowH int, pad float32) int {
 }
 
 func recomputeStatsWindowMetrics() {
+	statsPrimaryColumnWidth = statsPrimaryColumnWidthFor()
 	statsWindowWidth = statsWindowWidthFor(statsWindowPad, statsSectionGap)
 	statsWindowHeight = statsWindowHeightFor(statsRowH, statsWindowPad)
 }

@@ -27,7 +27,6 @@ const (
 	shortcutMinRows    = 1
 	shortcutControlGap = 0
 	shortcutControlPad = 2
-	shortcutControlW   = int(rotheme.IconButtonSize)
 	shortcutGripWidth  = 10
 )
 
@@ -404,7 +403,7 @@ func (b *ShortcutBar) slotBounds(ctx Context, slot int) (int, int) {
 }
 
 func shortcutBarWidth() int {
-	return shortcutGripWidth + shortcutGridWidth() + shortcutControlGap + shortcutControlW + shortcutControlPad
+	return shortcutGripWidth + shortcutGridWidth() + shortcutControlGap + int(rotheme.IconButtonSize) + shortcutControlPad
 }
 
 func shortcutGridWidth() int {
@@ -465,7 +464,7 @@ func (b *ShortcutBar) rowControls(visibleRows int) widget.Widget {
 			b.setVisibleRows(b.ctx, b.visibleRowCount()-1)
 		}),
 	).
-		Width(float32(shortcutControlW)).
+		Width(rotheme.IconButtonSize).
 		Gap(shortcutControlGap).
 		PaddingTop(float32(shortcutPad))
 }

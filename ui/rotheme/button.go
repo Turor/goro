@@ -8,16 +8,6 @@ import (
 	"github.com/gogpu/ui/widget"
 )
 
-// Button metrics are layout tokens (see theme_tokens.go).
-var (
-	ButtonRadius        float32 = 6
-	ButtonPaddingX      float32 = 8
-	ButtonPaddingY      float32 = 5.5
-	LargeButtonPaddingY float32 = 8.5
-	buttonReflectInset  float32 = 3
-	buttonReflectAlpha  float32 = 0.4
-)
-
 func Button(label string, onClick func()) *primitives.BoxWidget {
 	return ButtonDisabled(label, false, onClick)
 }
@@ -159,7 +149,7 @@ func (ButtonPainter) PaintButton(canvas widget.Canvas, state button.PaintState) 
 }
 
 func buttonGradientLight(dark widget.Color) widget.Color {
-	return dark.Lerp(widget.RGBA(1, 1, 1, dark.A), 0.42)
+	return dark.Lerp(buttonHighlight.WithAlpha(dark.A), buttonGradientMix)
 }
 
 func lighterTitleBarGradient(factor float32) (top, bottom widget.Color) {
@@ -179,7 +169,7 @@ func lighterColor(base widget.Color, factor float32) widget.Color {
 	if factor <= 1 {
 		return base
 	}
-	return base.Lerp(widget.RGBA(1, 1, 1, base.A), 1-1/factor)
+	return base.Lerp(buttonHighlight.WithAlpha(base.A), 1-1/factor)
 }
 
 func drawButtonGradient(canvas widget.Canvas, bounds geometry.Rect, dark widget.Color, radius float32) {
@@ -195,8 +185,8 @@ func drawButtonGradientColors(canvas widget.Canvas, bounds geometry.Rect, top, b
 }
 
 func drawButtonShadow(canvas widget.Canvas, bounds geometry.Rect, radius float32) {
-	canvas.DrawRoundRect(bounds.TranslateXY(0, 2), widget.RGBA(0.4, 0.4, 0.4, 0.15), radius)
-	canvas.DrawRoundRect(bounds.TranslateXY(0, 1), widget.RGBA(0.4, 0.4, 0.4, 0.35), radius)
+	canvas.DrawRoundRect(bounds.TranslateXY(0, buttonShadowOffsetY), buttonShadowFar, radius)
+	canvas.DrawRoundRect(bounds.TranslateXY(0, 1), buttonShadowNear, radius)
 }
 
 func drawButtonReflect(canvas widget.Canvas, bounds geometry.Rect, radius float32) {
@@ -212,7 +202,7 @@ func drawButtonReflect(canvas widget.Canvas, bounds geometry.Rect, radius float3
 		height,
 	)
 	reflectRadius := min(max(float32(0), radius-buttonReflectInset), height/2)
-	reflectColor := widget.RGBA(1, 1, 1, buttonReflectAlpha)
+	reflectColor := buttonHighlight.WithAlpha(buttonReflectAlpha)
 	if reflectRadius > 0 {
 		canvas.DrawRoundRect(reflectBounds, reflectColor, reflectRadius)
 		return
