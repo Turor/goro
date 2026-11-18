@@ -562,6 +562,12 @@ func (m *WorldMode) handleNetworkPacket(ctx client.Context, pkt network.Packet, 
 		m.ui.inventoryBag.ClampScroll(ctx.Session)
 		return nil, false
 	}
+	if boundary, ok, err := network.ParseInventoryBoundary(pkt); err != nil {
+		glog.Errorf("parse inventory boundary 0x%04X: %v", pkt.ID, err)
+	} else if ok {
+		glog.Debugf("inventory list start=%t type=%d", boundary.Start, boundary.Type)
+		return nil, false
+	}
 	if items, ok, err := network.ParseInventoryItemList(pkt); err != nil {
 		glog.Errorf("parse inventory item list 0x%04X: %v", pkt.ID, err)
 	} else if ok {
@@ -1490,6 +1496,8 @@ func (m *WorldMode) handleNetworkPacket(ctx client.Context, pkt network.Packet, 
 		m.actors().ClearActorVanish(entry.ID)
 		m.upsertNetworkActor(ctx, entry)
 		m.actors().ApplyWarpPortalEntry(ctx, entry)
+	} else {
+		glog.Debugf("world packet 0x%04X len=%d not handled by the generic parsers", pkt.ID, len(pkt.Data))
 	}
 
 	return nil, false

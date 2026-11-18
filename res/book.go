@@ -16,15 +16,15 @@ type BookContent struct {
 	Lines      []string
 }
 
-func BookResourcePath(itemID uint16) string {
+func BookResourcePath(itemID uint32) string {
 	return fmt.Sprintf("data/book/%d.txt", itemID)
 }
 
-func (m *Manager) HasBook(itemID uint16) bool {
+func (m *Manager) HasBook(itemID uint32) bool {
 	return itemID != 0 && m.HasFileExact(BookResourcePath(itemID))
 }
 
-func (m *Manager) LoadBook(itemID uint16) (BookContent, error) {
+func (m *Manager) LoadBook(itemID uint32) (BookContent, error) {
 	if m == nil || itemID == 0 {
 		return BookContent{}, fmt.Errorf("invalid book item %d", itemID)
 	}

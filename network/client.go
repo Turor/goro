@@ -32,7 +32,11 @@ func (e FrameError) Unwrap() error {
 type Client struct {
 	clientDate int
 	trace      bool
+	lengths    LengthTable
 	framer     *Framer
+	// rawSkip is the number of unframed bytes the server sends before its next
+	// packet (the char server answers CH_ENTER with a bare 4-byte account ID).
+	rawSkip int
 
 	mu      sync.Mutex
 	conn    net.Conn
@@ -58,7 +62,8 @@ func NewClient(clientDate int, trace bool) *Client {
 	return &Client{
 		clientDate:           clientDate,
 		trace:                trace,
-		framer:               NewFramer(PacketLengths2008()),
+		lengths:              PacketLengthsForClientDate(clientDate),
+		framer:               NewFramer(PacketLengthsForClientDate(clientDate)),
 		status:               "offline",
 		mapKeepaliveInterval: defaultMapKeepaliveInterval,
 	}
@@ -76,13 +81,19 @@ func (c *Client) Connect(ctx context.Context, address string, port int) error {
 
 	sendCh := make(chan outboundPacket, sendQueueSize)
 
+	// Each connection gets a fresh framer: bytes left over from a previous
+	// server must never prefix the next server's first packet.
+	framer := NewFramer(c.lengths)
+
 	c.mu.Lock()
 	c.conn = conn
 	c.sendCh = sendCh
+	c.framer = framer
+	c.rawSkip = 0
 	c.status = fmt.Sprintf("connected to %s:%d", address, port)
 	c.mu.Unlock()
 
-	go c.readLoop(conn)
+	go c.readLoop(conn, framer)
 	go c.writeLoop(conn, sendCh)
 	return nil
 }
@@ -163,6 +174,15 @@ func (c *Client) SendCharServerEnter(accountID, authCode, userLevel uint32, sex 
 		UserLevel: userLevel,
 		Sex:       sex,
 	})
+	if IsClientDate20250716(c.clientDate) {
+		// Hercules answers CH_ENTER with the bare account ID before any
+		// packet. The 2008 profile relies on framer resync for this; the
+		// 20250716 table is dense enough that resync can lock onto a bogus
+		// opcode inside those 4 bytes, so skip them explicitly.
+		c.mu.Lock()
+		c.rawSkip = 4
+		c.mu.Unlock()
+	}
 	return c.Send(packet)
 }
 
@@ -595,7 +615,7 @@ func (c *Client) DrainErrors() []error {
 	return out
 }
 
-func (c *Client) readLoop(conn net.Conn) {
+func (c *Client) readLoop(conn net.Conn, framer *Framer) {
 	buf := make([]byte, 4096)
 	for {
 		n, err := conn.Read(buf)
@@ -607,7 +627,15 @@ func (c *Client) readLoop(conn net.Conn) {
 				headLen := min(n, 32)
 				glog.Debugf("network read n=%d head=%s", n, hex.EncodeToString(buf[:headLen]))
 			}
-			packets, frameErr := c.framer.Push(buf[:n])
+			data := buf[:n]
+			c.mu.Lock()
+			if c.conn == conn && c.rawSkip > 0 {
+				skip := min(c.rawSkip, len(data))
+				c.rawSkip -= skip
+				data = data[skip:]
+			}
+			c.mu.Unlock()
+			packets, frameErr := framer.Push(data)
 			c.mu.Lock()
 			c.packets = append(c.packets, packets...)
 			if frameErr != nil {

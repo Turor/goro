@@ -19,7 +19,7 @@ func TestClientCloseDoesNotReportReadLoopError(t *testing.T) {
 	client.mu.Unlock()
 	done := make(chan struct{})
 	go func() {
-		client.readLoop(local)
+		client.readLoop(local, client.framer)
 		close(done)
 	}()
 
@@ -43,7 +43,7 @@ func TestClientReadLoopReportsRemoteDisconnect(t *testing.T) {
 	client.mu.Unlock()
 	done := make(chan struct{})
 	go func() {
-		client.readLoop(local)
+		client.readLoop(local, client.framer)
 		close(done)
 	}()
 

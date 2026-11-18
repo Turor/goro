@@ -32,16 +32,16 @@ func applyParameterChange(ctx client.Context, change network.ParameterChange) {
 		ctx.Session.Progress.JobExp = change.Value
 	case network.StatusHP:
 		ctx.Session.Vitals.HP = value
-		ctx.Session.Selected.HP = clampInt16(value)
+		ctx.Session.Selected.HP = value
 	case network.StatusMaxHP:
 		ctx.Session.Vitals.MaxHP = value
-		ctx.Session.Selected.MaxHP = clampInt16(value)
+		ctx.Session.Selected.MaxHP = value
 	case network.StatusSP:
 		ctx.Session.Vitals.SP = value
-		ctx.Session.Selected.SP = clampInt16(value)
+		ctx.Session.Selected.SP = value
 	case network.StatusMaxSP:
 		ctx.Session.Vitals.MaxSP = value
-		ctx.Session.Selected.MaxSP = clampInt16(value)
+		ctx.Session.Selected.MaxSP = value
 	case network.StatusPoint:
 		ctx.Session.Stats.Points = value
 	case network.StatusBaseLevel:
@@ -238,7 +238,7 @@ func recoverSessionHP(s *session.Session, amount int) bool {
 		next = maxHP
 	}
 	s.Vitals.HP = next
-	s.Selected.HP = clampInt16(next)
+	s.Selected.HP = next
 	return true
 }
 
@@ -252,7 +252,7 @@ func recoverSessionSP(s *session.Session, amount int) bool {
 		next = maxSP
 	}
 	s.Vitals.SP = next
-	s.Selected.SP = clampInt16(next)
+	s.Selected.SP = next
 	return true
 }
 
