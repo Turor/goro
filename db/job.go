@@ -384,6 +384,17 @@ func init() {
 	duplicateJobResourceName(JobStar, JobStarB)
 	duplicateJobResourceName(JobStar2, JobStar2B)
 	duplicateJobResourceName(JobLinker, JobLinkerB)
+	for job, name := range renewalJobResourceNames {
+		if _, ok := JobResourceName[job]; !ok {
+			JobResourceName[job] = name
+		}
+	}
+}
+
+// IsDoramJob reports the Doram race jobs, whose body, head and hair palette
+// sprites live under 도람족 instead of 인간족 (roBrowser DB.isDoram).
+func IsDoramJob(job int) bool {
+	return job >= 4217 && job <= 4220 || job == 4308 || job == 4315
 }
 
 func duplicateJobResourceName(origin int, jobs ...int) {
