@@ -111,25 +111,28 @@ func TestRSMFrustum(t *testing.T) {
 	rsw := &res.RSW{Models: []res.RSWModel{
 		{Filename: "front.rsm", Position: res.RSWVector3{}},
 		{Filename: "back.rsm", Position: res.RSWVector3{Z: -70}},
+		{Filename: "side.rsm", Position: res.RSWVector3{X: 30}},
 	}}
 	system := &System{}
 	projection := scene.NewProjection(800, 600, 200, 200, 0, 0, 230, 80)
 	visible := system.visibleRSMPlacements(rsw, gnd, projection)
-	front, back := placementSeen(visible, 200), placementSeen(visible, 130)
-	if !front || back {
-		t.Fatalf("frustum visible front=%t back=%t count=%d", front, back, len(visible))
+	front := placementAt(visible, 200, 200)
+	back := placementAt(visible, 200, 130)
+	side := placementAt(visible, 230, 200)
+	if !front || back || side {
+		t.Fatalf("frustum visible front=%t back=%t side=%t count=%d", front, back, side, len(visible))
 	}
 	open := scene.Projection{PlayerX: 200, PlayerY: 200}
 	both := system.visibleRSMPlacements(rsw, gnd, open)
-	if !placementSeen(both, 200) || !placementSeen(both, 130) {
-		t.Fatalf("zero view kept front=%t back=%t", placementSeen(both, 200), placementSeen(both, 130))
+	if !placementAt(both, 200, 200) || !placementAt(both, 200, 130) || !placementAt(both, 230, 200) {
+		t.Fatalf("zero view kept front=%t back=%t side=%t", placementAt(both, 200, 200), placementAt(both, 200, 130), placementAt(both, 230, 200))
 	}
-	t.Logf("frustum kept %d of 2, zero view kept %d", len(visible), len(both))
+	t.Logf("frustum kept %d of 3, zero view kept %d", len(visible), len(both))
 }
 
-func placementSeen(visible []ModelPlacement, baseY float64) bool {
+func placementAt(visible []ModelPlacement, baseX, baseY float64) bool {
 	for _, placement := range visible {
-		if placement.BaseY == baseY {
+		if placement.BaseX == baseX && placement.BaseY == baseY {
 			return true
 		}
 	}

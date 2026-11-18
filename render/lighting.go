@@ -70,9 +70,35 @@ func SelectPointLights(lights []PointLight, cap int) []PointLight {
 	return out
 }
 
+// ShaderFramebufferTile is the tile tile_point_term reads for a framebuffer
+// pixel. The origin is the top-left, matching pixel.y / screen.y in the
+// shader: pixel (0, 0) is tile (0, 0). NDC y +1 is that top row, and NDC y -1
+// is the last row.
+func ShaderFramebufferTile(pixelX, pixelY, screenW, screenH float32, tilesX, tilesY int) (int, int) {
+	return shaderTileAxis(pixelX, screenW, tilesX), shaderTileAxis(pixelY, screenH, tilesY)
+}
+
+func shaderTileAxis(pixel, screen float32, tiles int) int {
+	if tiles < 1 {
+		tiles = 1
+	}
+	if screen < 1 {
+		screen = 1
+	}
+	idx := int(pixel / screen * float32(tiles))
+	if idx < 0 {
+		idx = 0
+	}
+	if idx >= tiles {
+		idx = tiles - 1
+	}
+	return idx
+}
+
 // AssignTileLights bins lights into a tilesX by tilesY grid. A light is absent
 // from a tile its screen-space sphere misses. The returned lists are light
-// indices into lights.
+// indices into lights. Rows match ShaderFramebufferTile, so row 0 is the top
+// of the framebuffer.
 func AssignTileLights(lights []PointLight, viewProj [16]float32, tilesX, tilesY int) [][]int {
 	if tilesX < 1 {
 		tilesX = LightTileCount
@@ -90,24 +116,10 @@ func AssignTileLights(lights []PointLight, viewProj [16]float32, tilesX, tilesY 
 		if clipW > 0.0001 {
 			radius = light.Range / clipW
 		}
-		minX := int(math.Floor(float64((ndcX - radius + 1) * 0.5 * float32(tilesX))))
-		maxX := int(math.Floor(float64((ndcX + radius + 1) * 0.5 * float32(tilesX))))
-		minY := int(math.Floor(float64((ndcY - radius + 1) * 0.5 * float32(tilesY))))
-		maxY := int(math.Floor(float64((ndcY + radius + 1) * 0.5 * float32(tilesY))))
-		if maxX < 0 || maxY < 0 || minX >= tilesX || minY >= tilesY {
+		minX, maxX, okX := ndcSpanTiles(ndcX, radius, tilesX, false)
+		minY, maxY, okY := ndcSpanTiles(ndcY, radius, tilesY, true)
+		if !okX || !okY {
 			continue
-		}
-		if minX < 0 {
-			minX = 0
-		}
-		if minY < 0 {
-			minY = 0
-		}
-		if maxX >= tilesX {
-			maxX = tilesX - 1
-		}
-		if maxY >= tilesY {
-			maxY = tilesY - 1
 		}
 		for y := minY; y <= maxY; y++ {
 			for x := minX; x <= maxX; x++ {
@@ -120,6 +132,31 @@ func AssignTileLights(lights []PointLight, viewProj [16]float32, tilesX, tilesY 
 		}
 	}
 	return tiles
+}
+
+// ndcSpanTiles maps a light's NDC extent onto shader tile indexes. yFromTop
+// uses the framebuffer convention: NDC +1 is tile 0 and NDC -1 is the last tile.
+func ndcSpanTiles(ndc, radius float32, tiles int, yFromTop bool) (int, int, bool) {
+	lo := ndc - radius
+	hi := ndc + radius
+	if hi < -1 || lo > 1 {
+		return 0, 0, false
+	}
+	screen := float32(tiles)
+	var p0, p1 float32
+	if yFromTop {
+		p0 = (1 - hi) * 0.5 * screen
+		p1 = (1 - lo) * 0.5 * screen
+	} else {
+		p0 = (lo + 1) * 0.5 * screen
+		p1 = (hi + 1) * 0.5 * screen
+	}
+	a := shaderTileAxis(p0, screen, tiles)
+	b := shaderTileAxis(p1, screen, tiles)
+	if a > b {
+		a, b = b, a
+	}
+	return a, b, true
 }
 
 func projectClip(viewProj [16]float32, p [3]float32) (ndcX, ndcY, clipW float32, ok bool) {

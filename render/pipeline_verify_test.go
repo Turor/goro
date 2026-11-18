@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"image/color"
 	"math"
+	"strings"
 	"testing"
 )
 
@@ -178,6 +179,53 @@ func TestEnhancedShade(t *testing.T) {
 		t.Fatalf("uniform tile 0 count %d does not match AssignTileLights %d", binary.LittleEndian.Uint32(rawOn[384:388]), len(encodedTiles[0]))
 	}
 	t.Logf("facing=%.3f away=%.3f occluded=%.3f selected=%d tile0=%d", facing[0], away[0], occluded[0], len(selected), len(tiles[0]))
+}
+
+func TestTileRowMatchesShader(t *testing.T) {
+	const screen = float32(64)
+	bottom := PointLight{Position: [3]float32{0, -1, 0}, Color: [3]float32{1, 1, 1}, Range: 0.05, Intensity: 1}
+	if !strings.Contains(lightingShaderWGSL, "pixel.y / screen.y * tiles.y") {
+		t.Fatal("shader tile row does not read framebuffer y from the top")
+	}
+	pixelY := (1 - float32(-1)) * screen * 0.5
+	if pixelY >= screen {
+		pixelY = screen - 0.5
+	}
+	col, row := ShaderFramebufferTile(screen*0.5, pixelY, screen, screen, LightTileCount, LightTileCount)
+	if row == 0 {
+		t.Fatal("bottom framebuffer pixel mapped to tile row 0")
+	}
+	tiles := AssignTileLights([]PointLight{bottom}, IdentityViewProjection(), LightTileCount, LightTileCount)
+	if !tileRowHas(tiles, row) {
+		t.Fatalf("light at NDC y=-1 is absent from shader row %d", row)
+	}
+	if tileRowHas(tiles, 0) {
+		t.Fatal("light at NDC y=-1 was assigned to the top tile row")
+	}
+	raw := EncodeLightingUniform(SunLight{}, []PointLight{bottom}, IdentityViewProjection(), IdentityViewProjection(), int(screen), int(screen), true)
+	tile := row*LightTileCount + col
+	if uniformTileCount(raw, tile) == 0 {
+		t.Fatalf("uniform tile %d (row %d) does not carry the bottom light", tile, row)
+	}
+	if uniformTileCount(raw, col) != 0 {
+		t.Fatal("uniform top row carries the bottom light")
+	}
+	t.Logf("NDC y=-1 shader row %d tile %d count %d", row, tile, uniformTileCount(raw, tile))
+}
+
+func tileRowHas(tiles [][]int, row int) bool {
+	for x := 0; x < LightTileCount; x++ {
+		slot := row*LightTileCount + x
+		if slot >= 0 && slot < len(tiles) && len(tiles[slot]) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func uniformTileCount(buf []byte, tile int) uint32 {
+	offset := 384 + (tile/4)*16 + (tile%4)*4
+	return binary.LittleEndian.Uint32(buf[offset : offset+4])
 }
 
 func fillSubmissionFrame(screen *Frame, red, blue *Image, triX float32) {
