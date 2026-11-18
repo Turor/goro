@@ -154,6 +154,18 @@ func (w *uiLayoutWatcher) reload(now time.Time) bool {
 	return true
 }
 
+// updateUITuner toggles the --ui-dev tuning panel with F11 and runs it.
+func (g *Game) updateUITuner() {
+	if g.uiTuner == nil || g.cfg.Headless {
+		return
+	}
+	ctx := g.modeContext()
+	if g.input.KeyCodeJustPressed(gpucontext.KeyF11) {
+		g.uiTuner.Toggle(ctx)
+	}
+	g.uiTuner.Update(ctx)
+}
+
 var (
 	uiLayoutOKColor    = color.RGBA{R: 160, G: 255, B: 160, A: 255}
 	uiLayoutErrorColor = color.RGBA{R: 255, G: 120, B: 120, A: 255}
