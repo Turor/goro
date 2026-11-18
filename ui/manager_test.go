@@ -214,6 +214,11 @@ func TestKeepOverlayOrderRepublishesInPlace(t *testing.T) {
 	if len(m.overlays) != 3 || m.overlays[0] != widget.Widget(a2) || m.overlays[2] != widget.Widget(c) {
 		t.Fatalf("overlay order after a kept-order republish = %v", m.overlays)
 	}
+	b2 := primitives.Box()
+	m.ReplaceOverlay(b, b2)
+	if m.overlays[1] != widget.Widget(b2) {
+		t.Fatal("a rebuilt window did not keep its stack slot")
+	}
 	d := primitives.Box()
 	m.AddOverlay(d)
 	if m.overlays[3] != widget.Widget(d) {

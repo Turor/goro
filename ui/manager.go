@@ -91,6 +91,29 @@ func (m *Manager) RemoveOverlay(root widget.Widget) {
 	}
 }
 
+// ReplaceOverlay swaps old for root in the same stack slot, or adds root on
+// top when old is not published.
+func (m *Manager) ReplaceOverlay(old, root widget.Widget) {
+	if m == nil || root == nil {
+		return
+	}
+	for i, child := range m.overlays {
+		if child != old {
+			continue
+		}
+		disableRootRepaintBoundary(root)
+		m.overlays[i] = root
+		for j, foreground := range m.foreground {
+			if foreground == old {
+				m.foreground[j] = root
+			}
+		}
+		m.apply()
+		return
+	}
+	m.AddOverlay(root)
+}
+
 // KeepOverlayOrder runs fn so that a window it republishes (its overlay
 // removed and a new one added) keeps its place in the stack instead of
 // jumping to the top. A UI layout reload rebuilds windows this way.
@@ -99,8 +122,9 @@ func (m *Manager) KeepOverlayOrder(fn func()) {
 		fn()
 		return
 	}
+	prevKeep, prevAt := m.keepOrder, m.replaceAt
 	m.keepOrder, m.replaceAt = true, -1
-	defer func() { m.keepOrder, m.replaceAt = false, -1 }()
+	defer func() { m.keepOrder, m.replaceAt = prevKeep, prevAt }()
 	fn()
 }
 

@@ -502,6 +502,16 @@ func (w *Window) Publish(ctx client.Context) {
 	if w.fullRedraw {
 		markNeedsRedraw(root)
 	}
+	// A window that is already up and only rebuilt (resized, or restyled by
+	// a layout reload) keeps its place in the stack; Raise brings it forward.
+	if replacer, ok := ctx.UIManager.(interface{ ReplaceOverlay(old, root widget.Widget) }); ok && w.published != nil {
+		old := w.published
+		w.cancelDragLayer(ctx)
+		clearPositionedOverlayDamage(old)
+		w.published = root
+		replacer.ReplaceOverlay(old, root)
+		return
+	}
 	w.Unpublish(ctx)
 	w.published = root
 	ctx.UIManager.AddOverlay(root)
