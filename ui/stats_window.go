@@ -12,12 +12,19 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
+// Row height, padding and section gap are layout tokens; the window size
+// follows them (recomputeStatsWindowMetrics).
+var (
+	statsWindowPad  float32 = 10
+	statsRowH               = 18
+	statsSectionGap float32 = 10
+
+	statsWindowWidth  = statsWindowWidthFor(statsWindowPad, statsSectionGap)
+	statsWindowHeight = statsWindowHeightFor(statsRowH, statsWindowPad)
+)
+
 const (
-	statsWindowHeight = 161
-	statsWindowPad    = 10
-	statsRowH         = 18
-	statsRowGap       = rotheme.TableGap
-	statsSectionGap   = 10
+	statsRowGap = rotheme.TableGap
 
 	statsPrimaryLabelWidth  float32 = 44
 	statsPrimaryValueWidth  float32 = 56
@@ -29,8 +36,21 @@ const (
 	statsDerivedValueWidth  float32 = 62
 	statsDerivedPairWidth           = statsDerivedLabelWidth + rotheme.TableGap + statsDerivedValueWidth
 	statsDerivedColumnWidth         = 2*(statsDerivedLabelWidth+statsDerivedValueWidth) + 3*rotheme.TableGap
-	statsWindowWidth                = int(2*statsWindowPad + statsPrimaryColumnWidth + statsSectionGap + statsDerivedColumnWidth)
+	statsPrimaryRows                = 6
 )
+
+func statsWindowWidthFor(pad, sectionGap float32) int {
+	return int(2*pad + statsPrimaryColumnWidth + sectionGap + statsDerivedColumnWidth)
+}
+
+func statsWindowHeightFor(rowH int, pad float32) int {
+	return ROWindowTitleHeight + int(2*pad) + statsPrimaryRows*rowH + int((statsPrimaryRows-1)*statsRowGap)
+}
+
+func recomputeStatsWindowMetrics() {
+	statsWindowWidth = statsWindowWidthFor(statsWindowPad, statsSectionGap)
+	statsWindowHeight = statsWindowHeightFor(statsRowH, statsWindowPad)
+}
 
 type StatsWindow struct {
 	Window
@@ -108,6 +128,7 @@ func (w *StatsWindow) refresh(ctx Context) {
 	if !w.IsOpen() {
 		return
 	}
+	w.SetSize(statsWindowWidth, statsWindowHeight)
 	w.snapshot = statsWindowSnapshot(ctx.Session)
 	w.SetContent(w.widgetTree(ctx))
 	w.Publish(ctx)
@@ -137,7 +158,7 @@ func (w *StatsWindow) widgetTree(ctx Context) widget.Widget {
 		Title("Status"),
 		CloseButton(true),
 		OnClose(func() { w.close(ctx) }),
-		Size(float32(statsWindowWidth), statsWindowHeight),
+		Size(float32(statsWindowWidth), float32(statsWindowHeight)),
 		Content(
 			primitives.Box(w.statsBodyWidget(ctx)).Padding(statsWindowPad),
 		),
@@ -167,7 +188,7 @@ func (w *StatsWindow) statRowsWidget(ctx Context) widget.Widget {
 		children = append(children,
 			primitives.HBox(
 				statsLabelCell(row.label, statsPrimaryLabelWidth).
-					Height(statsRowH).
+					Height(float32(statsRowH)).
 					Background(rotheme.Default.Colors.ButtonHover),
 				statsTextCell(formatStatValue(row.value, row.bonus), statsPrimaryValueWidth, rotheme.Default.Colors.Text),
 				statsTextCell(fmt.Sprintf("%d", statCost(row)), statsPrimaryCostWidth, rotheme.Default.Colors.MutedText),
@@ -176,7 +197,7 @@ func (w *StatsWindow) statRowsWidget(ctx Context) widget.Widget {
 					w.requestStatIncrease(ctx, row)
 				}),
 			).
-				Height(statsRowH).
+				Height(float32(statsRowH)).
 				CrossAlign(primitives.CrossAxisCenter).
 				Background(rotheme.Default.Colors.WindowFooter),
 		)
@@ -269,7 +290,7 @@ func statsDetailsWidget(s *session.Session, points int) widget.Widget {
 				{Text: statsGuildName(s), Width: statsDerivedPairWidth, Align: widget.TextAlignRight},
 			},
 		},
-		rotheme.TableRowHeightOpt(statsRowH),
+		rotheme.TableRowHeightOpt(float32(statsRowH)),
 		rotheme.TableColors(rotheme.Default.Colors.ButtonHover, rotheme.Default.Colors.WindowFooter),
 	)
 }

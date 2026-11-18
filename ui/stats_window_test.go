@@ -14,8 +14,8 @@ func TestStatsWindowSectionsLayOutHorizontally(t *testing.T) {
 	w := &StatsWindow{}
 	body := w.statsBodyWidget(Context{Session: &session.Session{}})
 	body.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(
-		float32(statsWindowWidth-2*statsWindowPad),
-		statsWindowHeight-ROWindowTitleHeight-2*statsWindowPad,
+		float32(statsWindowWidth)-2*statsWindowPad,
+		float32(statsWindowHeight-ROWindowTitleHeight)-2*statsWindowPad,
 	)))
 	children := body.(interface{ Children() []widget.Widget }).Children()
 	if len(children) != 2 {
@@ -75,7 +75,7 @@ func TestStatsDetailsSplitAtDerivedTableCenter(t *testing.T) {
 	details := statsDetailsWidget(&session.Session{GuildName: "Knights"}, 12)
 	details.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(
 		statsDerivedColumnWidth,
-		2*statsRowH+rotheme.TableGap,
+		2*float32(statsRowH)+rotheme.TableGap,
 	)))
 	if got := details.(interface{ Bounds() geometry.Rect }).Bounds().Width(); got != statsDerivedColumnWidth {
 		t.Fatalf("stats details width = %.1f, want %.1f", got, statsDerivedColumnWidth)
@@ -99,7 +99,7 @@ func TestStatsPrimaryRowsUseTableRhythm(t *testing.T) {
 	rows := w.statRowsWidget(Context{Session: &session.Session{}})
 	rows.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(
 		statsPrimaryColumnWidth,
-		6*statsRowH+5*statsRowGap,
+		6*float32(statsRowH)+5*statsRowGap,
 	)))
 	children := rows.(interface{ Children() []widget.Widget }).Children()
 	if len(children) != 6 {
@@ -107,10 +107,10 @@ func TestStatsPrimaryRowsUseTableRhythm(t *testing.T) {
 	}
 	for i, child := range children {
 		bounds := child.(interface{ Bounds() geometry.Rect }).Bounds()
-		if bounds.Height() != statsRowH {
+		if bounds.Height() != float32(statsRowH) {
 			t.Fatalf("primary row %d height = %.1f, want %d", i, bounds.Height(), statsRowH)
 		}
-		wantY := float32(i) * (statsRowH + statsRowGap)
+		wantY := float32(i) * (float32(statsRowH) + statsRowGap)
 		if bounds.Min.Y != wantY {
 			t.Fatalf("primary row %d y = %.1f, want %.1f", i, bounds.Min.Y, wantY)
 		}

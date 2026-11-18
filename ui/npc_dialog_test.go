@@ -142,7 +142,7 @@ func TestNPCDialogControllerSelectionScrollsAndClamps(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		dialog.Control(Context{}, "down")
 	}
-	if dialog.menuRow != 6 || dialog.menuScrollY.Get() != 2*npcMenuRowH {
+	if dialog.menuRow != 6 || dialog.menuScrollY.Get() != float32(2*npcMenuRowH) {
 		t.Fatalf("last choice not selected and visible: row=%d scroll=%v", dialog.menuRow, dialog.menuScrollY.Get())
 	}
 	for i := 0; i < 10; i++ {

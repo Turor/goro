@@ -11,6 +11,8 @@ func init() {
 	rotheme.RegisterFloat("window", "title_padding_left", &windowTitlePadL, 0, 64, "space left of the window title")
 	rotheme.RegisterInt("window", "title_padding_right", &windowTitleButtonPadR, 0, 64, "space right of the title bar buttons")
 	rotheme.RegisterInt("window", "title_button_gap", &windowTitleButtonGap, 0, 32, "gap between title bar buttons")
+	rotheme.RegisterInt("window", "title_height", &windowTitleHeight, 16, 64, "title bar height; windows grow or shrink to keep their content area")
+	rotheme.RegisterInt("window", "footer_height", &windowFooterHeight, 24, 96, "footer height; windows grow or shrink to keep their content area")
 	rotheme.RegisterInt("window", "footer_padding", &ROWindowFooterPadding, 0, 64, "footer left and right padding")
 	rotheme.RegisterInt("window", "footer_gap", &ROWindowFooterGap, 0, 64, "gap between footer buttons")
 
@@ -23,6 +25,20 @@ func init() {
 	rotheme.RegisterInt("inventory", "cols", &inventoryBagCols, 1, 16, "inventory columns")
 	rotheme.RegisterInt("inventory", "rows", &inventoryBagRows, 1, 20, "visible inventory rows")
 	rotheme.OnLayoutApplied(recomputeInventoryBagMetrics)
+
+	rotheme.RegisterInt("status", "row_height", &statsRowH, 12, 40, "status window row height")
+	rotheme.RegisterFloat("status", "padding", &statsWindowPad, 0, 32, "status window padding")
+	rotheme.RegisterFloat("status", "section_gap", &statsSectionGap, 0, 48, "gap between the status window's stat columns")
+	rotheme.OnLayoutApplied(recomputeStatsWindowMetrics)
+
+	rotheme.RegisterInt("npc_dialog", "width", &npcDialogWidth, 260, 800, "NPC dialog width")
+	rotheme.RegisterInt("npc_dialog", "height", &npcDialogHeight, 130, 600, "NPC dialog height")
+	rotheme.RegisterInt("npc_dialog", "padding", &npcDialogPad, 0, 32, "NPC dialog text padding")
+	rotheme.RegisterInt("npc_dialog", "line_height", &npcDialogLineH, 10, 32, "NPC dialog line height")
+	rotheme.RegisterInt("npc_dialog", "button_width", &npcDialogButtonW, 40, 200, "NPC dialog Next/Close button width")
+	rotheme.RegisterInt("npc_dialog", "menu_width", &npcMenuWidth, 220, 600, "NPC menu width")
+	rotheme.RegisterInt("npc_dialog", "menu_row_height", &npcMenuRowH, 14, 40, "NPC menu row height")
+	rotheme.RegisterInt("npc_dialog", "menu_padding", &npcMenuPad, 0, 32, "NPC menu padding")
 
 	rotheme.RegisterRGBA("theme", "hp_bar", &PlayerHPBarColor, "player HP bar")
 	rotheme.RegisterRGBA("theme", "sp_bar", &PlayerSPBarColor, "player SP bar")
