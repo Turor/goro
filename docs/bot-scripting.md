@@ -47,6 +47,8 @@ Run the same scripts without a window or audio:
 
 `--headless` enables automatic login and requires credentials and a character
 slot (0–8). These can also come from the existing `[login]` configuration.
+Live TEST scenarios (`scenarios/*.lua`) are opt-in; see
+[simulation testing](simulation-testing.md).
 As with `--autologin`, the first login server and first character server are
 selected by default. Use `--server-slot N` to select a login server from
 `clientinfo.xml`, and `--char-server-slot N` to select a character server from
@@ -132,6 +134,8 @@ The ordinary `input()` callback retains its gameplay focus filtering.
 
 UI navigation is available in login and world mode:
 
+- `goro.quit()` asks the client to exit (true when a quit handler is bound).
+  Headless scenarios use it instead of waiting for a signal.
 - `goro.in_game()` reports whether the script is bound to the world. Gameplay
   actions return false/no result during login; world lists are empty and vitals
   are zero.
