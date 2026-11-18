@@ -52,12 +52,12 @@ type MailEntry struct {
 
 type MailAttachment struct {
 	Amount     uint32
-	ItemID     uint16
+	ItemID     uint32
 	Type       uint16
 	Identified bool
 	Damaged    bool
 	Refine     uint8
-	Cards      [4]uint16
+	Cards      [4]uint32
 }
 
 type MailMessage struct {
@@ -134,11 +134,11 @@ func ParseMailRead(packet Packet) (MailMessage, bool, error) {
 		return MailMessage{}, false, fmt.Errorf("invalid mail body length %d for packet %d", bodyLen, len(p))
 	}
 	attachment := MailAttachment{
-		Amount: binary.LittleEndian.Uint32(p[80:84]), ItemID: binary.LittleEndian.Uint16(p[84:86]),
+		Amount: binary.LittleEndian.Uint32(p[80:84]), ItemID: uint32(binary.LittleEndian.Uint16(p[84:86])),
 		Type: binary.LittleEndian.Uint16(p[86:88]), Identified: p[88] != 0, Damaged: p[89] != 0, Refine: p[90],
 	}
 	for i := range attachment.Cards {
-		attachment.Cards[i] = binary.LittleEndian.Uint16(p[91+i*2 : 93+i*2])
+		attachment.Cards[i] = uint32(binary.LittleEndian.Uint16(p[91+i*2 : 93+i*2]))
 	}
 	return MailMessage{
 		ID: binary.LittleEndian.Uint32(p[4:8]), Title: packetCString(p[8:48]),

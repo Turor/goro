@@ -51,7 +51,7 @@ type StorageWindow struct {
 }
 
 type storageItemIconKey struct {
-	itemID     uint16
+	itemID     uint32
 	identified bool
 }
 

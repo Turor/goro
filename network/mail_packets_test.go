@@ -114,7 +114,7 @@ func TestMailReadAttachmentsAndBody(t *testing.T) {
 		if !ok || err != nil {
 			t.Fatalf("read: %v %v", ok, err)
 		}
-		if m.ID != 42 || m.Title != "Subject" || m.Sender != "Sender" || m.Body != body || m.Zeny != 123456 || m.Attachment != (MailAttachment{ItemID: 501, Amount: 15, Type: 4, Identified: true, Damaged: true, Refine: 7, Cards: [4]uint16{4000, 4001, 4002, 4003}}) {
+		if m.ID != 42 || m.Title != "Subject" || m.Sender != "Sender" || m.Body != body || m.Zeny != 123456 || m.Attachment != (MailAttachment{ItemID: 501, Amount: 15, Type: 4, Identified: true, Damaged: true, Refine: 7, Cards: [4]uint32{4000, 4001, 4002, 4003}}) {
 			t.Fatalf("message %+v", m)
 		}
 	}

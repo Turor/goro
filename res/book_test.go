@@ -89,7 +89,7 @@ func TestManagerLoadsBookFromRealClientData(t *testing.T) {
 			if err != nil {
 				continue
 			}
-			book, err := m.LoadBook(uint16(itemID))
+			book, err := m.LoadBook(uint32(itemID))
 			if err != nil {
 				t.Fatalf("load %s: %v", name, err)
 			}

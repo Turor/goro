@@ -67,7 +67,7 @@ type HomunculusProperty struct {
 
 type HomunculusFeedResult struct {
 	Result bool
-	ItemID uint16
+	ItemID uint32
 }
 
 type HomunculusStateChange struct {
@@ -245,7 +245,7 @@ func ParseHomunculusFeedResult(packet Packet) (HomunculusFeedResult, bool, error
 	}
 	return HomunculusFeedResult{
 		Result: packet.Data[2] != 0,
-		ItemID: binary.LittleEndian.Uint16(packet.Data[3:5]),
+		ItemID: uint32(binary.LittleEndian.Uint16(packet.Data[3:5])),
 	}, true, nil
 }
 

@@ -309,7 +309,7 @@ func benchStorageSession(count int) *session.Session {
 	for i := range items {
 		items[i] = session.InventoryItem{
 			Index:      uint16(i + 1),
-			ItemID:     uint16(500 + i%120),
+			ItemID:     uint32(500 + i%120),
 			Amount:     (i % 99) + 1,
 			Identified: true,
 		}
@@ -329,7 +329,7 @@ func benchCartSession(count int) *session.Session {
 	for i := range items {
 		items[i] = session.InventoryItem{
 			Index:      uint16(i + 1),
-			ItemID:     uint16(500 + i%120),
+			ItemID:     uint32(500 + i%120),
 			Amount:     (i % 99) + 1,
 			Identified: true,
 		}

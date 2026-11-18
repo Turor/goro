@@ -69,16 +69,16 @@ func TestPartyPickupShowsEquipmentDetails(t *testing.T) {
 	}
 	for _, tt := range []struct {
 		name       string
-		itemID     uint16
+		itemID     uint32
 		identified bool
 		refine     uint8
-		cards      [4]uint16
+		cards      [4]uint32
 		want       string
 	}{
-		{"refined", 1101, true, 7, [4]uint16{}, "+7 Sword [3]"},
-		{"carded", 1101, true, 7, [4]uint16{4001, 4001, 4002}, "+7 Double Poring Sword Fabre [3]"},
-		{"existing slot suffix", 1102, true, 7, [4]uint16{4001}, "+7 Poring Sword [3]"},
-		{"unidentified", 1101, false, 7, [4]uint16{4001}, "Weapon"},
+		{"refined", 1101, true, 7, [4]uint32{}, "+7 Sword [3]"},
+		{"carded", 1101, true, 7, [4]uint32{4001, 4001, 4002}, "+7 Double Poring Sword Fabre [3]"},
+		{"existing slot suffix", 1102, true, 7, [4]uint32{4001}, "+7 Poring Sword [3]"},
+		{"unidentified", 1101, false, 7, [4]uint32{4001}, "Weapon"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := client.Context{Resources: resources, Session: &session.Session{
@@ -88,13 +88,13 @@ func TestPartyPickupShowsEquipmentDetails(t *testing.T) {
 			data := make([]byte, 22)
 			binary.LittleEndian.PutUint16(data, network.PacketZCItemPickupParty)
 			binary.LittleEndian.PutUint32(data[2:], 300)
-			binary.LittleEndian.PutUint16(data[6:], tt.itemID)
+			binary.LittleEndian.PutUint16(data[6:], uint16(tt.itemID))
 			if tt.identified {
 				data[8] = 1
 			}
 			data[10] = tt.refine
 			for i, card := range tt.cards {
-				binary.LittleEndian.PutUint16(data[11+2*i:], card)
+				binary.LittleEndian.PutUint16(data[11+2*i:], uint16(card))
 			}
 			binary.LittleEndian.PutUint16(data[19:], db.EquipWeapon)
 			data[21] = db.ItemTypeWeapon

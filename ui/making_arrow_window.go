@@ -27,7 +27,7 @@ type MakingArrowWindow struct {
 	Window
 	scrollY      state.Signal[float32]
 	selectedRow  int
-	itemIDs      []uint16
+	itemIDs      []uint32
 	lastClickAt  time.Time
 	lastClickRow int
 	icons        map[identifyItemIconKey]image.Image
@@ -108,7 +108,7 @@ func (w *MakingArrowWindow) widgetTree(ctx Context) widget.Widget {
 }
 
 func (w *MakingArrowWindow) tableWidget(ctx Context) *rotheme.TableViewWidget {
-	ids := append([]uint16(nil), w.itemIDs...)
+	ids := append([]uint32(nil), w.itemIDs...)
 	return itemTableView(
 		w.itemTableRows(ctx, ids),
 		"Item",
@@ -164,7 +164,7 @@ func (w *MakingArrowWindow) rowAtMouse(mouseX, mouseY int) (int, bool) {
 	return row, true
 }
 
-func (w *MakingArrowWindow) makeArrow(ctx Context, itemID uint16) {
+func (w *MakingArrowWindow) makeArrow(ctx Context, itemID uint32) {
 	if ctx.Network == nil {
 		glog.Warnf("making arrow failed: not connected")
 		return
@@ -186,7 +186,7 @@ func (w *MakingArrowWindow) cancel(ctx Context) {
 	w.Close()
 }
 
-func (w *MakingArrowWindow) itemTableRows(ctx Context, itemIDs []uint16) []itemTableRow {
+func (w *MakingArrowWindow) itemTableRows(ctx Context, itemIDs []uint32) []itemTableRow {
 	rows := make([]itemTableRow, len(itemIDs))
 	for i, itemID := range itemIDs {
 		rows[i] = itemTableRow{
@@ -197,7 +197,7 @@ func (w *MakingArrowWindow) itemTableRows(ctx Context, itemIDs []uint16) []itemT
 	return rows
 }
 
-func (w *MakingArrowWindow) itemIconImage(manager *res.Manager, itemID uint16) image.Image {
+func (w *MakingArrowWindow) itemIconImage(manager *res.Manager, itemID uint32) image.Image {
 	return cachedIdentifiedItemIcon(manager, itemID, &w.icons, &w.iconMiss)
 }
 

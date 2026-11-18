@@ -85,7 +85,7 @@ type shopTableRow struct {
 }
 
 type shopItemIconKey struct {
-	itemID     uint16
+	itemID     uint32
 	identified bool
 }
 
@@ -793,7 +793,7 @@ func tableRowAt(mx, my, tableX, tableY, tableW, tableH, rowCount, rowHeight int,
 	return row, true
 }
 
-func (w *ShopWindow) shopItemIconImage(manager *res.Manager, itemID uint16) image.Image {
+func (w *ShopWindow) shopItemIconImage(manager *res.Manager, itemID uint32) image.Image {
 	if manager == nil || itemID == 0 {
 		return nil
 	}

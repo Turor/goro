@@ -46,7 +46,7 @@ func itemUseAckTestPacket(aid uint32, itemID, amount uint16, result byte) networ
 func TestNearbyItemUseDoesNotChangeOwnInventory(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
-		itemID uint16
+		itemID uint32
 		amount uint16
 		charID uint32
 	}{
@@ -61,7 +61,7 @@ func TestNearbyItemUseDoesNotChangeOwnInventory(t *testing.T) {
 			ctx.World.UpsertActor(worldstate.Actor{ID: 2000001, X: 10, Y: 20})
 			mode := &WorldMode{}
 			mode.ui.shortcutBar.SyncFromSession(ctx)
-			mode.handleNetworkPacket(ctx, itemUseAckTestPacket(2000001, tc.itemID, tc.amount, 1), time.Now())
+			mode.handleNetworkPacket(ctx, itemUseAckTestPacket(2000001, uint16(tc.itemID), tc.amount, 1), time.Now())
 			if items := ctx.Session.Inventory.Items; len(items) != 1 || items[0].Amount != 4 {
 				t.Fatalf("nearby item use changed own inventory: %+v", items)
 			}
@@ -93,7 +93,7 @@ func TestUnconsumedItemUsePreservesInventoryWithoutFalseError(t *testing.T) {
 	// successful rental/reusable item uses. The ACK cannot distinguish them.
 	for _, tc := range []struct {
 		name   string
-		itemID uint16
+		itemID uint32
 	}{
 		{"rejected dead branch", 604},
 		{"successful rental potion", 501},
@@ -101,7 +101,7 @@ func TestUnconsumedItemUsePreservesInventoryWithoutFalseError(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			for _, packet := range []network.Packet{
-				itemUseAckTestPacket(2000000, tc.itemID, 0, 0),
+				itemUseAckTestPacket(2000000, uint16(tc.itemID), 0, 0),
 				{ID: 0x00A8, Data: []byte{0xA8, 0, 12, 0, 0, 0, 0}},
 			} {
 				ctx := itemUseTestContext()
