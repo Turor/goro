@@ -147,7 +147,7 @@ height = 720
 fullscreen = false
 
 [packet]
-client_date = 20080910
+client_date = 20250716
 profile = 23
 
 [audio]
@@ -220,7 +220,7 @@ Useful options:
 
 ```sh
 --net-trace
---packet-client-date 20211103 # only when rAthena is rebuilt for that packetver
+--packet-client-date 20080910 # classic profile; default and clientinfo.xml are 20250716
 --fullscreen
 --bgm=false
 --bgm-volume 0.35
