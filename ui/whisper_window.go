@@ -163,7 +163,7 @@ func (w *WhisperWindow) contentTree() widget.Widget {
 					Color(line.color).
 					MaxLines(1).
 					Ellipsis(),
-			).Height(consoleLineH),
+			).Height(float32(consoleLineH)),
 		)
 	}
 	messageList := primitives.Box(rows...).
