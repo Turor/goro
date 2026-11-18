@@ -10,7 +10,7 @@
 #   goro/main/goro-linux-amd64-<sha>
 #   goro/main/goro-windows-amd64-<sha>.exe
 # The last 3 SHAs are kept. The bucket's existing write-only key is reused;
-# remoteclient2 serves https://ro.turoran.com/client/goro/main/latest from it.
+# remoteclient2 serves the update catalog (updater.DefaultCatalogURL) from it.
 set -euo pipefail
 
 SHA="" MANIFEST="" LINUX="" WINDOWS="" DRY_RUN=0
@@ -47,8 +47,12 @@ fi
 
 CRED="${GORO_GARAGE_ENV:-$HOME/Work/korangar-signing/garage-writer.env}"
 [[ -f "$CRED" ]] || { echo "missing garage writer env" >&2; exit 1; }
-GARAGE_HOST="${GARAGE_HOST:-root@192.168.11.20}"
-SSH_EXTRA="${SSH_EXTRA:--J root@192.168.11.3}"
+# Hosts are operator config, never committed (see publish.env.example).
+CONF="${GORO_PUBLISH_CONFIG:-$HOME/Work/goro-release-publisher/publish.env}"
+pconf() { [[ -f "$CONF" ]] || return 0; sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" "$CONF" | tail -n1 | tr -d '\r"' | sed 's/[[:space:]]*$//'; }
+GARAGE_HOST="${GARAGE_HOST:-$(pconf garage_host)}"
+SSH_EXTRA="${SSH_EXTRA-$(pconf ssh_extra)}"
+[[ -n "$GARAGE_HOST" ]] || { echo "set garage_host in $CONF" >&2; exit 1; }
 ENDPOINT="${ENDPOINT:-http://127.0.0.1:3900}"
 REMOTE=/root/goro-release-upload
 

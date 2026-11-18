@@ -16,13 +16,18 @@ manifest magic, file names and hosting prefix differ.
    a lock older than 15 minutes is taken over by an atomic rename). If another
    instance holds it, the check is skipped. `<name>.old` is only deleted by the
    lock holder.
-3. The client fetches `https://ro.turoran.com/client/goro/main/latest`. That
-   remoteclient2 endpoint returns JSON with a short-lived presigned
-   `manifest_url` and per-file URLs for the private Garage bucket.
-   `GORO_UPDATE_MANIFEST_URL` overrides the URL (a catalog or a manifest), but
-   only allowlisted URLs are fetched: that catalog, presigned
-   `https://garage.turoran.com/korangar-releases/goro/main/<name>` objects,
-   loopback `http://`, and `file://`. Redirects are refused.
+3. The client fetches the catalog URL linked into the release
+   (`updater.DefaultCatalogURL`). That remoteclient2 endpoint returns JSON
+   with a short-lived presigned `manifest_url` and per-file URLs for the
+   private Garage bucket. `GORO_UPDATE_MANIFEST_URL` overrides the URL (a
+   catalog or a manifest), but only allowlisted URLs are fetched: that
+   catalog, presigned `<updater.ReleaseURLPrefix><name>` objects, loopback
+   `http://`, and `file://`. Redirects are refused. Neither URL is in the
+   source: `scripts/release/build-release.sh` links them in from the build
+   host's `/etc/goro-release/release.env` (see
+   `scripts/release/release.env.example`) and refuses to build without them.
+   A binary without them (any plain `go build`) allowlists only `file://` and
+   loopback.
    The catalog and manifest fetches share one **12 s deadline** (5 s dial, 5 s
    TLS), so a stalled server delays the window by at most that; a timeout is a
    quiet skip. Only the binary download gets the long (10 minute) timeout.
