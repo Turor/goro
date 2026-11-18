@@ -804,38 +804,54 @@ type EffectSpec struct {
 	SFXDelays        []time.Duration
 	SFXRandMin       int
 	SFXRandMax       int
-	Components       []EffectComponent
+	// Layer, ZOrder and Depth drive draw order. Layer < 0 draws with the
+	// ground pass (before entities); Layer > 0 draws after entities. Layer 0
+	// keeps each component's RenderBefore flag. Depth is extra camera-plane
+	// bias for the renderer (G61 owns Crazy Uproar's remaining visual fix).
+	Layer      int
+	ZOrder     int
+	Depth      float64
+	Components []EffectComponent
 }
 
 // DrawsBeforeEntities reports whether this component is submitted in the
-// pre-actor world pass. Negative Layer matches G60's planned order field.
+// pre-actor world pass on its own Layer: negative draws before entities,
+// positive after, and 0 keeps RenderBefore. EffectDrawsBeforeEntities also
+// falls back to the spec Layer.
 func (c EffectComponent) DrawsBeforeEntities() bool {
-	return c.RenderBefore || c.Layer < 0
+	switch {
+	case c.Layer < 0:
+		return true
+	case c.Layer > 0:
+		return false
+	default:
+		return c.RenderBefore
+	}
 }
 
 type EffectComponent struct {
-	Kind             EffectComponentKind
-	HitRing          *EffectHitRing
-	HitParticles     *EffectHitParticles
-	FuncName         string
-	Color            color.RGBA
-	Duration         time.Duration
-	DurationRandMin  time.Duration
-	DurationRandMax  time.Duration
-	Delay            time.Duration
-	DuplicateDelay   time.Duration
-	DelayOffsetDelta time.Duration
-	Repeat           bool
-	RepeatDelay      time.Duration
-	STRFile          string
-	STRMinFile       string
-	STRRandMin       int
-	STRRandMax       int
-	AttachedEntity   bool
-	RenderBefore     bool // robr renderBeforeEntities
-	// Layer is the data-driven draw order G60 will load. Negative draws before
-	// entities; 0 and positive draw after. RenderBefore still draws first.
+	Kind               EffectComponentKind
+	HitRing            *EffectHitRing
+	HitParticles       *EffectHitParticles
+	FuncName           string
+	Color              color.RGBA
+	Duration           time.Duration
+	DurationRandMin    time.Duration
+	DurationRandMax    time.Duration
+	Delay              time.Duration
+	DuplicateDelay     time.Duration
+	DelayOffsetDelta   time.Duration
+	Repeat             bool
+	RepeatDelay        time.Duration
+	STRFile            string
+	STRMinFile         string
+	STRRandMin         int
+	STRRandMax         int
+	AttachedEntity     bool
+	RenderBefore       bool // robr renderBeforeEntities
 	Layer              int
+	ZOrder             int
+	Depth              float64
 	TexturePath        string
 	TextureName        string
 	TextureFile        string

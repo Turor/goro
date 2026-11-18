@@ -858,13 +858,25 @@ type Spec struct {
 	SfxDelays        []time.Duration
 	SfxRandMin       int
 	SfxRandMax       int
+	Layer            int
+	ZOrder           int
+	Depth            float64
 	Components       []Component
 }
 
 // DrawsBeforeEntities reports whether this component is submitted in the
-// pre-actor world pass. Negative Layer is the G60 order hook.
+// pre-actor world pass on its own Layer: negative draws before entities,
+// positive after, and 0 keeps RenderBefore. Spec.componentDrawsBeforeEntities
+// also falls back to the spec Layer.
 func (c Component) DrawsBeforeEntities() bool {
-	return c.RenderBefore || c.Layer < 0
+	switch {
+	case c.Layer < 0:
+		return true
+	case c.Layer > 0:
+		return false
+	default:
+		return c.RenderBefore
+	}
 }
 
 type Component struct {
@@ -889,6 +901,8 @@ type Component struct {
 	AttachedEntity     bool
 	RenderBefore       bool
 	Layer              int
+	ZOrder             int
+	Depth              float64
 	TexturePath        string
 	TextureName        string
 	TextureFile        string
@@ -1551,6 +1565,9 @@ func convertDBWorldEffectSpec(spec db.EffectSpec) Spec {
 		DetachLocalActor: spec.DetachLocalActor,
 		SfxRandMin:       spec.SFXRandMin,
 		SfxRandMax:       spec.SFXRandMax,
+		Layer:            spec.Layer,
+		ZOrder:           spec.ZOrder,
+		Depth:            spec.Depth,
 	}
 	if len(spec.SFX) > 0 {
 		out.Sfx = append([]string(nil), spec.SFX...)
@@ -1590,6 +1607,8 @@ func convertDBWorldEffectComponent(component db.EffectComponent) Component {
 		AttachedEntity:     component.AttachedEntity,
 		RenderBefore:       component.RenderBefore,
 		Layer:              component.Layer,
+		ZOrder:             component.ZOrder,
+		Depth:              component.Depth,
 		TexturePath:        component.TexturePath,
 		TextureName:        component.TextureName,
 		TextureFile:        component.TextureFile,
@@ -1744,6 +1763,7 @@ func (m *System) Draw(screen *render.Frame, ctx client.Context, projection scene
 		m.whitePixel = render.NewImage(1, 1)
 		m.whitePixel.Fill(color.White)
 	}
+	m.invalidateSpecsIfStale()
 	active := m.Active[:0]
 	for _, effect := range m.Active {
 		if effect.Expired(now) {
@@ -1798,8 +1818,16 @@ func (m *System) Draw(screen *render.Frame, ctx client.Context, projection scene
 			anchor = effect.ActorOrigin
 		}
 		for index, component := range spec.Components {
-			if component.DrawsBeforeEntities() != beforeEntities {
+			if spec.componentDrawsBeforeEntities(component) != beforeEntities {
 				continue
+			}
+			// Inherit the spec Layer and Depth so the STR pass choice
+			// (AfterBillboards) and depth bias match the pass drawn here.
+			if component.Layer == 0 {
+				component.Layer = spec.Layer
+			}
+			if component.Depth == 0 {
+				component.Depth = spec.Depth
 			}
 			// These persistent effects play their startup STR only once.
 			if effect.Persistent && effect.EffectID != LKConcentration && effect.EffectID != SafetyWall {
@@ -1817,6 +1845,24 @@ func (m *System) Draw(screen *render.Frame, ctx client.Context, projection scene
 		}
 	}
 	m.Active = active
+}
+
+func (s Spec) componentDrawsBeforeEntities(component Component) bool {
+	if component.Layer == 0 {
+		component.Layer = s.Layer
+	}
+	return component.DrawsBeforeEntities()
+}
+
+func (m *System) invalidateSpecsIfStale() {
+	gen := db.EffectTablesGeneration()
+	if m.effectGen == gen {
+		return
+	}
+	if m.effectGen != 0 {
+		m.specs = nil
+	}
+	m.effectGen = gen
 }
 
 func EffectWorldAnchor(ctx client.Context, effect Instance, at time.Time) scene.Point3 {
