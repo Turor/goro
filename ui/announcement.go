@@ -29,6 +29,13 @@ type Announcement struct {
 	y        int
 	fontSize int
 	bold     bool
+	life     time.Duration
+}
+
+// ShowFor is Show with a custom lifetime instead of the 20 s announcement.
+func (a *Announcement) ShowFor(text string, messageColor color.RGBA, style AnnouncementStyle, now time.Time, life time.Duration) {
+	a.Show(text, messageColor, style, now)
+	a.life = life
 }
 
 func (a *Announcement) Show(text string, messageColor color.RGBA, style AnnouncementStyle, now time.Time) {
@@ -56,6 +63,7 @@ func (a *Announcement) Show(text string, messageColor color.RGBA, style Announce
 	a.y = style.Y
 	a.fontSize = style.FontSize
 	a.bold = style.Bold
+	a.life = announcementLife
 }
 
 func (a *Announcement) Visible(now time.Time) bool {
@@ -65,7 +73,11 @@ func (a *Announcement) Visible(now time.Time) bool {
 	if now.IsZero() {
 		now = time.Now()
 	}
-	return now.Sub(a.shownAt) < announcementLife
+	life := a.life
+	if life <= 0 {
+		life = announcementLife
+	}
+	return now.Sub(a.shownAt) < life
 }
 
 func (a *Announcement) Draw(screen *render.Frame, now time.Time) {

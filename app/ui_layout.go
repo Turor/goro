@@ -2,11 +2,19 @@ package app
 
 import (
 	"fmt"
+	"image/color"
 	"io"
 	"os"
+	"strings"
+	"time"
+
+	"github.com/gogpu/gpucontext"
+	"github.com/kivutar/goro/input"
+	gameui "github.com/kivutar/goro/ui"
 
 	"github.com/kivutar/goro/config"
 	"github.com/kivutar/goro/glog"
+	"github.com/kivutar/goro/render"
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
@@ -50,4 +58,109 @@ func writeAndClose(file *os.File, write func(io.Writer) error) error {
 		return err
 	}
 	return file.Close()
+}
+
+// uiLayoutPollInterval keeps edits visible within about a second while
+// costing one stat call per interval, and only with --ui-dev.
+const uiLayoutPollInterval = 500 * time.Millisecond
+
+// uiLayoutWatcher applies ui-layout.ini edits while the game runs. It only
+// exists with --ui-dev or [ui_layout] watch = true; players never poll. It
+// runs on the game thread, so token writes never race the UI.
+type uiLayoutWatcher struct {
+	path     string
+	nextPoll time.Time
+	modTime  time.Time
+	size     int64
+	exists   bool
+	toast    gameui.Announcement
+}
+
+func newUILayoutWatcher(cfg config.Config, now time.Time) *uiLayoutWatcher {
+	if !cfg.UILayout.Watch {
+		return nil
+	}
+	w := &uiLayoutWatcher{path: cfg.UILayoutPath()}
+	w.stamp()
+	w.nextPoll = now.Add(uiLayoutPollInterval)
+	glog.Infof("ui layout watch on path=%s (F10 reloads)", w.path)
+	return w
+}
+
+func (w *uiLayoutWatcher) stamp() bool {
+	info, err := os.Stat(w.path)
+	exists := err == nil
+	var mod time.Time
+	var size int64
+	if exists {
+		mod, size = info.ModTime(), info.Size()
+	}
+	changed := exists != w.exists || !mod.Equal(w.modTime) || size != w.size
+	w.exists, w.modTime, w.size = exists, mod, size
+	return changed
+}
+
+// Update polls the file and handles F10. It reports whether new values were
+// applied, so the caller can refresh open windows.
+func (w *uiLayoutWatcher) Update(in *input.State, now time.Time) bool {
+	if w == nil {
+		return false
+	}
+	forced := in != nil && in.KeyCodeJustPressed(gpucontext.KeyF10)
+	if !forced {
+		if now.Before(w.nextPoll) {
+			return false
+		}
+		w.nextPoll = now.Add(uiLayoutPollInterval)
+		if !w.stamp() {
+			return false
+		}
+	} else {
+		w.stamp()
+	}
+	return w.reload(now)
+}
+
+func (w *uiLayoutWatcher) reload(now time.Time) bool {
+	if !w.exists {
+		rotheme.ResetLayout()
+		glog.Infof("ui layout file gone, built-in layout restored path=%s", w.path)
+		w.show("UI layout: file removed, built-in layout restored", uiLayoutOKColor, now, 4*time.Second)
+		return true
+	}
+	applied, warnings, err := rotheme.LoadLayoutFile(w.path)
+	for _, warning := range warnings {
+		glog.Warnf("ui layout: %s", warning)
+	}
+	if err != nil {
+		glog.Errorf("ui layout rejected, keeping previous values: %v", err)
+		w.show("UI layout NOT applied: "+err.Error(), uiLayoutErrorColor, now, 15*time.Second)
+		return false
+	}
+	if !applied {
+		return false
+	}
+	glog.Infof("ui layout reloaded path=%s", w.path)
+	msg := "UI layout reloaded"
+	if len(warnings) > 0 {
+		msg += " (" + strings.Join(warnings, "; ") + ")"
+	}
+	w.show(msg, uiLayoutOKColor, now, 4*time.Second)
+	return true
+}
+
+var (
+	uiLayoutOKColor    = color.RGBA{R: 160, G: 255, B: 160, A: 255}
+	uiLayoutErrorColor = color.RGBA{R: 255, G: 120, B: 120, A: 255}
+)
+
+func (w *uiLayoutWatcher) show(text string, c color.RGBA, now time.Time, life time.Duration) {
+	w.toast.ShowFor(text, c, gameui.AnnouncementStyle{Y: 12}, now, life)
+}
+
+func (w *uiLayoutWatcher) Draw(screen *render.Frame, now time.Time) {
+	if w == nil {
+		return
+	}
+	w.toast.Draw(screen, now)
 }

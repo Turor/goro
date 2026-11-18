@@ -26,6 +26,7 @@ type windowConfig struct {
 	height       float32
 	titleBar     bool
 	radius       float32
+	radiusSet    bool
 	background   *widget.Color
 }
 
@@ -36,9 +37,48 @@ type windowTitleButton struct {
 
 // windowFrame retains the title-bar close action for keyboard closing too.
 // This preserves each window's cleanup and server cancellation behavior.
+// It also re-reads the frame's layout tokens (body color, border, radius)
+// when a reloaded ui-layout.ini changes them, so open windows follow edits.
 type windowFrame struct {
 	*primitives.BoxWidget
-	onClose func()
+	onClose    func()
+	background *widget.Color
+	radiusSet  bool
+	opacity    float32
+	layoutGen  uint64
+	title      *primitives.TextWidget
+}
+
+func (f *windowFrame) applyBackground() {
+	color := windowBodyColor(f.opacity)
+	if f.background != nil {
+		color = *f.background
+		color.A *= f.opacity
+	}
+	f.BoxWidget.Background(color)
+}
+
+// refreshLayoutTokens reapplies token-driven frame styling after a reload.
+func (f *windowFrame) refreshLayoutTokens() {
+	gen := rotheme.Generation()
+	if f.layoutGen == gen {
+		return
+	}
+	f.layoutGen = gen
+	f.applyBackground()
+	f.BoxWidget.BorderStyle(windowBorderWidth, rotheme.Default.Colors.WindowBorder)
+	if !f.radiusSet {
+		f.BoxWidget.Rounded(WindowRadius)
+	}
+	if f.title != nil {
+		f.title.Color(rotheme.Default.Colors.TitleText).FontSize(rotheme.Default.Typography.TextSize)
+	}
+	f.BoxWidget.SetNeedsRedraw(true)
+}
+
+func (f *windowFrame) Layout(ctx widget.Context, constraints geometry.Constraints) geometry.Size {
+	f.refreshLayoutTokens()
+	return f.BoxWidget.Layout(ctx, constraints)
 }
 
 // Title and footer heights stay compile-time: about 90 window sizes are
@@ -73,11 +113,14 @@ func Win(options ...WindowOption) widget.Widget {
 	}
 
 	children := make([]widget.Widget, 0, 3)
+	var titleText *primitives.TextWidget
 	if cfg.titleBar {
-		var title widget.Widget = rotheme.Title(cfg.title)
+		titleText = rotheme.Title(cfg.title)
+		var title widget.Widget = titleText
 		if cfg.titleSignal != nil {
+			titleText = rotheme.Title("").ContentSignal(cfg.titleSignal)
 			title = &windowTitleText{
-				TextWidget: rotheme.Title("").ContentSignal(cfg.titleSignal),
+				TextWidget: titleText,
 				signal:     cfg.titleSignal,
 			}
 		}
@@ -132,10 +175,15 @@ func Win(options ...WindowOption) widget.Widget {
 		Background(background).
 		BorderStyle(windowBorderWidth, rotheme.Default.Colors.WindowBorder).
 		Rounded(cfg.radius)
-	if cfg.onClose == nil {
-		return box
+	return &windowFrame{
+		BoxWidget:  box,
+		onClose:    cfg.onClose,
+		background: cfg.background,
+		radiusSet:  cfg.radiusSet,
+		opacity:    1,
+		layoutGen:  rotheme.Generation(),
+		title:      titleText,
 	}
-	return &windowFrame{BoxWidget: box, onClose: cfg.onClose}
 }
 
 // Unlike a paint-only text binding, a title change also affects header layout.
@@ -232,6 +280,7 @@ func TitleBar(enabled bool) WindowOption {
 func Radius(radius float32) WindowOption {
 	return func(cfg *windowConfig) {
 		cfg.radius = radius
+		cfg.radiusSet = true
 	}
 }
 
@@ -576,9 +625,13 @@ func (w *Window) setOpacity(opacity float32) {
 	}
 	box, _ := w.content.(*primitives.BoxWidget)
 	if frame, ok := w.content.(*windowFrame); ok {
-		box = frame.BoxWidget
-	}
-	if box != nil {
+		// As before tokens, the Window background (or the theme body color)
+		// replaces a Win Background option once opacity is applied.
+		frame.opacity = opacity
+		frame.background = w.background
+		frame.applyBackground()
+		frame.SetNeedsRedraw(true)
+	} else if box != nil {
 		background := windowBodyColor(opacity)
 		if w.background != nil {
 			background = *w.background

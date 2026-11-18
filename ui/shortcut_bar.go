@@ -75,6 +75,7 @@ type shortcutSlotState struct {
 }
 
 type ShortcutBar struct {
+	layoutGen     uint64
 	slots         [shortcutTotalSlots]shortcutSlotState
 	visibleRows   int
 	activeRow     int
@@ -152,6 +153,11 @@ func (b *ShortcutBar) Publish(ctx Context, actions GameActions, assets AssetProv
 	b.ctx = ctx
 	b.actions = actions
 	b.assets = assets
+	if gen := rotheme.Generation(); gen != b.layoutGen {
+		// A reloaded ui-layout.ini may resize slots: rebuild at the new size.
+		b.layoutGen = gen
+		b.contentDirty = true
+	}
 	w, h := shortcutBarWidth(), shortcutBarHeightForRows(b.visibleRowCount())
 	b.ensureWindow()
 	if !b.window.dragging {
