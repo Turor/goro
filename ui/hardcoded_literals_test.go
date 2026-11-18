@@ -95,7 +95,10 @@ func TestNoHardcodedUILiterals(t *testing.T) {
 	}
 }
 
-var uiLiteralDirs = []string{".", "rotheme", filepath.Join("..", "game", "login")}
+// Each entry is a package directory, or a glob for UI files in a package that
+// also holds non-UI code (the map loading screen lives in game/map; its
+// tokens are in rotheme/theme_loading.go).
+var uiLiteralDirs = []string{".", "rotheme", filepath.Join("..", "game", "login"), filepath.Join("..", "game", "map", "loading.go")}
 
 func TestHardcodedUILiteralScannerCatchesEachRule(t *testing.T) {
 	dir := t.TempDir()
@@ -191,7 +194,11 @@ func isDefaultsTable(path string) bool {
 func scanUILiteralDirs(t *testing.T, dirs []string) (violations, annotated, unregistered []string) {
 	t.Helper()
 	for _, dir := range dirs {
-		files, err := filepath.Glob(filepath.Join(dir, "*.go"))
+		pattern := filepath.Join(dir, "*.go")
+		if strings.ContainsAny(dir, "*?[") {
+			pattern = dir
+		}
+		files, err := filepath.Glob(pattern)
 		if err != nil {
 			t.Fatal(err)
 		}

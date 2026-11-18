@@ -36,6 +36,7 @@ new sizes and colors:
   confirm dialogs, context menus);
 - paint-time HUD elements (hotbar, status icons, notifications, minimap
   markers) read their values on every draw.
+- the map loading screen progress bar (`[loading]`).
 
 ## In-game tuner (F11)
 
@@ -85,7 +86,8 @@ No UI size or color is hardcoded. Each window keeps its compiled defaults in a
 `.Int`, `.Float`, `.Color`, `.RGBA` or `.String`. Window code only reads those
 variables. `ui/hardcoded_literals_test.go` fails on any color literal, or any
 size, offset, padding or row height written as a number, in `ui`,
-`ui/rotheme` or `game/login` outside the `theme.go`/`theme_*.go` defaults
+`ui/rotheme`, `game/login` or the map loading screen (`game/map/loading.go`,
+whose defaults are in `ui/rotheme/theme_loading.go`) outside the `theme.go`/`theme_*.go` defaults
 tables, and on a defaults-table value that is not registered. A number that is
 not visual (packet flag, skill ID, text limit, timer, capacity) stays inline
 with `// theme:ok <reason>`.
@@ -97,8 +99,9 @@ on screen (persistent world windows are also rebound by the world mode).
 Values computed from tokens are computed where used, or in an
 `rotheme.OnLayoutApplied` hook. Build a window's tree from
 `Window.baseHeight()` (not `height`), so the title/footer delta is added once.
-After adding a token, regenerate `ui-layout.default.ini`; a test fails while
-it is stale.
+After adding a token, regenerate `ui-layout.default.ini`; a test in package
+main (which links every package that registers tokens) fails while it is
+stale.
 
 Offline previews for theming without a server: `GORO_PREVIEW_MAP=prontera`
 with `GORO_PREVIEW_WINDOWS=shop`, or `GORO_PREVIEW_SCREEN=charselect`.
