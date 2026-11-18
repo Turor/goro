@@ -135,7 +135,7 @@ func fillGradientRow(target *image.RGBA, y int, fill widget.Color) {
 		offset := target.PixOffset(x, y)
 		target.Pix[offset+0] = r
 		target.Pix[offset+1] = g
-		target.Pix[offset+2] = b
+		target.Pix[offset+2] = b // theme:ok rgba pixel channel index
 		target.Pix[offset+3] = a
 	}
 }

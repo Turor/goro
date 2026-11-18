@@ -23,7 +23,6 @@ import (
 const (
 	// shortcutTotalSlots is the 2008 hotkey list length; it sizes the slot array.
 	shortcutTotalSlots = network.HotkeyListSlots2008
-	shortcutControlW   = int(rotheme.IconButtonSize)
 )
 
 // shortcutMaxRows is the 2008 hotkey list divided by the column token.
@@ -414,7 +413,7 @@ func (b *ShortcutBar) slotBounds(ctx Context, slot int) (int, int) {
 }
 
 func shortcutBarWidth() int {
-	return shortcutGripWidth + shortcutGridWidth() + shortcutControlGap + shortcutControlW + shortcutControlPad
+	return shortcutGripWidth + shortcutGridWidth() + shortcutControlGap + int(rotheme.IconButtonSize) + shortcutControlPad
 }
 
 func shortcutGridWidth() int {
@@ -475,7 +474,7 @@ func (b *ShortcutBar) rowControls(visibleRows int) widget.Widget {
 			b.setVisibleRows(b.ctx, b.visibleRowCount()-1)
 		}),
 	).
-		Width(float32(shortcutControlW)).
+		Width(rotheme.IconButtonSize).
 		Gap(float32(shortcutControlGap)).
 		PaddingTop(float32(shortcutPad))
 }

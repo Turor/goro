@@ -12,9 +12,9 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-// Row height, padding, column widths and the section gap are layout tokens;
-// the window size follows them (recomputeStatsWindowMetrics).
-
+// Row height, padding, column widths, the section gap and the icon button
+// size are layout tokens; the window size follows them
+// (recomputeStatsWindowMetrics).
 func statsWindowWidthFor(pad, sectionGap float32) int {
 	return int(2*pad + statsPrimaryColumnWidth + sectionGap + statsDerivedColumnWidth)
 }
