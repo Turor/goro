@@ -269,6 +269,10 @@ numeric entries taking priority. Without it, Goro loads existing `fdata.grf`,
 `rdata.grf`, `sdata.grf`, and `data.grf` in that order. Event and custom archives
 must be listed explicitly. See [GRF archive configuration](docs/client-setup.md#grf-archives).
 
+With no archives in the data folder, goro streams client data on demand from the
+TuroranRO asset server and caches it (`[data] remote = auto`). See
+[TuroranRO data](docs/turoran-data.md#streaming-players-nothing-to-install).
+
 ## Current Scope
 
 Currently implemented (not a claim of complete reference-client parity):

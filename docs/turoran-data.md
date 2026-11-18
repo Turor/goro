@@ -1,5 +1,47 @@
 # TuroranRO data directory
 
+## Streaming (players: nothing to install)
+
+goro streams client data from the TuroranRO asset server (remoteclient2,
+`https://ro.turoran.com/client/`), the same source roBrowser and Korangar
+read. With no GRF in the data directory (`[data] remote = auto`, the
+default) every file the directory lacks is fetched on first use and kept in
+`<user cache>/goro/remote/<host>/` (`$XDG_CACHE_HOME`, `%LocalAppData%`).
+
+- **Priority.** Loose files in `--data-dir`, then local archives, then the
+  server. The server applies roBrowser's order itself: `System/`, the text
+  overlays (`OVERLAY_PATH`), then slot-0 `translation.grf` and the other
+  `DATA.INI` archives. The Turoran table names below are tried before the
+  canonical ones (`res.TuroranRemoteAliases`; a test keeps it equal to the
+  assemble script).
+- **Paths.** Names are decoded from EUC-KR to UTF-8 and percent-encoded per
+  segment (`data/texture/%EC%9C%A0...`), as roBrowser requests them. Only
+  `data/` and `System/` are requested.
+- **Startup.** Nothing waits for the network. The server's archive name
+  list (`GET list-files`, about 1.4 MB gzip) loads in the background; once it
+  is in, archive files it does not list are not requested at all. Text tables
+  (`.lub .lua .txt .xml .json`) are always eligible because overlays are not
+  in that list.
+- **Freshness.** Archive files are reused from the cache and revalidated
+  (`If-None-Match`) when the server's archive list changes. Cached text
+  tables are served at once and refreshed in the background, so an overlay
+  change shows on the next run.
+- **Failures.** A 404 is remembered for the run and the lookup falls through
+  to the next candidate. If the server is unreachable, cached files are used
+  and new requests pause for 30 s; nothing aborts.
+- **Settings.** `[data] remote = auto|on|off`, `remote_url`, `cache_dir`, or
+  `--data-remote`, `--data-url`, `--data-cache`. `on` also streams files that
+  local archives lack. `clientinfo.xml` is never streamed: the server list
+  stays local.
+
+Check a map without any local data:
+
+```sh
+go run ./cmd/goro-datacheck --data-url https://ro.turoran.com/client/ --stream-map prontera
+```
+
+## Assembled data directory (offline, developers)
+
 goro reads the same data roBrowser serves for TuroranRO: the five GRFs in
 `DATA.INI` order plus remoteclient2's loose overlay. Loose files beat every
 archive in goro (as `OVERLAY_PATH` does in remoteclient2), so the overlay is
@@ -29,7 +71,9 @@ The output is symlinks only. The script also links the tables roBrowser's
 | `lua files/datainfo/petinfo.lub`, `addrandomoptionnametable.lub` | `*.turoran.lub` |
 | `data/cardprefixnametable.txt`, `data/num2cardillustnametable.txt` | `*.turoran.txt` |
 
-When roBrowser bumps one of these names, bump the script in the same change.
+When roBrowser bumps one of these names, bump the script and
+`res.TuroranRemoteAliases` in the same change (`TestRemoteTuroranAliasesPreferVersionedTables`
+fails if they differ).
 
 ## Lua tables (.lub)
 

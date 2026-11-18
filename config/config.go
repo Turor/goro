@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -35,6 +36,44 @@ type Config struct {
 	ChatShortcuts ChatShortcuts
 	UI            UISettings
 	UILayout      UILayoutConfig
+	Data          DataConfig
+}
+
+// DataConfig selects streaming of client data from an asset server.
+type DataConfig struct {
+	// Remote is "auto" (stream when the data directory has no archives),
+	// "on" (also stream files missing from local archives) or "off".
+	Remote string
+	// RemoteURL is the asset server root (remoteclient2).
+	RemoteURL string
+	// CacheDir keeps streamed files. Empty means the user cache directory.
+	CacheDir string
+}
+
+// Remote data modes.
+const (
+	DataRemoteAuto = "auto"
+	DataRemoteOn   = "on"
+	DataRemoteOff  = "off"
+)
+
+// DefaultDataRemoteURL is the TuroranRO asset server.
+const DefaultDataRemoteURL = "https://ro.turoran.com/client/"
+
+// RemoteCacheDir returns where streamed files are kept.
+func (d DataConfig) RemoteCacheDir() (string, error) {
+	if d.CacheDir != "" {
+		return filepath.Abs(d.CacheDir)
+	}
+	base, err := os.UserCacheDir()
+	if err != nil {
+		return "", err
+	}
+	host := "default"
+	if u, err := url.Parse(d.RemoteURL); err == nil && u.Host != "" {
+		host = strings.NewReplacer(":", "_", "/", "_").Replace(u.Host)
+	}
+	return filepath.Join(base, "goro", "remote", host), nil
 }
 
 // UILayoutConfig selects the UI layout and theme override file
@@ -344,6 +383,7 @@ func (cfg Config) saveConfigValues(values map[string]map[string]string) (string,
 
 func defaultConfig() Config {
 	return Config{
+		Data:          DataConfig{Remote: DataRemoteAuto, RemoteURL: DefaultDataRemoteURL},
 		ChatShortcuts: defaultChatShortcuts(),
 		Window: WindowConfig{
 			Title:      "goro",
@@ -414,6 +454,9 @@ func parseCLI(cfg *Config, args []string) error {
 	fs.StringVar(&cfg.ConfigPath, "config", cfg.ConfigPath, "path to goro ini configuration (also used to save settings)")
 	fs.BoolVar(&cfg.Headless, "headless", false, "run without a window or audio (implies autologin)")
 	fs.StringVar(&cfg.DataDir, "data-dir", cfg.DataDir, "Ragnarok data directory (loads goro.ini from this directory)")
+	fs.StringVar(&cfg.Data.Remote, "data-remote", cfg.Data.Remote, "stream client data from the asset server: auto (when there are no local archives), on, off")
+	fs.StringVar(&cfg.Data.RemoteURL, "data-url", cfg.Data.RemoteURL, "asset server URL for streamed client data")
+	fs.StringVar(&cfg.Data.CacheDir, "data-cache", cfg.Data.CacheDir, "directory for streamed client data (default: user cache directory)")
 	fs.StringVar(&cfg.Window.Title, "title", cfg.Window.Title, "window title")
 	fs.IntVar(&cfg.Window.Width, "width", cfg.Window.Width, "window width")
 	fs.IntVar(&cfg.Window.Height, "height", cfg.Window.Height, "window height")
@@ -551,6 +594,12 @@ func applyConfigValue(cfg *Config, section, key, value string) error {
 	switch section + "." + key {
 	case ".datadir", "data.dir", "data.datadir", "config.datadir", "core.datadir":
 		cfg.DataDir = value
+	case "data.remote":
+		cfg.Data.Remote = strings.ToLower(strings.TrimSpace(value))
+	case "data.remoteurl", "data.url":
+		cfg.Data.RemoteURL = value
+	case "data.cachedir", "data.cache":
+		cfg.Data.CacheDir = value
 	case "window.title":
 		cfg.Window.Title = value
 	case "window.width":
@@ -713,6 +762,17 @@ func validateConfig(cfg *Config) error {
 	}
 	if cfg.Render.BenchSeconds < 0 || cfg.Render.BenchWarmupSeconds < 0 {
 		return fmt.Errorf("benchmark durations must be non-negative")
+	}
+	switch cfg.Data.Remote {
+	case DataRemoteAuto, DataRemoteOn, DataRemoteOff:
+	default:
+		return fmt.Errorf("data remote must be auto, on or off, not %q", cfg.Data.Remote)
+	}
+	if cfg.Data.Remote != DataRemoteOff {
+		u, err := url.Parse(cfg.Data.RemoteURL)
+		if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
+			return fmt.Errorf("invalid data URL %q", cfg.Data.RemoteURL)
+		}
 	}
 	switch cfg.Log.Level {
 	case "debug", "info", "warn", "warning", "error", "fatal":
