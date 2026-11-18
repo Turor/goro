@@ -2,6 +2,7 @@ package render
 
 import (
 	"fmt"
+	"github.com/gogpu/ui/theme"
 	"image"
 	"image/color"
 	"image/draw"
@@ -69,6 +70,21 @@ func (b uiAppBridge) BlockInput() func() {
 	b.App.Window().HandlePointerEvent(&gesture.PointerEvent{EventType: gesture.PointerCancel, PointerID: 1})
 	b.events.blocked = true
 	return func() { b.events.blocked = false }
+}
+
+// goroUITheme is the base gogpu/ui theme built from the current rotheme
+// values; the background stays clear so the game shows through.
+func goroUITheme() *theme.Theme {
+	uiTheme := rotheme.Default.AsTheme()
+	uiTheme.Colors.Background = widget.RGBA8(0, 0, 0, 0)
+	return uiTheme
+}
+
+// RefreshTheme rebuilds the base theme after a UI layout reload.
+func (b uiAppBridge) RefreshTheme() {
+	if b.App != nil {
+		b.App.SetTheme(goroUITheme())
+	}
 }
 
 func (b uiAppBridge) SetUIRoot(root widget.Widget) {
@@ -341,8 +357,7 @@ func Run(game Game, cfg config.WindowConfig, renderCfg config.RenderConfig) erro
 		events.prepareKeyInput = preparer.PrepareKeyInput
 		events.prepareTextInput = preparer.PrepareTextInput
 	}
-	uiTheme := rotheme.Default.AsTheme()
-	uiTheme.Colors.Background = widget.RGBA8(0, 0, 0, 0)
+	uiTheme := goroUITheme()
 	uiWindow := &uiWindowProvider{WindowProvider: gg}
 	// Keep physical input current while allowing the UI stream to be blocked.
 	uiEvents := newFanoutEventSource(events)
