@@ -40,6 +40,7 @@ type Game struct {
 	pendingScreenshot string
 	uiLayout          *uiLayoutWatcher
 	skillData         *skillDataWatcher
+	effectData        *effectDataWatcher
 	uiTuner           *gameui.LayoutTuner
 	uiGen             uint64
 }
@@ -108,6 +109,8 @@ func NewWithResources(cfg config.Config, resource *res.Manager) *Game {
 	}
 	g.uiLayout = newUILayoutWatcher(cfg, time.Now())
 	g.skillData = newSkillDataWatcher(cfg.UILayout.Watch, resource, time.Now())
+	g.effectData = newEffectDataWatcher(cfg.UILayout.Watch, resource, time.Now())
+	resource.EnsureEffectData()
 	if g.uiLayout != nil {
 		g.uiTuner = gameui.NewLayoutTuner(g.uiLayout.path)
 	}
@@ -143,6 +146,9 @@ func (g *Game) Update() error {
 	g.network.Pump()
 	g.uiLayout.Update(g.input, time.Now())
 	g.skillData.Update(g.input, time.Now())
+	g.effectData.Update(g.input, time.Now())
+	// Retry streamed effects.json while the asset server is still coming up.
+	g.resource.EnsureEffectData()
 	// Changed data files queued by the streaming layer reload here, on the
 	// game thread; open skill windows rebuild from the new tree generation.
 	g.resource.ApplyDataInvalidations()

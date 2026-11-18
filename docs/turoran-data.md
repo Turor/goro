@@ -86,6 +86,29 @@ and descriptions come from `skilldescript.turoran.re2.lub`.
   reloads it. `Manager.QueueDataInvalidation` / `InvalidateData` is the
   entry point for server-driven invalidation.
 
+## Effect tables
+
+`EffectSpecs`, `SkillEffects` and `SkillActions` load from
+`data/contentdata/effectdata/effects.json` (also `data/effectdata/effects.json`
+and `data/effects.json`) through the same streaming path as the skill tables.
+The compiled Go tables stay as the fallback when the file is missing.
+
+`data/contentdata/effectdata/ez2streffect.bson` is merged on top when present,
+following roBrowserLegacy `mergeEz2Effects` (exact SKID name, path segment,
+sound basename, then suffix inheritance). Missing BSON is skipped.
+
+Each spec has `Layer`, `ZOrder` and `Depth` so draw order can be data-driven
+(Crazy Uproar uses the actor layer and a camera-plane depth bias; G61 owns
+any remaining visual depth-test fix). Overlay files are live-reloadable:
+`--ui-dev` / F10 watches loose files, and `InvalidateData` reloads streamed
+changes. A parse error keeps the previous tables and logs.
+
+Dump the compiled tables for a data-server overlay:
+
+```sh
+go run ./cmd/goro-effects-export effects.json
+```
+
 Check the real streamed tables (prints warnings and per-job tabs):
 
 ```sh

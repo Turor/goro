@@ -27,8 +27,11 @@ func TestMapTexturesPreloadAllSourcesAndReuseDrawCaches(t *testing.T) {
 	for _, load := range m.TextureLoadTasks(ctx) {
 		load()
 	}
-	if len(m.Images.Uploads) != 35 || len(m.Textures) != 34 || len(m.TextureMiss) != 1 {
-		t.Fatalf("uploads=%d textures=%d missing=%d; want 2 shared/model + 32 water + lightmap", len(m.Images.Uploads), len(m.Textures), len(m.TextureMiss))
+	if len(m.Images.Uploads) != 36 || len(m.Textures) != 35 || len(m.TextureMiss) != 1 {
+		t.Fatalf("uploads=%d textures=%d missing=%d; want 2 shared/model + 32 water + lightmap + missing checkerboard", len(m.Images.Uploads), len(m.Textures), len(m.TextureMiss))
+	}
+	if missing := m.Textures["missing.png"]; missing == nil || missing.Bounds() != image.Rect(0, 0, 64, 64) {
+		t.Fatal("missing map texture must upload the magenta-and-black checkerboard")
 	}
 	for _, name := range []string{"ground.png", "model.png"} {
 		if img := m.Textures[name]; img.ByteSize() != 12 {
@@ -48,8 +51,19 @@ func TestMapTexturesPreloadAllSourcesAndReuseDrawCaches(t *testing.T) {
 			t.Fatalf("water frame %d missing or mipmapped", frame)
 		}
 	}
-	if atlas := m.gndMeshCache.lightmapAtlas.image; atlas == nil || atlas != m.Images.Uploads[1] || atlas.ByteSize() != len(atlas.RGBA().Pix) {
+	atlas := m.gndMeshCache.lightmapAtlas.image
+	if atlas == nil || atlas.ByteSize() != len(atlas.RGBA().Pix) {
 		t.Fatal("lightmap preparation was not retained")
+	}
+	foundLightmap := false
+	for _, img := range m.Images.Uploads {
+		if img == atlas {
+			foundLightmap = true
+			break
+		}
+	}
+	if !foundLightmap {
+		t.Fatal("lightmap was not queued for upload")
 	}
 }
 
@@ -61,7 +75,7 @@ func TestMapTexturesSkipDryMapsAndHeadless(t *testing.T) {
 		for _, load := range m.TextureLoadTasks(ctx) {
 			load()
 		}
-		want := 3
+		want := 4
 		if headless {
 			want = 0
 		}
