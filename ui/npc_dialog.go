@@ -68,6 +68,7 @@ type NPCDialog struct {
 	input       string
 	inputField  *textfield.Widget
 	menuRow     int
+	layoutGen   uint64
 	menuScrollY state.Signal[float32]
 
 	dialogWindow Window
@@ -199,6 +200,11 @@ func (d *NPCDialog) Update(ctx Context) bool {
 	}
 	if ctx.Input == nil {
 		return false
+	}
+	if gen := rotheme.Generation(); gen != d.layoutGen {
+		// Rebuild at the reloaded layout tokens' sizes.
+		d.layoutGen = gen
+		d.dirty = true
 	}
 	if d.openWindows(ctx) {
 		return true
