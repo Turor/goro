@@ -6,12 +6,6 @@ import (
 	"github.com/gogpu/ui/widget"
 )
 
-const (
-	CheckboxSize   float32 = 17
-	CheckboxRadius float32 = 6
-	CheckboxGap    float32 = 8
-)
-
 func Checkbox(opts ...checkbox.Option) *checkbox.Widget {
 	opts = append(opts, checkbox.PainterOpt(CheckboxPainter{}))
 	return checkbox.New(opts...).Padding(0)
@@ -72,13 +66,13 @@ func checkboxLabel(bounds geometry.Rect) geometry.Rect {
 func drawCheckboxV(canvas widget.Canvas, box geometry.Rect, color widget.Color) {
 	x := box.Min.X
 	y := box.Min.Y
-	canvas.DrawLine(geometry.Pt(x+4, y+8), geometry.Pt(x+7, y+11), color, 1)
-	canvas.DrawLine(geometry.Pt(x+7, y+11), geometry.Pt(x+14, y+4), color, 1)
+	canvas.DrawLine(geometry.Pt(x+checkboxMarkInset, y+checkboxMarkStartY), geometry.Pt(x+checkboxMarkMidX, y+checkboxMarkMidY), color, 1)
+	canvas.DrawLine(geometry.Pt(x+checkboxMarkMidX, y+checkboxMarkMidY), geometry.Pt(x+checkboxMarkEndX, y+checkboxMarkEndY), color, 1)
 }
 
 func drawCheckboxDash(canvas widget.Canvas, box geometry.Rect, color widget.Color) {
 	y := box.Min.Y + box.Height()/2
-	canvas.DrawLine(geometry.Pt(box.Min.X+4, y), geometry.Pt(box.Max.X-4, y), color, 1)
+	canvas.DrawLine(geometry.Pt(box.Min.X+checkboxMarkInset, y), geometry.Pt(box.Max.X-checkboxMarkInset, y), color, 1)
 }
 
 var _ checkbox.Painter = CheckboxPainter{}

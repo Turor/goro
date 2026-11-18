@@ -1,7 +1,6 @@
 package effects
 
 import (
-	"image/color"
 	"math"
 	"time"
 
@@ -21,12 +20,12 @@ func (m *System) drawBlind(screen *render.Frame, ctx client.Context, projection 
 	if texture == nil || white == nil || !ok {
 		return
 	}
-	radius := float64(140-10*(effect.EffectID-Devil1+1)) / 5
-	shade := uint8(30)
+	radius := float64(140-10*(effect.EffectID-Devil1+1)) / 5 // theme:ok original per-level Darkness radius
+	tint := darknessTint
 	if effect.EffectID == Blind {
-		radius, shade = 10, 10
+		radius, tint = blindRadius, blindTint
 	}
-	tint := color.RGBA{shade, shade, shade, uint8(min(255, int(now.Sub(effect.Starts)/db.EffectFrameDuration)+1))}
+	tint.A = uint8(min(255, int(now.Sub(effect.Starts)/db.EffectFrameDuration)+1)) // theme:ok fade-in per effect frame
 	point := func(dx, dy float64) scene.Point3 {
 		return scene.Add3(scene.Point3{X: x, Y: z, Z: y}, scene.Add3(scene.Mul3(right, dx), scene.Mul3(up, dy)))
 	}

@@ -18,18 +18,6 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	cartGridCols     = 7
-	cartGridRows     = 4
-	cartGridCell     = 32
-	cartGridW        = cartGridCols * cartGridCell
-	cartGridViewW    = cartGridW + ROScrollbarGutter
-	cartGridViewH    = cartGridRows * cartGridCell
-	cartGridLeftPad  = 40
-	cartWindowWidth  = cartGridLeftPad + cartGridViewW
-	cartWindowHeight = ROWindowTitleHeight + cartGridViewH + ROWindowFooterHeight
-)
-
 type CartWindow struct {
 	Window
 	scrollY       state.Signal[float32]
@@ -67,6 +55,7 @@ func (w *CartWindow) SetOpen(open bool) {
 
 func (w *CartWindow) OpenWindow(ctx Context) {
 	w.EnsureWindow(cartWindowWidth, cartWindowHeight)
+	w.SetSize(cartWindowWidth, cartWindowHeight)
 	w.ClampScroll(ctx.Session)
 	w.snapshot = w.cartSnapshot(ctx.Session)
 	x, y := cartDefaultPosition(ctx)
@@ -76,6 +65,10 @@ func (w *CartWindow) OpenWindow(ctx Context) {
 	} else {
 		w.SetContent(w.widgetTree(ctx, w.itemInfo))
 	}
+	w.OnLayoutReload(func() {
+		w.SetSize(cartWindowWidth, cartWindowHeight)
+		w.SetContent(w.widgetTree(ctx, w.itemInfo))
+	})
 	if ctx.Session != nil {
 		ctx.Session.Cart.Open = true
 	}
@@ -221,7 +214,7 @@ func (w *CartWindow) widgetTree(ctx Context, itemInfo *ItemWindows) widget.Widge
 		scrollview.DirectionOpt(scrollview.Vertical),
 		scrollview.ScrollbarOpt(scrollview.ScrollbarAuto),
 		scrollview.ScrollYSignal(w.ensureScrollSignal()),
-		scrollview.ScrollStep(cartGridCell),
+		scrollview.ScrollStep(float32(cartGridCell)),
 	)
 	return Win(
 		Title("Pushcart"),
@@ -230,16 +223,16 @@ func (w *CartWindow) widgetTree(ctx Context, itemInfo *ItemWindows) widget.Widge
 			w.close(ctx)
 			w.Publish(ctx)
 		}),
-		Size(cartWindowWidth, cartWindowHeight),
+		Size(float32(cartWindowWidth), float32(cartWindowHeight)),
 		Content(
 			primitives.HBox(
 				primitives.Box().
-					Width(cartGridLeftPad).
-					Height(cartGridViewH).
+					Width(float32(cartGridLeftPad)).
+					Height(float32(cartGridViewH)).
 					Background(rotheme.Default.Colors.WindowBody),
 				primitives.Box(scroll).
-					Width(cartGridViewW).
-					Height(cartGridViewH),
+					Width(float32(cartGridViewW)).
+					Height(float32(cartGridViewH)),
 			).
 				Gap(0).
 				Background(rotheme.Default.Colors.WindowBody),
@@ -296,6 +289,7 @@ func (w *CartWindow) withdraw(ctx Context, item session.InventoryItem) {
 
 func (w *CartWindow) refresh(ctx Context, itemInfo *ItemWindows) {
 	w.EnsureWindow(cartWindowWidth, cartWindowHeight)
+	w.SetSize(cartWindowWidth, cartWindowHeight)
 	w.ClampScroll(ctx.Session)
 	w.snapshot = w.cartSnapshot(ctx.Session)
 	w.itemInfo = itemInfo
@@ -418,7 +412,7 @@ func (w *CartWindow) showTooltip(ctx Context, item session.InventoryItem) {
 		return
 	}
 	text := fmt.Sprintf("%s: %d ea", inventoryItemDisplayName(ctx.Resources, item), maxInt(1, item.Amount))
-	w.tooltip.Show(ctx, text, ctx.Input.MouseX, ctx.Input.MouseY+18, ctx.Input.MouseY-6)
+	w.tooltip.Show(ctx, text, ctx.Input.MouseX, ctx.Input.MouseY+cartTooltipBelow, ctx.Input.MouseY-cartTooltipAbove)
 }
 
 func (w *CartWindow) hideTooltip() {
@@ -427,7 +421,7 @@ func (w *CartWindow) hideTooltip() {
 
 func cartDefaultPosition(ctx Context) (int, int) {
 	width, _ := ctx.ScreenSize()
-	return maxInt(windowScreenMargin, width-cartWindowWidth-windowScreenMargin), 118
+	return maxInt(windowScreenMargin, width-cartWindowWidth-windowScreenMargin), cartScreenTop
 }
 
 func sortedCartItems(s *session.Session) []session.InventoryItem {

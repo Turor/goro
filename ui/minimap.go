@@ -20,22 +20,8 @@ import (
 	xdraw "golang.org/x/image/draw"
 )
 
-const (
-	minimapWidth           = 188
-	minimapHeight          = 206
-	minimapMargin          = windowScreenMargin
-	minimapPad             = 10
-	minimapInfoBandH       = 22
-	minimapCompassDuration = 15 * time.Second
-)
-
-var (
-	minimapTextColor   = TextColor
-	minimapMutedColor  = MutedTextColor
-	minimapPlayerColor = color.RGBA{R: 255, G: 232, B: 96, A: 255}
-	minimapGuildColor  = color.RGBA{R: 255, G: 140, B: 26, A: 255}
-	minimapBossColor   = color.RGBA{R: 255, G: 0, B: 0, A: 255}
-)
+// theme:ok compass marker lifetime
+const minimapCompassDuration = 15 * time.Second
 
 type Minimap struct {
 	mapName          string
@@ -148,6 +134,14 @@ func (m *Minimap) Update(ctx Context) bool {
 	markerOnly := markerChanged && !fullRedraw
 	drawPendingMarker := m.pendingMarker && !markerChanged
 	needsRedraw := fullRedraw || drawPendingMarker
+	if m.window.width != w || m.window.baseHeight() != h {
+		m.window.SetSize(w, h)
+		if m.window.IsOpen() {
+			m.widget.image = m.scaledImage(minimapContentMapSize(w, h))
+			m.window.SetContent(m.widgetTree())
+			needsPublish = true
+		}
+	}
 	if !m.window.IsOpen() {
 		m.window.SetAutoPosition(x, y)
 		m.window.Open(ctx, m.widgetTree())
@@ -156,6 +150,9 @@ func (m *Minimap) Update(ctx Context) bool {
 		if m.window.SetAutoPosition(x, y) {
 			needsPublish = true
 		}
+	}
+	if m.window.layoutRebuild == nil {
+		m.window.OnLayoutReload(func() { m.rebuildFromLayout() })
 	}
 	if m.window.published == nil {
 		needsPublish = true
@@ -218,9 +215,21 @@ func (m *Minimap) widgetTree() widget.Widget {
 	return Win(
 		Title("Mini Map"),
 		CloseButton(false),
-		Size(minimapWidth, minimapHeight),
+		Size(float32(minimapWidth), float32(minimapHeight)),
 		Content(m.widget),
 	)
+}
+
+func (m *Minimap) rebuildFromLayout() {
+	ctx := m.window.ctx
+	screenW, screenH := ctx.ScreenSize()
+	x, y, w, h := minimapBounds(screenW, screenH)
+	m.window.SetAutoPosition(x, y)
+	m.window.SetSize(w, h)
+	if m.widget != nil {
+		m.widget.image = m.scaledImage(minimapContentMapSize(w, h))
+	}
+	m.window.SetContent(m.widgetTree())
 }
 
 func (m *Minimap) ensureImage(manager *res.Manager, mapName string) {
@@ -558,8 +567,8 @@ func (m *Minimap) currentVisualKey(ctx Context, now time.Time) string {
 }
 
 func minimapBounds(width, _ int) (int, int, int, int) {
-	x := maxInt(minimapMargin, width-minimapWidth-minimapMargin)
-	return x, minimapMargin, minimapWidth, minimapHeight
+	x := maxInt(windowScreenMargin, width-minimapWidth-windowScreenMargin)
+	return x, windowScreenMargin, minimapWidth, minimapHeight
 }
 
 func MinimapBounds(width, height int) (int, int, int, int) {
@@ -568,13 +577,13 @@ func MinimapBounds(width, height int) (int, int, int, int) {
 
 func minimapMapRect(x, y, w, h int) minimapRect {
 	available := h - ROWindowTitleHeight - minimapInfoBandH - minimapPad
-	size := minInt(w-2*minimapPad, available)
-	if size < 32 {
-		size = 32
+	size := minInt(w-minimapPad-minimapPad, available)
+	if size < minimapMapMin {
+		size = minimapMapMin
 	}
 	return minimapRect{
 		x: x + (w-size)/2,
-		y: y + ROWindowTitleHeight + 4,
+		y: y + ROWindowTitleHeight + minimapMapTop,
 		w: size,
 		h: size,
 	}
@@ -624,7 +633,7 @@ func newMinimapWidget() *minimapWidget {
 }
 
 func (w *minimapWidget) Layout(_ widget.Context, constraints geometry.Constraints) geometry.Size {
-	size := constraints.Constrain(geometry.Size{Width: minimapWidth, Height: minimapHeight - ROWindowTitleHeight})
+	size := constraints.Constrain(geometry.Size{Width: float32(minimapWidth), Height: float32(minimapHeight - ROWindowTitleHeight)})
 	w.SetBounds(geometry.FromPointSize(w.Position(), size))
 	return size
 }
@@ -648,10 +657,10 @@ func (w *minimapWidget) Draw(_ widget.Context, canvas widget.Canvas) {
 			drawMinimapCompassMarkers(canvas, rect, mapW, mapH, w.compassMarkers, w.now, w.ctx.Started)
 		}
 		label := minimapDisplayName(w.ctx.Resources, w.ctx.World.MapName)
-		footerY := bounds.Min.Y + bounds.Height() - 19
-		canvas.DrawText(trimRunes(label, 13), geometry.NewRect(bounds.Min.X+minimapPad, footerY, bounds.Width()/2, 16), float32(rotheme.Default.Typography.TextSize), Color(minimapTextColor), false, widget.TextAlignLeft)
+		footerY := bounds.Min.Y + bounds.Height() - float32(minimapFooterOff)
+		canvas.DrawText(trimRunes(label, 13), geometry.NewRect(bounds.Min.X+float32(minimapPad), footerY, bounds.Width()/2, float32(minimapLabelH)), float32(rotheme.Default.Typography.TextSize), Color(minimapTextColor), false, widget.TextAlignLeft)
 		coords := fmt.Sprintf("X:%d Y:%d", w.ctx.World.Player.X, w.ctx.World.Player.Y)
-		canvas.DrawText(coords, geometry.NewRect(bounds.Min.X+bounds.Width()/2, footerY, bounds.Width()/2-minimapPad, 16), float32(rotheme.Default.Typography.TextSize), Color(minimapMutedColor), false, widget.TextAlignRight)
+		canvas.DrawText(coords, geometry.NewRect(bounds.Min.X+bounds.Width()/2, footerY, bounds.Width()/2-float32(minimapPad), float32(minimapLabelH)), float32(rotheme.Default.Typography.TextSize), Color(minimapMutedColor), false, widget.TextAlignRight)
 	}
 }
 
@@ -702,13 +711,13 @@ func (w *minimapWidget) markPlayerDirty(old, current minimapPlayerMarkerState) b
 
 func minimapContentMapRect(bounds geometry.Rect) minimapRect {
 	available := int(bounds.Height()) - minimapInfoBandH - minimapPad
-	size := minInt(int(bounds.Width())-2*minimapPad, available)
-	if size < 32 {
-		size = 32
+	size := minInt(int(bounds.Width())-minimapPad-minimapPad, available)
+	if size < minimapMapMin {
+		size = minimapMapMin
 	}
 	return minimapRect{
 		x: int(bounds.Min.X) + (int(bounds.Width())-size)/2,
-		y: int(bounds.Min.Y) + 4,
+		y: int(bounds.Min.Y) + minimapMapTop,
 		w: size,
 		h: size,
 	}
@@ -720,7 +729,7 @@ func drawMinimapPlayerMarker(canvas widget.Canvas, rect minimapRect, mapW, mapH,
 		return
 	}
 	if arrow == nil {
-		drawMinimapMarkerAt(canvas, x, y, minimapPlayerColor, 4)
+		drawMinimapMarkerAt(canvas, x, y, minimapPlayerColor, minimapPlayerRadius)
 		return
 	}
 	bounds := arrow.Bounds()
@@ -732,23 +741,25 @@ func minimapPlayerMarkerDirtyRect(rect minimapRect, mapW, mapH int, marker minim
 	if !ok {
 		return geometry.Rect{}
 	}
-	width, height := 11, 11
+	width, height := minimapMarkerSize, minimapMarkerSize
 	if marker.arrow != nil {
 		bounds := marker.arrow.Bounds()
 		width = maxInt(width, bounds.Dx())
 		height = maxInt(height, bounds.Dy())
 	}
-	return geometry.NewRect(float32(x-width/2), float32(y-height/2), float32(width), float32(height)).Expand(4)
+	return geometry.NewRect(float32(x-width/2), float32(y-height/2), float32(width), float32(height)).Expand(float32(minimapMarkerExpand))
 }
 
 func minimapCoordsDirtyRect(bounds geometry.Rect) geometry.Rect {
-	footerY := bounds.Min.Y + bounds.Height() - 19
-	return geometry.NewRect(bounds.Min.X+bounds.Width()/2-2, footerY-2, bounds.Width()/2-minimapPad+4, 20)
+	footerY := bounds.Min.Y + bounds.Height() - float32(minimapFooterOff)
+	return geometry.NewRect(bounds.Min.X+bounds.Width()/2-float32(minimapCoordsPad), footerY-float32(minimapCoordsPad), bounds.Width()/2-float32(minimapPad)+float32(minimapCoordsExtra), float32(minimapCoordsH))
 }
 
 func drawMinimapMarkerAt(canvas widget.Canvas, x, y int, fill color.RGBA, radius int) {
-	canvas.DrawRect(geometry.NewRect(float32(x-radius-1), float32(y-radius-1), float32(radius*2+3), float32(radius*2+3)), Color(color.RGBA{A: 190}))
-	canvas.DrawRect(geometry.NewRect(float32(x-radius), float32(y-radius), float32(radius*2+1), float32(radius*2+1)), Color(fill))
+	shadow := radius*2 + minimapShadowExtra
+	inner := radius*2 + 1
+	canvas.DrawRect(geometry.NewRect(float32(x-radius-1), float32(y-radius-1), float32(shadow), float32(shadow)), Color(minimapShadowColor))
+	canvas.DrawRect(geometry.NewRect(float32(x-radius), float32(y-radius), float32(inner), float32(inner)), Color(fill))
 }
 
 func drawMinimapCompassMarkers(canvas widget.Canvas, rect minimapRect, mapW, mapH int, markers []minimapCompassMarker, now, started time.Time) {
@@ -791,8 +802,8 @@ func drawMinimapPartyMarkers(canvas widget.Canvas, rect minimapRect, mapW, mapH 
 		if !ok {
 			continue
 		}
-		drawMinimapSquareCentered(canvas, x, y, 6, color.RGBA{R: 255, G: 255, B: 255, A: 255})
-		drawMinimapSquareCentered(canvas, x, y, 4, minimapMemberColor(member.AccountID))
+		drawMinimapSquareCentered(canvas, x, y, minimapPartyOuter, minimapPartyColor)
+		drawMinimapSquareCentered(canvas, x, y, minimapPartyInner, minimapMemberColor(member.AccountID))
 	}
 }
 
@@ -812,13 +823,15 @@ func drawMinimapGuildMarkers(canvas widget.Canvas, rect minimapRect, mapW, mapH 
 		if !ok {
 			continue
 		}
-		drawMinimapSquareCentered(canvas, x, y, 3, minimapGuildColor)
+		drawMinimapSquareCentered(canvas, x, y, minimapGuildMarkerSize, minimapGuildColor)
 	}
 }
 
 func drawMinimapCross(canvas widget.Canvas, x, y int, fill color.RGBA) {
-	canvas.DrawRect(geometry.NewRect(float32(x-1), float32(y-4), 2, 8), Color(fill))
-	canvas.DrawRect(geometry.NewRect(float32(x-4), float32(y-1), 8, 2), Color(fill))
+	half := minimapCrossLength / 2
+	thick := minimapCrossThick
+	canvas.DrawRect(geometry.NewRect(float32(x-thick/2), float32(y-half), float32(thick), float32(minimapCrossLength)), Color(fill))
+	canvas.DrawRect(geometry.NewRect(float32(x-half), float32(y-thick/2), float32(minimapCrossLength), float32(thick)), Color(fill))
 }
 
 func drawMinimapSquareCentered(canvas widget.Canvas, x, y, size int, fill color.RGBA) {
@@ -844,8 +857,8 @@ func minimapProjectedMapRect(rect minimapRect, mapW, mapH int) minimapRect {
 		return minimapRect{}
 	}
 	maxSide := maxInt(mapW, mapH)
-	drawW := int(float64(rect.w)*float64(mapW)/float64(maxSide) + 0.5)
-	drawH := int(float64(rect.h)*float64(mapH)/float64(maxSide) + 0.5)
+	drawW := int(float64(rect.w)*float64(mapW)/float64(maxSide) + 0.5) // theme:ok round to nearest pixel
+	drawH := int(float64(rect.h)*float64(mapH)/float64(maxSide) + 0.5) // theme:ok round to nearest pixel
 	drawW = maxInt(1, minInt(rect.w, drawW))
 	drawH = maxInt(1, minInt(rect.h, drawH))
 	return minimapRect{
@@ -929,7 +942,7 @@ func normalizeMinimapDirection(direction int) int {
 
 func minimapPlayerArrowAngle(direction int) float64 {
 	robrDirection := minimapROBrowserDirection(direction)
-	return float64((robrDirection+4)&7) * math.Pi / 4
+	return float64((robrDirection+4)&7) * math.Pi / 4 // theme:ok eight-direction index, not a pixel offset
 }
 
 func minimapROBrowserDirection(direction int) int {
@@ -980,6 +993,7 @@ func rotateMinimapArrow(src image.Image, angle float64) image.Image {
 }
 
 func minimapCompassColor(rgb uint32) color.RGBA {
+	// theme:ok compass rgb comes from the server packet
 	return color.RGBA{
 		R: uint8((rgb >> 16) & 0xff),
 		G: uint8((rgb >> 8) & 0xff),
@@ -1024,6 +1038,7 @@ func minimapMemberColor(accountID uint32) color.RGBA {
 	x ^= x << 13
 	x ^= x >> 17
 	x ^= x << 5
+	// theme:ok party member color is hashed from the account id
 	return color.RGBA{
 		R: uint8(48 + (x & 0xbf)),
 		G: uint8(48 + ((x >> 8) & 0xbf)),

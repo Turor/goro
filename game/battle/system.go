@@ -37,6 +37,7 @@ type System struct {
 	DamageNumberView *scene.SpriteView
 	DamageNumberMiss bool
 	DamageNumbers    map[string]*scene.Billboard
+	damageNumberGap  int
 	DamageMsgView    *scene.SpriteView
 	DamageMsgMiss    bool
 	DamageFloaters   []Floater

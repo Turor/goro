@@ -16,14 +16,6 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	equipmentChoiceWindowWidth  = 312
-	equipmentChoiceTableHeaderH = 24
-	equipmentChoiceRowH         = 32
-	equipmentChoiceRows         = 6
-	equipmentChoiceWindowHeight = ROWindowTitleHeight + equipmentChoiceTableHeaderH + equipmentChoiceRows*equipmentChoiceRowH + ROWindowFooterHeight
-)
-
 type equipmentChoice struct {
 	Index  uint16
 	ItemID uint32
@@ -48,6 +40,7 @@ type equipmentChoiceWindow struct {
 
 func (w *equipmentChoiceWindow) OpenChoices(ctx Context, title, emptyText string, items []equipmentChoice, onConfirm func(Context, equipmentChoice), onCancel func(Context)) {
 	w.EnsureWindow(equipmentChoiceWindowWidth, equipmentChoiceWindowHeight)
+	w.SetSize(equipmentChoiceWindowWidth, equipmentChoiceWindowHeight)
 	w.title = title
 	w.emptyText = emptyText
 	w.onConfirm = onConfirm
@@ -64,6 +57,10 @@ func (w *equipmentChoiceWindow) OpenChoices(ctx Context, title, emptyText string
 		return
 	}
 	w.Open(ctx, w.widgetTree(ctx))
+	w.OnLayoutReload(func() {
+		w.SetSize(equipmentChoiceWindowWidth, equipmentChoiceWindowHeight)
+		w.SetContent(w.widgetTree(ctx))
+	})
 	w.Publish(ctx)
 }
 
@@ -90,7 +87,7 @@ func (w *equipmentChoiceWindow) Update(ctx Context) bool {
 	consumed := w.Window.Update(ctx)
 	keyboardConsumed := false
 	if w.IsOpen() {
-		keyboardConsumed = updateSelectionTableKeyboard(ctx, &w.selectedRow, len(w.items), equipmentChoiceRows, equipmentChoiceRowH, w.ensureScrollSignal(), func() {
+		keyboardConsumed = updateSelectionTableKeyboard(ctx, &w.selectedRow, len(w.items), equipmentChoiceRows, float32(equipmentChoiceRowH), w.ensureScrollSignal(), func() {
 			w.confirm(ctx)
 		})
 		if keyboardConsumed && w.IsOpen() {
@@ -112,7 +109,7 @@ func (w *equipmentChoiceWindow) widgetTree(ctx Context) widget.Widget {
 			w.cancel(ctx)
 			w.Publish(ctx)
 		}),
-		Size(equipmentChoiceWindowWidth, equipmentChoiceWindowHeight),
+		Size(float32(equipmentChoiceWindowWidth), float32(equipmentChoiceWindowHeight)),
 		Content(
 			primitives.Box(w.tableWidget(ctx)).
 				Height(equipmentChoiceTableHeight()).
@@ -137,8 +134,8 @@ func (w *equipmentChoiceWindow) tableWidget(ctx Context) *rotheme.TableViewWidge
 	return itemTableView(
 		w.itemTableRows(ctx, items),
 		"Item",
-		equipmentChoiceRowH,
-		equipmentChoiceTableHeaderH,
+		float32(equipmentChoiceRowH),
+		float32(equipmentChoiceTableHeaderH),
 		w.emptyText,
 		w.ensureScrollSignal(),
 		w.selectedRow,
@@ -194,7 +191,7 @@ func (w *equipmentChoiceWindow) rowAtMouse(mouseX, mouseY int) (int, bool) {
 	if !pointInRect(mouseX, mouseY, tableX, rowY, scrollbarSafeIntWidth(equipmentChoiceWindowWidth), equipmentChoiceRows*equipmentChoiceRowH) {
 		return 0, false
 	}
-	row := int((float32(mouseY-rowY) + w.ensureScrollSignal().Get()) / equipmentChoiceRowH)
+	row := int((float32(mouseY-rowY) + w.ensureScrollSignal().Get()) / float32(equipmentChoiceRowH))
 	if row < 0 || row >= len(w.items) {
 		return 0, false
 	}
@@ -246,7 +243,7 @@ func (w *equipmentChoiceWindow) ensureScrollSignal() state.Signal[float32] {
 }
 
 func equipmentChoiceTableHeight() float32 {
-	return equipmentChoiceTableHeaderH + equipmentChoiceRows*equipmentChoiceRowH
+	return float32(equipmentChoiceTableHeaderH + equipmentChoiceRows*equipmentChoiceRowH)
 }
 
 type RepairItemWindow struct {

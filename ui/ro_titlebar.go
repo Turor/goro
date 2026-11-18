@@ -69,6 +69,6 @@ func drawTitleBarGradient(canvas widget.Canvas, bounds geometry.Rect) {
 		rotheme.Default.Colors.WindowTitleTop,
 		rotheme.Default.Colors.WindowTitle,
 		rotheme.Default.Colors.WindowBorder,
-		1,
+		titlebarBorderH,
 	)
 }

@@ -5,8 +5,6 @@ import (
 	"github.com/kivutar/goro/input"
 )
 
-const homunculusContextMenuWidth = 120
-
 type HomunculusContextActionKind uint8
 
 const (
@@ -35,6 +33,10 @@ func (m *HomunculusContextMenu) Open(ctx Context, x, y int, aggressive bool) {
 	x = clampWindowInt(x, windowScreenMargin, maxInt(windowScreenMargin, screenW-homunculusContextMenuWidth-windowScreenMargin))
 	y = clampWindowInt(y, windowScreenMargin, maxInt(windowScreenMargin, screenH-m.height()-windowScreenMargin))
 	m.OpenAt(x, y, m.widgetTree())
+	m.claimLayoutReload(func() {
+		m.SetSize(homunculusContextMenuWidth, m.height())
+		m.SetContent(m.widgetTree())
+	})
 	m.Publish(ctx)
 }
 

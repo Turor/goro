@@ -13,13 +13,6 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	whisperWindowW        = 286
-	whisperWindowContentH = 120
-	whisperMessagePadX    = 8
-	whisperMessagePadY    = 6
-)
-
 type WhisperWindowAction struct {
 	Target  string
 	Message string
@@ -50,8 +43,9 @@ func (w *WhisperWindow) open(ctx Context, target string) {
 	if target == "" {
 		return
 	}
-	w.EnsureWindow(whisperWindowW, ROWindowTitleHeight+whisperWindowContentH+ROWindowFooterHeight)
-	w.SetBackground(widget.RGBA8(0, 0, 0, 0))
+	w.EnsureWindow(whisperWindowW, whisperWindowH())
+	w.SetSize(whisperWindowW, whisperWindowH())
+	w.SetBackground(whisperWindowBg)
 	w.SetFullRedraw(true)
 	w.ctx = ctx
 	if !strings.EqualFold(w.target, target) {
@@ -61,11 +55,22 @@ func (w *WhisperWindow) open(ctx Context, target string) {
 		w.inputField = nil
 	}
 	w.Window.Open(ctx, w.widgetTree(ctx))
+	w.OnLayoutReload(w.reloadLayout)
 	w.Publish(ctx)
 }
 
+func (w *WhisperWindow) reloadLayout() {
+	focused := w.inputField != nil && w.inputField.IsFocused()
+	w.SetSize(whisperWindowW, whisperWindowH())
+	w.SetBackground(whisperWindowBg)
+	w.SetContent(w.widgetTree(w.ctx))
+	if focused {
+		w.focusInput()
+	}
+}
+
 func (w *WhisperWindow) Update(ctx Context) bool {
-	w.EnsureWindow(whisperWindowW, ROWindowTitleHeight+whisperWindowContentH+ROWindowFooterHeight)
+	w.EnsureWindow(whisperWindowW, whisperWindowH())
 	w.SetFullRedraw(true)
 	w.ctx = ctx
 	if !w.IsOpen() {
@@ -81,8 +86,8 @@ func (w *WhisperWindow) Update(ctx Context) bool {
 }
 
 func (w *WhisperWindow) Rebind(ctx Context) {
-	w.EnsureWindow(whisperWindowW, ROWindowTitleHeight+whisperWindowContentH+ROWindowFooterHeight)
-	w.SetBackground(widget.RGBA8(0, 0, 0, 0))
+	w.EnsureWindow(whisperWindowW, whisperWindowH())
+	w.SetBackground(whisperWindowBg)
 	w.SetFullRedraw(true)
 	if !w.IsOpen() {
 		return
@@ -105,11 +110,11 @@ func (w *WhisperWindow) PopAction() WhisperWindowAction {
 }
 
 func (w *WhisperWindow) AddIncoming(ctx Context, sender, message string) {
-	w.addLine(ctx, fmt.Sprintf("%s : %s", strings.TrimSpace(sender), strings.TrimSpace(message)), widget.RGBA8(181, 222, 239, 255))
+	w.addLine(ctx, fmt.Sprintf("%s : %s", strings.TrimSpace(sender), strings.TrimSpace(message)), whisperIncomingText)
 }
 
 func (w *WhisperWindow) AddOutgoing(ctx Context, message string) {
-	w.addLine(ctx, fmt.Sprintf("me : %s", strings.TrimSpace(message)), widget.RGBA8(255, 255, 120, 255))
+	w.addLine(ctx, fmt.Sprintf("me : %s", strings.TrimSpace(message)), whisperOutgoingText)
 }
 
 func (w *WhisperWindow) AddError(ctx Context, message string) {
@@ -123,7 +128,7 @@ func (w *WhisperWindow) addLine(ctx Context, text string, color widget.Color) {
 	}
 	w.lines = append(w.lines, whisperWindowLine{text: text, color: color})
 	if len(w.lines) > 60 {
-		copy(w.lines, w.lines[len(w.lines)-60:])
+		copy(w.lines, w.lines[len(w.lines)-60:]) // theme:ok message history cap
 		w.lines = w.lines[:60]
 	}
 	if w.IsOpen() {
@@ -136,8 +141,8 @@ func (w *WhisperWindow) widgetTree(ctx Context) widget.Widget {
 		Title(w.title()),
 		CloseButton(true),
 		OnClose(w.Close),
-		Size(whisperWindowW, ROWindowTitleHeight+whisperWindowContentH+ROWindowFooterHeight),
-		Background(widget.RGBA8(0, 0, 0, 0)),
+		Size(float32(whisperWindowW), float32(whisperWindowH())),
+		Background(whisperWindowBg),
 		Content(w.contentTree()),
 		Footer(w.footerTree(ctx)...),
 	)
@@ -158,7 +163,7 @@ func (w *WhisperWindow) contentTree() widget.Widget {
 					Color(line.color).
 					MaxLines(1).
 					Ellipsis(),
-			).Height(consoleLineH),
+			).Height(float32(consoleLineH)),
 		)
 	}
 	messageList := primitives.Box(rows...).
@@ -168,15 +173,15 @@ func (w *WhisperWindow) contentTree() widget.Widget {
 	return primitives.Box(
 		scrollview.New(
 			primitives.Box(messageList).
-				PaddingRight(ROScrollbarGutter),
+				PaddingRight(float32(ROScrollbarGutter)),
 			scrollview.ScrollbarOpt(scrollview.ScrollbarAuto),
 			scrollview.ScrollYSignal(w.ensureScrollSignal()),
 			scrollview.ScrollStep(float32(consoleLineH*3)),
 		),
 	).
-		PaddingXY(whisperMessagePadX, whisperMessagePadY).
-		Background(widget.RGBA8(14, 18, 24, 188)).
-		BorderStyle(1, widget.RGBA8(180, 198, 218, 95)).
+		PaddingXY(float32(whisperMessagePadX), float32(whisperMessagePadY)).
+		Background(whisperPanelBg).
+		BorderStyle(1, whisperPanelBorder).
 		CrossAlign(primitives.CrossAxisStretch)
 }
 
@@ -184,7 +189,7 @@ func (w *WhisperWindow) footerTree(ctx Context) []widget.Widget {
 	return []widget.Widget{
 		primitives.Expanded(
 			primitives.Box(w.inputWidget(ctx)).
-				Height(24).
+				Height(float32(whisperInputH)).
 				CrossAlign(primitives.CrossAxisStretch),
 		),
 		rotheme.Button("Send", func() {
@@ -269,7 +274,7 @@ func (w *WhisperWindow) title() string {
 
 func (w *WhisperWindow) visibleLines() []whisperWindowLine {
 	if len(w.lines) == 0 {
-		return []whisperWindowLine{{text: "No messages", color: widget.RGBA8(150, 165, 182, 255)}}
+		return []whisperWindowLine{{text: "No messages", color: whisperEmptyText}}
 	}
 	return w.lines
 }

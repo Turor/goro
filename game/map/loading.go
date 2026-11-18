@@ -12,6 +12,7 @@ import (
 	"github.com/kivutar/goro/client"
 	"github.com/kivutar/goro/render"
 	"github.com/kivutar/goro/res"
+	"github.com/kivutar/goro/ui/rotheme"
 )
 
 const (
@@ -131,7 +132,7 @@ func (l *Loading) Percent(pendingUploads, coveredFrames int) int {
 		if l.uploads > 0 {
 			progress -= 8 * pendingUploads / l.uploads
 		}
-		return min(100, progress+2*coveredFrames/FadePrewarmFrames)
+		return min(100, progress+2*coveredFrames/FadePrewarmFrames) // theme:ok progress percentage, not a size
 	}
 	// Stage weights reserve the final ten percent for uploads and warmup.
 	limits := [...]int{0, 10, 30, 85, 90}
@@ -144,25 +145,32 @@ func (l *Loading) Percent(pendingUploads, coveredFrames int) int {
 
 func (l *Loading) Draw(screen *render.Frame, percent int, alpha uint8) {
 	width, height := float64(screen.Bounds().Dx()), float64(screen.Bounds().Dy())
-	render.DrawRect(screen, 0, 0, width, height, color.RGBA{A: alpha})
+	render.DrawRect(screen, 0, 0, width, height, fadedLoadingColor(rotheme.LoadingBackground, alpha))
 	if l.background != nil {
 		var opts render.DrawImageOptions
 		opts.GeoM.Scale(width/float64(l.background.Bounds().Dx()), height/float64(l.background.Bounds().Dy()))
-		opts.ColorScale.ScaleAlpha(float32(alpha) / 255)
+		opts.ColorScale.ScaleAlpha(float32(alpha) / 255) // theme:ok alpha byte to fraction
 		opts.Filter = render.FilterLinear
 		screen.DrawImage(l.background, &opts)
 	}
-	w, h := render.SnapScreenPoint(screen, min(240.0, width-16), 15)
-	x, y := render.SnapScreenPoint(screen, (width-w)/2, height*0.75)
+	w, h := render.SnapScreenPoint(screen, min(rotheme.LoadingBarMaxWidth, width-rotheme.LoadingBarSideMargin), rotheme.LoadingBarHeight)
+	x, y := render.SnapScreenPoint(screen, (width-w)/2, height*rotheme.LoadingBarYRatio)
 	// Snap each inset once so opposite edges have the same physical thickness.
-	borderX, borderY := render.SnapScreenPoint(screen, 1, 1)
-	padX, padY := render.SnapScreenPoint(screen, 2, 2)
-	render.DrawRect(screen, x, y, w, h, color.RGBA{G: 255, B: 255, A: alpha})
-	render.DrawRect(screen, x+borderX, y+borderY, w-2*borderX, h-2*borderY, color.RGBA{R: 140, G: 140, B: 140, A: alpha})
-	render.DrawRect(screen, x+padX, y+padY, float64(percent)*(w-2*padX)/100, h-2*padY, color.RGBA{R: 66, G: 99, B: 165, A: alpha})
+	borderX, borderY := render.SnapScreenPoint(screen, rotheme.LoadingBarBorder, rotheme.LoadingBarBorder)
+	padX, padY := render.SnapScreenPoint(screen, rotheme.LoadingBarPadding, rotheme.LoadingBarPadding)
+	render.DrawRect(screen, x, y, w, h, fadedLoadingColor(rotheme.LoadingBarBorderColor, alpha))
+	render.DrawRect(screen, x+borderX, y+borderY, w-2*borderX, h-2*borderY, fadedLoadingColor(rotheme.LoadingBarTrack, alpha))           // theme:ok inset on both edges
+	render.DrawRect(screen, x+padX, y+padY, float64(percent)*(w-2*padX)/100, h-2*padY, fadedLoadingColor(rotheme.LoadingBarFill, alpha)) // theme:ok inset on both edges, percent to fraction
 	text := fmt.Sprintf("%d%%", percent)
 	// Overlay labels include padding around the glyphs.
-	render.DrawCenteredUITextAtSize(screen, text, width/2, y-4, color.RGBA{R: 255, G: 255, A: alpha}, 11, false)
+	render.DrawCenteredUITextAtSize(screen, text, width/2, y-rotheme.LoadingLabelGap, fadedLoadingColor(rotheme.LoadingLabelColor, alpha), rotheme.LoadingLabelSize, false)
+}
+
+// fadedLoadingColor scales a theme color alpha by the screen fade alpha. With
+// the default opaque colors this is exactly the fade alpha.
+func fadedLoadingColor(c color.RGBA, alpha uint8) color.RGBA {
+	c.A = uint8(uint32(c.A) * uint32(alpha) / 255) // theme:ok alpha channel scale
+	return c
 }
 
 func (l *Loading) Release() {

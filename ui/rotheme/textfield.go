@@ -31,7 +31,7 @@ func (TextFieldPainter) PaintTextField(canvas widget.Canvas, state *textfield.Pa
 	drawTextFieldInsetShadow(canvas, state.Bounds)
 	canvas.StrokeRect(state.Bounds, border, 1)
 
-	content := geometry.NewRect(state.Bounds.Min.X+6, state.Bounds.Min.Y+4, state.Bounds.Width()-12, state.Bounds.Height()-8)
+	content := geometry.NewRect(state.Bounds.Min.X+textFieldPadX, state.Bounds.Min.Y+textFieldPadY, state.Bounds.Width()-textFieldPadX*2, state.Bounds.Height()-textFieldPadY*2)
 	text := state.Text
 	if state.InputType == textfield.TypePassword {
 		text = strings.Repeat("*", len([]rune(text)))
@@ -49,17 +49,17 @@ func (TextFieldPainter) PaintTextField(canvas widget.Canvas, state *textfield.Pa
 			cursor = len(runes)
 		}
 		x := min(content.Max.X, content.Min.X+MeasureText(canvas, string(runes[:cursor]), Default.Typography.TextSize, false))
-		canvas.DrawLine(geometry.Pt(x, state.Bounds.Min.Y+4), geometry.Pt(x, state.Bounds.Max.Y-4), Default.Colors.Text, 1)
+		canvas.DrawLine(geometry.Pt(x, state.Bounds.Min.Y+textFieldPadY), geometry.Pt(x, state.Bounds.Max.Y-textFieldPadY), Default.Colors.Text, 1)
 	}
 }
 
 func drawTextFieldInsetShadow(canvas widget.Canvas, bounds geometry.Rect) {
-	rows := min(4, int(bounds.Height())-2)
+	rows := min(textFieldShadowRows, int(bounds.Height())-textFieldShadowInset)
 	for row := 0; row < rows; row++ {
-		alpha := uint8(34 - row*7)
+		alpha := uint8(textFieldShadowAlpha - row*textFieldShadowAlphaStep)
 		canvas.DrawRect(
 			geometry.NewRect(bounds.Min.X, bounds.Min.Y+float32(row), bounds.Width(), 1),
-			widget.RGBA8(82, 108, 138, alpha),
+			textFieldShadow.WithAlpha(float32(alpha)/255),
 		)
 	}
 }

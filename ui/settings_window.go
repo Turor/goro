@@ -13,11 +13,6 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	settingsWindowW = 300
-	settingsWindowH = 359
-)
-
 type settingsTab int
 
 const (
@@ -35,6 +30,10 @@ func (w *SettingsWindow) OpenWindow(ctx client.Context) {
 	w.EnsureWindow(settingsWindowW, settingsWindowH)
 	w.ctx = ctx
 	w.Open(ctx, w.widgetTree(ctx))
+	w.OnLayoutReload(func() {
+		w.SetSize(settingsWindowW, settingsWindowH)
+		w.SetContent(w.widgetTree(w.ctx))
+	})
 	w.Publish(ctx)
 }
 
@@ -61,7 +60,7 @@ func (w *SettingsWindow) widgetTree(ctx client.Context) widget.Widget {
 		Title("Settings"),
 		CloseButton(true),
 		OnClose(w.Close),
-		Size(settingsWindowW, settingsWindowH),
+		Size(float32(settingsWindowW), float32(settingsWindowH)),
 		Content(w.contentTree(ctx)),
 	)
 }
@@ -69,7 +68,7 @@ func (w *SettingsWindow) widgetTree(ctx client.Context) widget.Widget {
 func (w *SettingsWindow) contentTree(ctx client.Context) widget.Widget {
 	return primitives.Box(
 		w.tabStrip(),
-		primitives.Box().Height(1).Background(rotheme.Default.Colors.WindowBorder),
+		primitives.Box().Height(float32(settingsDividerH)).Background(rotheme.Default.Colors.WindowBorder),
 		primitives.Expanded(w.tabContent(ctx)),
 	).CrossAlign(primitives.CrossAxisStretch)
 }
@@ -87,8 +86,8 @@ func (w *SettingsWindow) tabStrip() widget.Widget {
 		tabs = append(tabs, newTabWidget(tabWidgetConfig{
 			label:  def.label,
 			active: w.tab == def.tab,
-			width:  88,
-			height: 24,
+			width:  settingsTabW,
+			height: settingsTabH,
 			onClick: func() {
 				w.tab = def.tab
 				w.refresh(w.ctx)
@@ -96,7 +95,7 @@ func (w *SettingsWindow) tabStrip() widget.Widget {
 		}))
 	}
 	tabs = append(tabs, primitives.Expanded(primitives.Box()))
-	return primitives.HBox(tabs...).Gap(-1)
+	return primitives.HBox(tabs...).Gap(float32(settingsTabOverlap))
 }
 
 func (w *SettingsWindow) tabContent(ctx client.Context) widget.Widget {
@@ -151,10 +150,10 @@ func (w *SettingsWindow) displayTree(ctx client.Context) widget.Widget {
 		primitives.HBox(
 			primitives.Expanded(rotheme.Text("Anisotropic filtering")),
 			rotheme.Button(anisotropyLabel(settingsAnisotropy(ctx)), func() {
-				level := settingsAnisotropy(ctx) * 2
+				level := settingsAnisotropy(ctx) * 2 // theme:ok anisotropy step
 				if level == 0 {
-					level = 2
-				} else if level > 16 {
+					level = 2 // theme:ok anisotropy minimum
+				} else if level > 16 { // theme:ok anisotropy maximum
 					level = 0
 				}
 				if ctx.Runtime != nil {
@@ -162,8 +161,8 @@ func (w *SettingsWindow) displayTree(ctx client.Context) widget.Widget {
 				}
 				w.saveSettings(ctx)
 				w.refresh(ctx)
-			}).Width(48),
-		).Gap(8).Height(rotheme.Default.Typography.TextSize+rotheme.ButtonPaddingY*2),
+			}).Width(float32(settingsOptionButtonW)),
+		).Gap(float32(settingsGap)).Height(rotheme.Default.Typography.TextSize+rotheme.ButtonPaddingY*2),
 
 		primitives.HBox(
 			primitives.Expanded(rotheme.Text("Upscaling (Next map)")),
@@ -173,8 +172,8 @@ func (w *SettingsWindow) displayTree(ctx client.Context) widget.Widget {
 				}
 				w.saveSettings(ctx)
 				w.refresh(ctx)
-			}).Width(48),
-		).Gap(8).Height(rotheme.Default.Typography.TextSize+rotheme.ButtonPaddingY*2),
+			}).Width(float32(settingsOptionButtonW)),
+		).Gap(float32(settingsGap)).Height(rotheme.Default.Typography.TextSize+rotheme.ButtonPaddingY*2),
 
 		rotheme.Checkbox(
 			checkbox.Checked(settingsSmoothSprites(ctx)),
@@ -223,7 +222,7 @@ func (w *SettingsWindow) displayTree(ctx client.Context) widget.Widget {
 				w.refresh(ctx)
 			}),
 		),
-	).Padding(14).Gap(8)
+	).Padding(float32(settingsPad)).Gap(float32(settingsGap))
 }
 
 func (w *SettingsWindow) soundTree(ctx client.Context) widget.Widget {
@@ -244,7 +243,7 @@ func (w *SettingsWindow) soundTree(ctx client.Context) widget.Widget {
 					}),
 				),
 			),
-		).Gap(8),
+		).Gap(float32(settingsGap)),
 
 		primitives.HBox(
 			rotheme.Text("SFX Vol"),
@@ -262,8 +261,8 @@ func (w *SettingsWindow) soundTree(ctx client.Context) widget.Widget {
 					}),
 				),
 			),
-		).Gap(8),
-	).Padding(14).Gap(8)
+		).Gap(float32(settingsGap)),
+	).Padding(float32(settingsPad)).Gap(float32(settingsGap))
 }
 
 func (w *SettingsWindow) gameplayTree(ctx client.Context) widget.Widget {
@@ -335,8 +334,8 @@ func (w *SettingsWindow) gameplayTree(ctx client.Context) widget.Widget {
 			}),
 		),
 	).
-		Padding(14).
-		Gap(8)
+		Padding(float32(settingsPad)).
+		Gap(float32(settingsGap))
 }
 
 func (w *SettingsWindow) refresh(ctx client.Context) {

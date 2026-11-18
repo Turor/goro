@@ -19,10 +19,8 @@ func (w *roFooterWidget) Draw(ctx widget.Context, canvas widget.Canvas) {
 	}
 	bounds := w.Bounds()
 	canvas.DrawRect(bounds, rotheme.Default.Colors.WindowFooter)
-	const stripeHeight float32 = 2
-	stripeColor := widget.RGBA(1, 1, 1, 0.5)
-	for y := bounds.Min.Y; y < bounds.Max.Y; y += stripeHeight * 2 {
-		canvas.DrawRect(geometry.NewRect(bounds.Min.X, y, bounds.Width(), min(stripeHeight, bounds.Max.Y-y)), stripeColor)
+	for y := bounds.Min.Y; y < bounds.Max.Y; y += footerStripeH * 2 {
+		canvas.DrawRect(geometry.NewRect(bounds.Min.X, y, bounds.Width(), min(footerStripeH, bounds.Max.Y-y)), footerStripeColor)
 	}
 	w.BoxWidget.Draw(ctx, canvas)
 }

@@ -15,14 +15,7 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	identifyWindowWidth  = 312
-	identifyTableHeaderH = 36
-	identifyRowH         = 32
-	identifyRows         = 6
-	identifyWindowHeight = ROWindowTitleHeight + identifyTableHeaderH + identifyRows*identifyRowH + ROWindowFooterHeight
-	identifyCancelIndex  = uint16(0xFFFF)
-)
+const identifyCancelIndex = uint16(0xFFFF)
 
 type IdentifyWindow struct {
 	Window
@@ -42,6 +35,7 @@ type identifyItemIconKey struct {
 
 func (w *IdentifyWindow) OpenList(ctx Context, list network.ItemIdentifyList) {
 	w.EnsureWindow(identifyWindowWidth, identifyWindowHeight)
+	w.SetSize(identifyWindowWidth, identifyWindowHeight)
 	w.indexes = append(w.indexes[:0], list.Indexes...)
 	w.selected = session.InventoryItem{}
 	w.ensureScrollSignal().Set(0)
@@ -53,6 +47,10 @@ func (w *IdentifyWindow) OpenList(ctx Context, list network.ItemIdentifyList) {
 	}
 	w.snapshot = w.items(ctx.Session)
 	w.Open(ctx, w.widgetTree(ctx))
+	w.OnLayoutReload(func() {
+		w.SetSize(identifyWindowWidth, identifyWindowHeight)
+		w.SetContent(w.widgetTree(ctx))
+	})
 	w.Publish(ctx)
 }
 
@@ -84,7 +82,7 @@ func (w *IdentifyWindow) widgetTree(ctx Context) widget.Widget {
 			w.cancel(ctx)
 			w.Publish(ctx)
 		}),
-		Size(identifyWindowWidth, identifyWindowHeight),
+		Size(float32(identifyWindowWidth), float32(identifyWindowHeight)),
 		Content(
 			primitives.Box(w.identifyTableWidget(ctx)).
 				Height(identifyTableHeight()).
@@ -109,8 +107,8 @@ func (w *IdentifyWindow) identifyTableWidget(ctx Context) *rotheme.TableViewWidg
 	return itemTableView(
 		w.identifyTableRows(ctx, items),
 		"Item",
-		identifyRowH,
-		identifyTableHeaderH,
+		float32(identifyRowH),
+		float32(identifyTableHeaderH),
 		"No unidentified equipment",
 		w.ensureScrollSignal(),
 		w.selectedRow(items),
@@ -247,7 +245,7 @@ func (w *IdentifyWindow) ensureScrollSignal() state.Signal[float32] {
 }
 
 func identifyTableHeight() float32 {
-	return identifyTableHeaderH + identifyRows*identifyRowH
+	return float32(identifyTableHeaderH + identifyRows*identifyRowH)
 }
 
 func findInventoryItemByIndex(s *session.Session, index uint16) (session.InventoryItem, bool) {
