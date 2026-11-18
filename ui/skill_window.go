@@ -40,10 +40,13 @@ const (
 	skillGridCellW        = 62
 	skillGridCellH        = 58
 	skillGridMinRows      = 6
-	skillGridViewW        = skillGridColumns*skillGridCellW + ROScrollbarGutter
 	skillGridViewH        = skillGridMinRows * skillGridCellH
-	skillGridWindowWidth  = skillTabRailW + verticalTabDividerW + skillGridViewW
 	skillGridWindowHeight = ROWindowTitleHeight + skillGridViewH + ROWindowFooterHeight
+)
+
+var (
+	skillGridViewW       = skillGridColumns*skillGridCellW + ROScrollbarGutter
+	skillGridWindowWidth = skillTabRailW + verticalTabDividerW + skillGridViewW
 )
 
 const (

@@ -179,7 +179,7 @@ func (w *ItemInfoWindow) descriptionPanel(ctx Context) widget.Widget {
 				primitives.Box(textLines...).
 					Gap(0),
 			).
-				PaddingRight(ROScrollbarGutter),
+				PaddingRight(float32(ROScrollbarGutter)),
 			scrollview.DirectionOpt(scrollview.Vertical),
 			scrollview.ScrollbarOpt(scrollview.ScrollbarAuto),
 			scrollview.ScrollStep(itemInfoLineH),

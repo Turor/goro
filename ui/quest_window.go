@@ -274,7 +274,7 @@ func (w *QuestWindow) detailTree(ctx Context, quest session.Quest) widget.Widget
 	}
 	return Win(Title("Quest Details"), CloseButton(true), OnClose(w.detail.Close), Size(questDetailW, questDetailH),
 		Content(primitives.Box(scrollview.New(
-			primitives.Box(content...).Gap(8).PaddingRight(ROScrollbarGutter),
+			primitives.Box(content...).Gap(8).PaddingRight(float32(ROScrollbarGutter)),
 			scrollview.DirectionOpt(scrollview.Vertical), scrollview.ScrollbarOpt(scrollview.ScrollbarAuto),
 			scrollview.ScrollYSignal(w.detailScrollY),
 		)).Padding(10)),

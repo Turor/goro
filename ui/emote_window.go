@@ -491,7 +491,7 @@ func (s *emoteSpriteSet) composeIcon(frame int) image.Image {
 
 func emoteIconAnchor(first res.ACTLayer) (float64, float64) {
 	return float64(emoteCellSize/2) - float64(first.X),
-		float64(emoteCellSize) - float64(first.Y) - uiSpriteRendererMidCellY
+		float64(emoteCellSize) - float64(first.Y) - float64(uiSpriteRendererMidCellY)
 }
 
 func (s *emoteSpriteSet) frameImage(index int32, sprType int32) *render.Image {

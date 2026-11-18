@@ -403,7 +403,7 @@ func TestPushcartGridUsesBottomCellShadows(t *testing.T) {
 		cellSize:  cartGridCell,
 		viewWidth: cartGridViewW,
 	})
-	grid.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(cartGridViewW, cartGridViewH)))
+	grid.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(float32(cartGridViewW), cartGridViewH)))
 	canvas := &uitest.MockCanvas{}
 	grid.Draw(widget.NewContext(), canvas)
 

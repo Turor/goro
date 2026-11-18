@@ -23,13 +23,13 @@ import (
 const (
 	minimapWidth           = 188
 	minimapHeight          = 206
-	minimapMargin          = windowScreenMargin
 	minimapPad             = 10
 	minimapInfoBandH       = 22
 	minimapCompassDuration = 15 * time.Second
 )
 
 var (
+	minimapMargin      = windowScreenMargin
 	minimapTextColor   = TextColor
 	minimapMutedColor  = MutedTextColor
 	minimapPlayerColor = color.RGBA{R: 255, G: 232, B: 96, A: 255}

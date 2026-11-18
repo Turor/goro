@@ -290,7 +290,7 @@ func (w *ChatRoomWindow) contentTree() widget.Widget {
 		primitives.Box(
 			scrollview.New(
 				primitives.Box(messageList).
-					PaddingRight(ROScrollbarGutter),
+					PaddingRight(float32(ROScrollbarGutter)),
 				scrollview.ScrollbarOpt(scrollview.ScrollbarAuto),
 				scrollview.ScrollYSignal(w.ensureScrollSignal()),
 				scrollview.ScrollStep(float32(consoleLineH*3)),

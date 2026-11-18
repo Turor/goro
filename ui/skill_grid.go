@@ -74,7 +74,7 @@ func newSkillGridWidget(cfg skillGridConfig) *skillGridWidget {
 }
 
 func (w *skillGridWidget) Layout(_ widget.Context, constraints geometry.Constraints) geometry.Size {
-	size := constraints.Constrain(geometry.Sz(skillGridViewW, float32(w.totalRows()*skillGridCellH)))
+	size := constraints.Constrain(geometry.Sz(float32(skillGridViewW), float32(w.totalRows()*skillGridCellH)))
 	w.SetBounds(geometry.FromPointSize(w.Position(), size))
 	return size
 }

@@ -23,11 +23,14 @@ const (
 	cartGridRows     = 4
 	cartGridCell     = 32
 	cartGridW        = cartGridCols * cartGridCell
-	cartGridViewW    = cartGridW + ROScrollbarGutter
 	cartGridViewH    = cartGridRows * cartGridCell
 	cartGridLeftPad  = 40
-	cartWindowWidth  = cartGridLeftPad + cartGridViewW
 	cartWindowHeight = ROWindowTitleHeight + cartGridViewH + ROWindowFooterHeight
+)
+
+var (
+	cartGridViewW   = cartGridW + ROScrollbarGutter
+	cartWindowWidth = cartGridLeftPad + cartGridViewW
 )
 
 type CartWindow struct {
@@ -230,7 +233,7 @@ func (w *CartWindow) widgetTree(ctx Context, itemInfo *ItemWindows) widget.Widge
 			w.close(ctx)
 			w.Publish(ctx)
 		}),
-		Size(cartWindowWidth, cartWindowHeight),
+		Size(float32(cartWindowWidth), cartWindowHeight),
 		Content(
 			primitives.HBox(
 				primitives.Box().
@@ -238,7 +241,7 @@ func (w *CartWindow) widgetTree(ctx Context, itemInfo *ItemWindows) widget.Widge
 					Height(cartGridViewH).
 					Background(rotheme.Default.Colors.WindowBody),
 				primitives.Box(scroll).
-					Width(cartGridViewW).
+					Width(float32(cartGridViewW)).
 					Height(cartGridViewH),
 			).
 				Gap(0).

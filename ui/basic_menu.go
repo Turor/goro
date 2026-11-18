@@ -8,8 +8,6 @@ import (
 )
 
 const (
-	basicMenuX         = windowScreenMargin
-	basicMenuY         = characterWindowY + characterWindowHeight + basicMenuFollowGap
 	basicMenuFollowGap = 2
 	basicMenuToggleH   = 10
 	basicMenuToggleGap = 2
@@ -20,6 +18,11 @@ const (
 	basicMenuGapX      = 6
 	basicMenuGapY      = 5
 	basicMenuPad       = 8
+)
+
+var (
+	basicMenuX = windowScreenMargin
+	basicMenuY = characterWindowY + characterWindowHeight + basicMenuFollowGap
 )
 
 type BasicMenu struct {

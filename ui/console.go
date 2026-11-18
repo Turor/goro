@@ -26,7 +26,6 @@ import (
 )
 
 const (
-	consoleMargin     = windowScreenMargin
 	consoleWidth      = 480
 	consoleHeight     = 176
 	consoleMaxInput   = 120
@@ -37,6 +36,8 @@ const (
 	doriDoriMinSpan   = 1500 * time.Millisecond
 	doriDoriMaxSpan   = 3 * time.Second
 )
+
+var consoleMargin = windowScreenMargin
 
 var (
 	consoleBackground       = widget.RGBA8(14, 18, 24, 188)
@@ -1051,7 +1052,7 @@ func (c *ChatConsole) widgetTree(width, height int) widget.Widget {
 	messages := primitives.Box(
 		scrollview.New(
 			primitives.Box(messageList).
-				PaddingRight(ROScrollbarGutter),
+				PaddingRight(float32(ROScrollbarGutter)),
 			scrollview.ScrollbarOpt(scrollview.ScrollbarAuto),
 			scrollview.ScrollYSignal(c.ensureScrollSignal()),
 			scrollview.ScrollStep(float32(consoleLineH*3)),

@@ -17,8 +17,6 @@ import (
 )
 
 const (
-	characterWindowX                     = windowScreenMargin
-	characterWindowY                     = windowScreenMargin
 	characterWindowWidth                 = 324
 	characterWindowHeight                = 140
 	characterWindowCompactHeight         = 80
@@ -33,6 +31,8 @@ const (
 )
 
 var (
+	characterWindowX           = windowScreenMargin
+	characterWindowY           = windowScreenMargin
 	characterWindowEXPColor    = WindowBorderColor
 	characterWindowJobEXPColor = WindowBorderColor
 )
