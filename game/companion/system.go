@@ -23,6 +23,7 @@ type Bindings struct {
 type Vitals struct{ HP, MaxHP, SP, MaxSP int }
 
 type Windows struct {
+	Companion         gameui.CompanionWindow
 	HomunculusInfo    gameui.HomunculusInfoWindow
 	HomunculusSkill   gameui.HomunculusSkillWindow
 	HomunculusContext gameui.HomunculusContextMenu

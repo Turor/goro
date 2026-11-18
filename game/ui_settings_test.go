@@ -36,6 +36,7 @@ func TestUISettingsRestoreAndRelog(t *testing.T) {
 		ChatShortcutsPosition:    config.WindowPosition{X: 130, Y: 60, Set: true},
 		SettingsPosition:         config.WindowPosition{X: 140, Y: 60, Set: true},
 		PetPosition:              config.WindowPosition{X: 150, Y: 60, Set: true},
+		CompanionPosition:        config.WindowPosition{X: 155, Y: 60, Set: true},
 		HomunculusPosition:       config.WindowPosition{X: 160, Y: 60, Set: true},
 		HomunculusSkillsPosition: config.WindowPosition{X: 170, Y: 60, Set: true},
 		MercenaryPosition:        config.WindowPosition{X: 180, Y: 60, Set: true},
@@ -225,6 +226,28 @@ func TestUISettingsRestoreBasicInfoAndMinimapPositions(t *testing.T) {
 	m.ui.minimap.Toggle(ctx)
 	if m.ui.minimap.SavedPosition() != ctx.Config.UI.MinimapPosition {
 		t.Fatal("showing the minimap lost its position")
+	}
+}
+
+func TestUISettingsRestoreCompanionWindow(t *testing.T) {
+	ctx := chatShortcutTestContext(t)
+	ctx.Config.UI = config.UISettings{
+		CompanionOpen: true, CompanionTab: int(gameui.CompanionTabStable), ShortcutRows: 1,
+		CompanionPosition: config.WindowPosition{X: 40, Y: 80, Set: true},
+	}
+	m := NewWorldMode()
+	m.restoreUISettings(ctx)
+	if !m.ui.companions.Companion.IsOpen() || m.ui.companions.Companion.Tab() != gameui.CompanionTabStable {
+		t.Fatal("did not restore the companion window on its saved tab")
+	}
+	if got := m.ui.companions.Companion.SavedPosition(); got != ctx.Config.UI.CompanionPosition {
+		t.Fatalf("companion position = %+v", got)
+	}
+	m.ui.companions.Companion.SetTab(gameui.CompanionTabMercenary)
+	m.SaveUISettings(ctx)
+	saved, err := ctx.Config.LoadUISettings()
+	if err != nil || saved.CompanionTab != int(gameui.CompanionTabMercenary) || !saved.CompanionOpen {
+		t.Fatalf("did not persist companion tab: %+v, %v", saved, err)
 	}
 }
 

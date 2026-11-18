@@ -325,15 +325,15 @@ func (m *System) roomBoardIcon(manager *res.Manager, key, resource string) *rend
 	if texture, ok := m.bindings.Map.Textures[key]; ok {
 		return texture
 	}
-	if _, ok := m.bindings.Map.TextureMiss[key]; ok {
+	img, _, err := res.LoadTextureWithin(manager, res.InterfaceTextureCandidates(resource), scene.FrameRemoteBudget)
+	if errors.Is(err, res.ErrRemotePending) {
 		return nil
 	}
-	img, _, err := res.LoadImageWithin(manager, res.InterfaceTextureCandidates(resource), scene.FrameRemoteBudget)
 	if err != nil {
-		if !errors.Is(err, res.ErrRemotePending) {
-			m.bindings.Map.TextureMiss[key] = struct{}{}
-		}
 		return nil
+	}
+	if res.IsMissingCheckerboard(img) {
+		m.bindings.Map.TextureMiss[key] = struct{}{}
 	}
 	texture := render.NewImageFromImage(img)
 	m.bindings.Map.Textures[key] = texture

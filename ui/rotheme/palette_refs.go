@@ -43,6 +43,7 @@ var paletteRefs = map[string]string{
 	"chat_room.summary_text":           "@accent spin(-13.8) saturate(17.1%) lighten(18.8%)",
 	"chat_room.system_text":            "@accent spin(3) saturate(11%) lighten(13%)",
 	"chat_room.window_background":      "@shadow alpha(0)",
+	"companion.frame_background":       "@background",
 	"console.background":               "@shadow spin(-144) saturate(26.3%) lighten(7.5%) alpha(0.737)",
 	"console.blue_color":               "@accent spin(-31.4) saturate(52.7%) darken(13.5%)",
 	"console.border_color":             "@border desaturate(14%) lighten(9%) alpha(0.373)",

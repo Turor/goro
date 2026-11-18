@@ -179,7 +179,7 @@ func TestSwordmanRealAssets(t *testing.T) {
 		spec, _ := Lookup(id)
 		for _, c := range spec.Components {
 			for _, path := range append([]string{c.TextureFile}, c.TextureFiles...) {
-				if path != "" && m.EffectFileTexture(manager, path) == nil {
+				if path != "" && !TextureLoaded(m.EffectFileTexture(manager, path)) {
 					t.Errorf("effect %d missing texture %s", id, path)
 				}
 			}

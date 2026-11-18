@@ -66,6 +66,9 @@ func Effect3DSpriteDrawOptions(component Component) *render.DrawTrianglesOptions
 	if component.WorldSizedSprite {
 		options.DepthBias = StrEffectDepthBias
 	}
+	if component.Depth != 0 {
+		options.DepthBias = float32(component.Depth)
+	}
 	if component.BlendAdditive {
 		options.Blend = render.BlendLighter
 	}

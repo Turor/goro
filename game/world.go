@@ -443,6 +443,7 @@ func (m *WorldMode) rebindPersistentUI(ctx client.Context) {
 	m.ui.social.ChatRoomPassword.Rebind(ctx)
 	m.ui.social.ChatRoom.Rebind(ctx)
 	m.ui.settingsWindow.Rebind(ctx)
+	m.ui.companions.Companion.Rebind(ctx)
 	m.ui.companions.HomunculusInfo.Rebind(ctx)
 	m.ui.companions.MercenaryInfo.Rebind(ctx)
 	m.ui.social.WhisperWindows.Rebind(ctx)
@@ -759,6 +760,12 @@ func (m *WorldMode) Update(ctx client.Context) (Mode, error) {
 		return nil, nil
 	}
 	if m.ui.pet.Info.Update(ctx) {
+		return nil, nil
+	}
+	if m.ui.companions.Companion.Update(ctx, m.petSystem.Property, m.petSystem.HasProperty) {
+		if action := m.ui.companions.Companion.PopAction(); action.Kind != gameui.CompanionActionNone {
+			m.companions().HandleCompanionWindowAction(ctx, action)
+		}
 		return nil, nil
 	}
 	if m.ui.companions.HomunculusConfirm.Update(ctx) {
@@ -1229,6 +1236,7 @@ func (m *WorldMode) nextWorldMode() *WorldMode {
 	next.ui.cardWindow = m.ui.cardWindow
 	next.ui.pet.Egg = m.ui.pet.Egg
 	next.ui.pet.Info = m.ui.pet.Info
+	next.ui.companions.Companion = m.ui.companions.Companion
 	next.ui.companions.HomunculusInfo = m.ui.companions.HomunculusInfo
 	next.ui.companions.HomunculusSkill = m.ui.companions.HomunculusSkill
 	next.ui.companions.MercenaryInfo = m.ui.companions.MercenaryInfo

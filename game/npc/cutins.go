@@ -1,6 +1,7 @@
 package npc
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -42,13 +43,15 @@ func (m *System) cutinTexture(manager *res.Manager, resource string) (*render.Im
 	if texture := m.bindings.Map.Textures[key]; texture != nil {
 		return texture, nil
 	}
-	if _, missed := m.bindings.Map.TextureMiss[key]; missed {
-		return nil, nil
-	}
-	img, _, err := res.LoadImage(manager, candidates)
-	if err != nil {
-		m.bindings.Map.TextureMiss[key] = struct{}{}
+	img, _, err := res.LoadTexture(manager, candidates)
+	if errors.Is(err, res.ErrRemotePending) {
 		return nil, err
+	}
+	if err != nil {
+		return nil, err
+	}
+	if res.IsMissingCheckerboard(img) {
+		m.bindings.Map.TextureMiss[key] = struct{}{}
 	}
 	texture := render.NewImageFromImage(img)
 	m.bindings.Map.Textures[key] = texture

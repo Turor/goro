@@ -68,6 +68,8 @@ type Manager struct {
 	skillTreeData            *db.SkillTreeData
 	skillTreeWarnings        []string
 	skillTreeRetryAt         time.Time
+	effectDataLoaded         bool
+	effectDataRetryAt        time.Time
 	invalidations            dataInvalidationQueue
 	songTalks                map[SongTalkKind][]string
 	songTalksLoaded          map[SongTalkKind]bool

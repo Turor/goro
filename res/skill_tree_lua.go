@@ -135,7 +135,7 @@ func (m *Manager) InvalidateData(paths []string) bool {
 	if m == nil || len(paths) == 0 {
 		return false
 	}
-	skill := false
+	skill, effect := false, false
 	for _, name := range paths {
 		if m.remote != nil {
 			m.remote.evict(name)
@@ -143,12 +143,21 @@ func (m *Manager) InvalidateData(paths []string) bool {
 		if IsSkillDataFile(name) {
 			skill = true
 		}
+		if IsEffectDataFile(name) {
+			effect = true
+		}
 	}
-	if !skill {
+	if !skill && !effect {
 		return false
 	}
-	glog.Infof("skill tree: reloading after %d changed files", len(paths))
-	m.ReloadSkillData()
+	if skill {
+		glog.Infof("skill tree: reloading after %d changed files", len(paths))
+		m.ReloadSkillData()
+	}
+	if effect {
+		glog.Infof("effects: reloading after %d changed files", len(paths))
+		m.ReloadEffectData()
+	}
 	return true
 }
 

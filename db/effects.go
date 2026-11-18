@@ -804,7 +804,29 @@ type EffectSpec struct {
 	SFXDelays        []time.Duration
 	SFXRandMin       int
 	SFXRandMax       int
-	Components       []EffectComponent
+	// Layer, ZOrder and Depth drive draw order. Layer < 0 draws with the
+	// ground pass (before entities); Layer > 0 draws after entities. Layer 0
+	// keeps each component's RenderBefore flag. Depth is extra camera-plane
+	// bias for the renderer (G61 owns Crazy Uproar's remaining visual fix).
+	Layer      int
+	ZOrder     int
+	Depth      float64
+	Components []EffectComponent
+}
+
+// DrawsBeforeEntities reports whether this component is submitted in the
+// pre-actor world pass on its own Layer: negative draws before entities,
+// positive after, and 0 keeps RenderBefore. EffectDrawsBeforeEntities also
+// falls back to the spec Layer.
+func (c EffectComponent) DrawsBeforeEntities() bool {
+	switch {
+	case c.Layer < 0:
+		return true
+	case c.Layer > 0:
+		return false
+	default:
+		return c.RenderBefore
+	}
 }
 
 type EffectComponent struct {
@@ -827,6 +849,9 @@ type EffectComponent struct {
 	STRRandMax         int
 	AttachedEntity     bool
 	RenderBefore       bool // robr renderBeforeEntities
+	Layer              int
+	ZOrder             int
+	Depth              float64
 	TexturePath        string
 	TextureName        string
 	TextureFile        string
