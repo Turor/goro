@@ -63,7 +63,7 @@ func TestListThemesBuiltinThenUserFiles(t *testing.T) {
 	writeFile(t, filepath.Join(dir, "ocean.ini"), "# name: Ocean Blue\n[palette]\naccent = #1060a0\n")
 	writeFile(t, filepath.Join(dir, "Sunset_Glow.INI"), "[palette]\naccent = #e06020\n")
 	writeFile(t, filepath.Join(dir, "dark.ini"), "[palette]\naccent = #ff0000\n") // shadows a built-in: skipped
-	writeFile(t, filepath.Join(dir, "bad name.ini"), "[palette]\n")                // invalid ID: skipped
+	writeFile(t, filepath.Join(dir, "bad name.ini"), "[palette]\n")               // invalid ID: skipped
 	writeFile(t, filepath.Join(dir, "notes.txt"), "not a theme\n")
 	if err := os.Mkdir(filepath.Join(dir, "folder.ini"), 0o755); err != nil {
 		t.Fatal(err)
