@@ -150,3 +150,30 @@ func apply(t *testing.T, src string) {
 	}
 	layout.Apply()
 }
+
+func TestLoadLayoutFileRejectsOversizeAndNonRegular(t *testing.T) {
+	resetLayoutAfter(t)
+	dir := t.TempDir()
+	big := filepath.Join(dir, "big.ini")
+	src := "[text]\nsize = 12\n" + strings.Repeat("# padding\n", MaxLayoutFileSize/10+1)
+	if err := os.WriteFile(big, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if applied, _, err := LoadLayoutFile(big); applied || err == nil || Default.Typography.TextSize == 12 {
+		t.Fatalf("oversize file: applied=%v err=%v", applied, err)
+	}
+	if applied, _, err := LoadLayoutFile(dir); applied || err == nil || !strings.Contains(err.Error(), "not a regular file") {
+		t.Fatalf("directory: applied=%v err=%v", applied, err)
+	}
+}
+
+func TestLayoutWarningsAreCapped(t *testing.T) {
+	src := "[x]\n" + strings.Repeat("k = 1\n", 5000)
+	_, warnings, err := ParseLayout(strings.NewReader(src), "f")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(warnings) != MaxLayoutWarnings+1 || !strings.Contains(warnings[MaxLayoutWarnings], "5000 unknown keys") {
+		t.Fatalf("got %d warnings, last %q", len(warnings), warnings[len(warnings)-1])
+	}
+}

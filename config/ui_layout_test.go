@@ -26,6 +26,16 @@ func TestUILayoutConfig(t *testing.T) {
 	if cfg.UILayout.Watch || cfg.UILayoutPath() != "/tmp/modern.ini" || cfg.UILayout.DumpPath != "-" {
 		t.Fatalf("flags not applied: %+v", cfg.UILayout)
 	}
+	if err := os.WriteFile(ini, []byte("[ui_layout]\nfile = themes/modern.ini\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err = LoadConfig([]string{"--config", ini})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(dir, "themes", "modern.ini"); cfg.UILayoutPath() != want {
+		t.Fatalf("relative [ui_layout] file = %q, want %q", cfg.UILayoutPath(), want)
+	}
 	if defaultConfig().UILayout.Watch {
 		t.Fatal("players must not poll the layout file by default")
 	}
