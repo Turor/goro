@@ -47,6 +47,10 @@ type windowFrame struct {
 	opacity    float32
 	layoutGen  uint64
 	title      *primitives.TextWidget
+	// titleStyle is what the theme last gave the title; a title restyled by
+	// its window since then keeps its own color or size across reloads.
+	titleColor widget.Color
+	titleSize  float32
 }
 
 func (f *windowFrame) applyBackground() {
@@ -71,7 +75,15 @@ func (f *windowFrame) refreshLayoutTokens() {
 		f.BoxWidget.Rounded(WindowRadius)
 	}
 	if f.title != nil {
-		f.title.Color(rotheme.Default.Colors.TitleText).FontSize(rotheme.Default.Typography.TextSize)
+		style := f.title.Style()
+		if style.Color == f.titleColor {
+			f.titleColor = rotheme.Default.Colors.TitleText
+			f.title.Color(f.titleColor)
+		}
+		if style.FontSize == f.titleSize {
+			f.titleSize = rotheme.Default.Typography.TextSize
+			f.title.FontSize(f.titleSize)
+		}
 	}
 	f.BoxWidget.SetNeedsRedraw(true)
 }
@@ -183,6 +195,8 @@ func Win(options ...WindowOption) widget.Widget {
 		opacity:    1,
 		layoutGen:  rotheme.Generation(),
 		title:      titleText,
+		titleColor: rotheme.Default.Colors.TitleText,
+		titleSize:  rotheme.Default.Typography.TextSize,
 	}
 }
 

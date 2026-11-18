@@ -23,8 +23,15 @@ func TestOpenWindowFrameFollowsReloadedTokens(t *testing.T) {
 	if style.Background != widget.RGBA8(0x20, 0x30, 0x40, 0x80) || style.Border.Color != widget.RGBA8(255, 0, 0, 255) || style.Border.Width != 3 || style.Radius != 0 {
 		t.Fatalf("frame kept old styling: %+v", style)
 	}
-	if frame.title == nil {
-		t.Fatal("frame lost its title widget")
+	if frame.title == nil || frame.title.Style().Color != widget.RGBA8(0, 255, 0, 255) {
+		t.Fatal("theme title color not applied on reload")
+	}
+	custom := widget.RGBA8(1, 2, 3, 255)
+	frame.title.Color(custom)
+	rotheme.ResetLayout()
+	frame.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(300, 240)))
+	if frame.title.Style().Color != custom {
+		t.Fatal("a window's custom title color was lost on reload")
 	}
 }
 

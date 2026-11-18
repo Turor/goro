@@ -5,8 +5,8 @@ import (
 	"image/color"
 	"io"
 	"os"
-	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/gogpu/gpucontext"
 	"github.com/kivutar/goro/input"
@@ -135,17 +135,14 @@ func (w *uiLayoutWatcher) reload(now time.Time) bool {
 	}
 	if err != nil {
 		glog.Errorf("ui layout rejected, keeping previous values: %v", err)
-		w.show("UI layout NOT applied: "+err.Error(), uiLayoutErrorColor, now, 15*time.Second)
+		w.show("UI layout NOT applied: "+bannerText(err.Error()), uiLayoutErrorColor, now, 15*time.Second)
 		return false
 	}
 	if !applied {
 		return false
 	}
 	glog.Infof("ui layout reloaded path=%s", w.path)
-	msg := "UI layout reloaded"
-	if len(warnings) > 0 {
-		msg += " (" + strings.Join(warnings, "; ") + ")"
-	}
+	msg := "UI layout reloaded" + warningSummary(warnings)
 	w.show(msg, uiLayoutOKColor, now, 4*time.Second)
 	return true
 }
@@ -164,4 +161,32 @@ func (w *uiLayoutWatcher) Draw(screen *render.Frame, now time.Time) {
 		return
 	}
 	w.toast.Draw(screen, now)
+}
+
+// uiLayoutBannerMax keeps banner text to about two lines; the log has it all.
+const uiLayoutBannerMax = 160
+
+func bannerText(s string) string {
+	if len(s) <= uiLayoutBannerMax {
+		return s
+	}
+	cut := uiLayoutBannerMax
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut] + "…"
+}
+
+// warningSummary shows one warning, or only a count when there are several.
+func warningSummary(warnings []string) string {
+	switch {
+	case len(warnings) == 0:
+		return ""
+	case len(warnings) == 1:
+		return " (" + bannerText(warnings[0]) + ")"
+	case len(warnings) > rotheme.MaxLayoutWarnings:
+		return fmt.Sprintf(" (over %d warnings, see log)", rotheme.MaxLayoutWarnings)
+	default:
+		return fmt.Sprintf(" (%d warnings, see log)", len(warnings))
+	}
 }

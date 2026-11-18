@@ -1,8 +1,10 @@
 package app
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -54,5 +56,21 @@ func TestUILayoutWatcherAppliesRejectsAndResets(t *testing.T) {
 	}
 	if !tick() || rotheme.Default.Typography.TextSize != builtIn {
 		t.Fatal("removing the file must restore the built-in layout")
+	}
+}
+
+func TestUILayoutBannerIsBounded(t *testing.T) {
+	many := make([]string, rotheme.MaxLayoutWarnings+1)
+	for i := range many {
+		many[i] = fmt.Sprintf("f:%d: unknown key [x] k (ignored)", i)
+	}
+	if got := warningSummary(many); got != fmt.Sprintf(" (over %d warnings, see log)", rotheme.MaxLayoutWarnings) {
+		t.Fatalf("summary %q", got)
+	}
+	if got := warningSummary(many[:3]); got != " (3 warnings, see log)" {
+		t.Fatalf("summary %q", got)
+	}
+	if got := bannerText(strings.Repeat("é", 500)); len(got) > uiLayoutBannerMax+len("…") || !strings.HasSuffix(got, "…") {
+		t.Fatalf("banner not truncated: %d bytes", len(got))
 	}
 }
