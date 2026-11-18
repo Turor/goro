@@ -13,6 +13,10 @@ type Manager struct {
 	root       *overlayRoot
 	overlays   []widget.Widget
 	foreground []widget.Widget
+	// keepOrder and replaceAt let KeepOverlayOrder put a republished window
+	// back in the stack slot of the overlay it replaced.
+	keepOrder bool
+	replaceAt int
 }
 
 func NewManager() *Manager {
@@ -38,6 +42,10 @@ func (m *Manager) AddOverlay(root widget.Widget) {
 	}
 	disableRootRepaintBoundary(root)
 	insert := len(m.overlays) - len(m.foreground)
+	if m.keepOrder && m.replaceAt >= 0 && m.replaceAt < insert {
+		insert = m.replaceAt
+	}
+	m.replaceAt = -1
 	m.overlays = append(m.overlays, nil)
 	copy(m.overlays[insert+1:], m.overlays[insert:])
 	m.overlays[insert] = root
@@ -67,6 +75,9 @@ func (m *Manager) RemoveOverlay(root widget.Widget) {
 	}
 	for i, child := range m.overlays {
 		if child == root {
+			if m.keepOrder {
+				m.replaceAt = i
+			}
 			m.overlays = append(m.overlays[:i], m.overlays[i+1:]...)
 			for j, foreground := range m.foreground {
 				if foreground == root {
@@ -78,6 +89,19 @@ func (m *Manager) RemoveOverlay(root widget.Widget) {
 			return
 		}
 	}
+}
+
+// KeepOverlayOrder runs fn so that a window it republishes (its overlay
+// removed and a new one added) keeps its place in the stack instead of
+// jumping to the top. A UI layout reload rebuilds windows this way.
+func (m *Manager) KeepOverlayOrder(fn func()) {
+	if m == nil {
+		fn()
+		return
+	}
+	m.keepOrder, m.replaceAt = true, -1
+	defer func() { m.keepOrder, m.replaceAt = false, -1 }()
+	fn()
 }
 
 func (m *Manager) Clear() {
