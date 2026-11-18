@@ -152,6 +152,10 @@ func (m *Manager) RefreshLayout() {
 		markTreeNeedsRedraw(root)
 	}
 	if m.app != nil {
+		// The base gogpu/ui theme (text fields, scrollbars, focus) follows too.
+		if app, ok := m.app.(interface{ RefreshTheme() }); ok {
+			app.RefreshTheme()
+		}
 		if app, ok := m.app.(layoutInvalidatingUIApp); ok {
 			app.InvalidateLayout()
 		}

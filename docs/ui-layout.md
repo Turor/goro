@@ -40,7 +40,7 @@ What updates live:
 | Section | Keys |
 |---|---|
 | `[theme]` | All window, button, text and input colors, context menu hover, HP/SP and hunger bars, success and error text |
-| `[text]` | UI text size |
+| `[text]` | UI text size, font family, optional font file |
 | `[button]` | Radius, horizontal and vertical padding, large-button padding, highlight opacity |
 | `[window]` | Corner radius, border width, title bar and footer heights, title padding, title button gap, footer padding and gap |
 | `[hotbar]` | Slot size, slot gap, row gap, padding |
@@ -53,8 +53,17 @@ Window sizes in the code are written against the built-in 28 px title bar
 and 42 px footer. Changing `title_height` or `footer_height` grows or shrinks
 every window by the difference, so each window keeps its content area.
 
-Still compiled in: the font family and the remaining per-window sizes. They
-move into the file as each window is tuned.
+Fonts: `font_family` names the font the UI draws with. The built-in font is
+`Inter`; to use another, set `font_file` to a TTF or OTF (relative to
+ui-layout.ini, up to 16 MiB) and `font_family` to the name to register it
+under. A family that is not loaded falls back to Inter, and a font file that
+cannot be read is reported in the banner and log.
+
+The base gogpu/ui theme (text fields, scrollbars, focus rings) is rebuilt
+from these values on every reload too.
+
+Still compiled in: the remaining per-window sizes. They move into the file as
+each window is tuned.
 
 ## For developers
 

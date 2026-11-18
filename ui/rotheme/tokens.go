@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"sync/atomic"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/gogpu/ui/widget"
 )
@@ -34,6 +36,7 @@ const (
 	tokenFloat
 	tokenColor
 	tokenRGBA
+	tokenString
 )
 
 type token struct {
@@ -48,6 +51,9 @@ type token struct {
 	floatPtr *float32
 	colorPtr *widget.Color
 	rgbaPtr  *color.RGBA
+	strPtr   *string
+	// allowEmpty lets a string token be blank (for example "no font file").
+	allowEmpty bool
 
 	def tokenValue
 }
@@ -57,6 +63,7 @@ type tokenValue struct {
 	f    float32
 	c    widget.Color
 	rgba color.RGBA
+	s    string
 }
 
 var (
@@ -113,6 +120,13 @@ func RegisterRGBA(section, key string, ptr *color.RGBA, doc string) {
 	register(&token{section: section, key: key, doc: doc, kind: tokenRGBA, rgbaPtr: ptr})
 }
 
+// RegisterString exposes a short text value such as a font family name. It is
+// at most maxLen bytes, has no control characters, and is blank only if
+// allowEmpty.
+func RegisterString(section, key string, ptr *string, maxLen int, allowEmpty bool, doc string) {
+	register(&token{section: section, key: key, doc: doc, kind: tokenString, strPtr: ptr, max: float64(maxLen), allowEmpty: allowEmpty})
+}
+
 // Generation increases every time layout values are replaced. Widgets that
 // copy token values at construction compare it to know when to refresh.
 func Generation() uint64 {
@@ -127,6 +141,8 @@ func (t *token) current() tokenValue {
 		return tokenValue{f: *t.floatPtr}
 	case tokenColor:
 		return tokenValue{c: *t.colorPtr}
+	case tokenString:
+		return tokenValue{s: *t.strPtr}
 	default:
 		return tokenValue{rgba: *t.rgbaPtr}
 	}
@@ -140,6 +156,8 @@ func (t *token) set(v tokenValue) {
 		*t.floatPtr = v.f
 	case tokenColor:
 		*t.colorPtr = v.c
+	case tokenString:
+		*t.strPtr = v.s
 	default:
 		*t.rgbaPtr = v.rgba
 	}
@@ -154,6 +172,8 @@ func (t *token) format(v tokenValue) string {
 	case tokenColor:
 		r, g, b, a := colorBytes(v.c)
 		return formatHex(r, g, b, a)
+	case tokenString:
+		return v.s
 	default:
 		return formatHex(v.rgba.R, v.rgba.G, v.rgba.B, v.rgba.A)
 	}
@@ -179,6 +199,8 @@ func (t *token) parse(raw string) (tokenValue, error) {
 			return tokenValue{}, fmt.Errorf("%s.%s must be between %g and %g, got %s", t.section, t.key, t.min, t.max, raw)
 		}
 		return tokenValue{f: float32(f)}, nil
+	case tokenString:
+		return t.parseString(raw)
 	default:
 		r, g, b, a, err := parseHexColor(raw)
 		if err != nil {
@@ -189,6 +211,19 @@ func (t *token) parse(raw string) (tokenValue, error) {
 		}
 		return tokenValue{rgba: color.RGBA{R: r, G: g, B: b, A: a}}, nil
 	}
+}
+
+func (t *token) parseString(raw string) (tokenValue, error) {
+	if raw == "" && !t.allowEmpty {
+		return tokenValue{}, fmt.Errorf("%s.%s must not be empty", t.section, t.key)
+	}
+	if len(raw) > int(t.max) {
+		return tokenValue{}, fmt.Errorf("%s.%s is longer than %d bytes", t.section, t.key, int(t.max))
+	}
+	if !utf8.ValidString(raw) || strings.IndexFunc(raw, unicode.IsControl) >= 0 {
+		return tokenValue{}, fmt.Errorf("%s.%s has invalid characters", t.section, t.key)
+	}
+	return tokenValue{s: raw}, nil
 }
 
 func parseHexColor(raw string) (r, g, b, a uint8, err error) {
@@ -397,7 +432,11 @@ func WriteLayout(w io.Writer) error {
 			if doc != "" {
 				fmt.Fprintf(bw, "# %s\n", doc)
 			}
-			fmt.Fprintf(bw, "%s = %s\n", t.key, t.format(t.current()))
+			if value := t.format(t.current()); value != "" {
+				fmt.Fprintf(bw, "%s = %s\n", t.key, value)
+			} else {
+				fmt.Fprintf(bw, "%s =\n", t.key)
+			}
 		}
 	}
 	return bw.Flush()

@@ -34,6 +34,9 @@ func loadUILayout(cfg config.Config) {
 		glog.Errorf("ui layout rejected, using built-in layout: %v", err)
 	case applied:
 		glog.Infof("ui layout loaded path=%s", path)
+		if err := loadUIFont(path); err != nil {
+			glog.Errorf("ui layout: %v (using the built-in font)", err)
+		}
 	}
 }
 
@@ -142,6 +145,10 @@ func (w *uiLayoutWatcher) reload(now time.Time) bool {
 		return false
 	}
 	glog.Infof("ui layout reloaded path=%s", w.path)
+	if err := loadUIFont(w.path); err != nil {
+		glog.Errorf("ui layout: %v (using the built-in font)", err)
+		warnings = append(warnings, err.Error())
+	}
 	msg := "UI layout reloaded" + warningSummary(warnings)
 	w.show(msg, uiLayoutOKColor, now, 4*time.Second)
 	return true

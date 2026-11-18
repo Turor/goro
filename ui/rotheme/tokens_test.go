@@ -57,7 +57,14 @@ func TestLayoutApplyOverridesAndOmittedKeysRevert(t *testing.T) {
 	if Generation() == gen {
 		t.Fatal("apply did not advance the generation")
 	}
+	apply(t, "[text]\nfont_family = DejaVu Sans\nfont_file = fonts/DejaVuSans.ttf\n")
+	if Default.Typography.FontFamily != "DejaVu Sans" || FontFile != "fonts/DejaVuSans.ttf" {
+		t.Fatalf("font family %q file %q", Default.Typography.FontFamily, FontFile)
+	}
 	apply(t, "[text]\nsize = 13\n")
+	if Default.Typography.FontFamily != "Inter" || FontFile != "" {
+		t.Fatal("font keys removed from the file did not return to their defaults")
+	}
 	if Default.Colors.WindowBody != tokenIndex["theme.window_body"].def.c || ButtonPaddingX != 8 {
 		t.Fatal("keys removed from the file did not return to their defaults")
 	}
@@ -73,6 +80,8 @@ func TestLayoutRejectsBadFilesAndKeepsLastGood(t *testing.T) {
 		"no equals":    "[theme]\nwindow_body\n",
 		"bad header":   "[theme\n",
 		"not a number": "[progress_bar]\nheight = tall\n",
+		"empty font":   "[text]\nfont_family =\n",
+		"control char": "[text]\nfont_family = In\x01ter\n",
 	}
 	for name, src := range cases {
 		_, _, err := ParseLayout(strings.NewReader(src), "ui-layout.ini")
