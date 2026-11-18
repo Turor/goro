@@ -13,17 +13,6 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	petInfoWindowW       = 292
-	petInfoWindowH       = 178
-	petInfoContentPad    = 12
-	petInfoLabelW        = 70
-	petInfoFieldW        = 120
-	petInfoRowH          = 20
-	petInfoNameFieldH    = 24
-	petInfoRenameButtonW = 58
-)
-
 type PetInfoWindow struct {
 	Window
 	property  network.PetProperty
@@ -48,6 +37,10 @@ func (w *PetInfoWindow) OpenInfo(ctx Context, property network.PetProperty) {
 	}
 	w.property = property
 	w.Window.Open(ctx, w.widgetTree(ctx))
+	w.OnLayoutReload(func() {
+		w.SetSize(petInfoWindowW, petInfoWindowH)
+		w.SetContent(w.widgetTree(w.ctx))
+	})
 	w.Publish(ctx)
 }
 
@@ -77,7 +70,7 @@ func (w *PetInfoWindow) widgetTree(ctx Context) widget.Widget {
 			w.Close()
 			w.Publish(ctx)
 		}),
-		Size(petInfoWindowW, petInfoWindowH),
+		Size(float32(petInfoWindowW), float32(petInfoWindowH)),
 		Content(
 			primitives.Box(
 				w.nameRow(ctx),
@@ -86,8 +79,8 @@ func (w *PetInfoWindow) widgetTree(ctx Context) widget.Widget {
 				w.infoRow("Intimacy", petIntimacyText(w.property.Relationship)),
 				w.infoRow("Accessory", w.accessoryText(ctx)),
 			).
-				Padding(petInfoContentPad).
-				Gap(6),
+				Padding(float32(petInfoContentPad)).
+				Gap(float32(petInfoRowGap)),
 		),
 	)
 }
@@ -99,16 +92,16 @@ func (w *PetInfoWindow) nameRow(ctx Context) widget.Widget {
 	return primitives.HBox(
 		w.rowLabel("Name"),
 		primitives.Box(w.nameInput(ctx)).
-			Width(petInfoFieldW).
-			Height(petInfoNameFieldH).
+			Width(float32(petInfoFieldW)).
+			Height(float32(petInfoNameFieldH)).
 			CrossAlign(primitives.CrossAxisStretch),
 		rotheme.Button("Edit", func() {
 			w.rename(ctx)
-		}).Width(petInfoRenameButtonW),
+		}).Width(float32(petInfoRenameButtonW)),
 	).
-		Gap(6).
+		Gap(float32(petInfoRowGap)).
 		CrossAlign(primitives.CrossAxisCenter).
-		Height(petInfoNameFieldH)
+		Height(float32(petInfoNameFieldH))
 }
 
 func (w *PetInfoWindow) nameInput(ctx Context) *textfield.Widget {
@@ -124,7 +117,7 @@ func (w *PetInfoWindow) nameInput(ctx Context) *textfield.Widget {
 		func(string) {
 			w.rename(ctx)
 		},
-		textfield.MaxLength(24),
+		textfield.MaxLength(24), // theme:ok name length limit
 	)
 	return w.nameField
 }
@@ -133,11 +126,11 @@ func (w *PetInfoWindow) infoRow(label, value string) widget.Widget {
 	return primitives.HBox(
 		w.rowLabel(label),
 		primitives.Box(rotheme.Text(value)).
-			Width(petInfoFieldW),
+			Width(float32(petInfoFieldW)),
 	).
-		Gap(6).
+		Gap(float32(petInfoRowGap)).
 		CrossAlign(primitives.CrossAxisCenter).
-		Height(petInfoRowH)
+		Height(float32(petInfoRowH))
 }
 
 func (w *PetInfoWindow) rowLabel(label string) widget.Widget {
@@ -145,7 +138,7 @@ func (w *PetInfoWindow) rowLabel(label string) widget.Widget {
 		rotheme.Text(label).
 			Color(rotheme.Default.Colors.MutedText),
 	).
-		Width(petInfoLabelW)
+		Width(float32(petInfoLabelW))
 }
 
 func (w *PetInfoWindow) accessoryText(ctx Context) string {
