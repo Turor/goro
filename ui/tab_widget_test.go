@@ -107,7 +107,7 @@ func TestInventoryBagUsesOnlyVerticalCategoryTabs(t *testing.T) {
 
 func TestStorageVerticalTabsFitTableHeight(t *testing.T) {
 	column := (&StorageWindow{}).tabColumn(Context{})
-	column.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(storageTabRailW, storageTableViewH)))
+	column.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(float32(storageTabRailW), float32(storageTableViewH))))
 
 	children := column.Children()
 	if len(children) != len(storageCategoryTabs) {
@@ -117,7 +117,7 @@ func TestStorageVerticalTabsFitTableHeight(t *testing.T) {
 	if !ok {
 		t.Fatalf("last storage tab = %T, want *tabWidget", children[len(children)-1])
 	}
-	if last.Bounds().Max.Y > storageTableViewH {
+	if last.Bounds().Max.Y > float32(storageTableViewH) {
 		t.Fatalf("last storage tab bottom = %.1f, table height = %d", last.Bounds().Max.Y, storageTableViewH)
 	}
 }

@@ -16,14 +16,6 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	cardCompositionWindowWidth  = 328
-	cardCompositionTableHeaderH = 24
-	cardCompositionRowH         = 32
-	cardCompositionRows         = 6
-	cardCompositionWindowHeight = ROWindowTitleHeight + cardCompositionTableHeaderH + cardCompositionRows*cardCompositionRowH + ROWindowFooterHeight
-)
-
 type CardCompositionWindow struct {
 	Window
 	scrollY   state.Signal[float32]
@@ -38,6 +30,7 @@ type CardCompositionWindow struct {
 
 func (w *CardCompositionWindow) OpenList(ctx Context, cardIndex uint16, list network.ItemCompositionList) {
 	w.EnsureWindow(cardCompositionWindowWidth, cardCompositionWindowHeight)
+	w.SetSize(cardCompositionWindowWidth, cardCompositionWindowHeight)
 	w.cardIndex = cardIndex
 	w.indexes = append(w.indexes[:0], list.Indexes...)
 	w.selected = session.InventoryItem{}
@@ -50,6 +43,10 @@ func (w *CardCompositionWindow) OpenList(ctx Context, cardIndex uint16, list net
 	}
 	w.snapshot = w.items(ctx.Session)
 	w.Open(ctx, w.widgetTree(ctx))
+	w.OnLayoutReload(func() {
+		w.SetSize(cardCompositionWindowWidth, cardCompositionWindowHeight)
+		w.SetContent(w.widgetTree(ctx))
+	})
 	w.Publish(ctx)
 }
 
@@ -94,7 +91,7 @@ func (w *CardCompositionWindow) widgetTree(ctx Context) widget.Widget {
 			w.Close()
 			w.Publish(ctx)
 		}),
-		Size(cardCompositionWindowWidth, cardCompositionWindowHeight),
+		Size(float32(cardCompositionWindowWidth), float32(cardCompositionWindowHeight)),
 		Content(
 			primitives.Box(w.tableWidget(ctx)).
 				Height(cardCompositionTableHeight()).
@@ -118,8 +115,8 @@ func (w *CardCompositionWindow) tableWidget(ctx Context) *rotheme.TableViewWidge
 	return itemTableView(
 		w.itemTableRows(ctx, items),
 		"Item",
-		cardCompositionRowH,
-		cardCompositionTableHeaderH,
+		float32(cardCompositionRowH),
+		float32(cardCompositionTableHeaderH),
 		"No items",
 		w.ensureScrollSignal(),
 		w.selectedRow(items),
@@ -239,5 +236,5 @@ func (w *CardCompositionWindow) ensureScrollSignal() state.Signal[float32] {
 }
 
 func cardCompositionTableHeight() float32 {
-	return cardCompositionTableHeaderH + cardCompositionRows*cardCompositionRowH
+	return float32(cardCompositionTableHeaderH + cardCompositionRows*cardCompositionRowH)
 }
