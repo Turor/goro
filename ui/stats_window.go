@@ -12,42 +12,22 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-// Row height, padding and section gap are layout tokens; the window size
-// follows them (recomputeStatsWindowMetrics).
-var (
-	statsWindowPad  float32 = 10
-	statsRowH               = 18
-	statsSectionGap float32 = 10
-
-	statsWindowWidth  = statsWindowWidthFor(statsWindowPad, statsSectionGap)
-	statsWindowHeight = statsWindowHeightFor(statsRowH, statsWindowPad)
-)
-
-const (
-	statsRowGap = rotheme.TableGap
-
-	statsPrimaryLabelWidth  float32 = 44
-	statsPrimaryValueWidth  float32 = 56
-	statsPrimaryCostWidth   float32 = 28
-	statsPrimaryButtonGap   float32 = 7
-	statsPrimaryColumnWidth         = statsPrimaryLabelWidth + statsPrimaryValueWidth + statsPrimaryCostWidth + rotheme.IconButtonSize + statsPrimaryButtonGap
-
-	statsDerivedLabelWidth  float32 = 46
-	statsDerivedValueWidth  float32 = 62
-	statsDerivedPairWidth           = statsDerivedLabelWidth + rotheme.TableGap + statsDerivedValueWidth
-	statsDerivedColumnWidth         = 2*(statsDerivedLabelWidth+statsDerivedValueWidth) + 3*rotheme.TableGap
-	statsPrimaryRows                = 6
-)
+// Row height, padding, column widths and the section gap are layout tokens;
+// the window size follows them (recomputeStatsWindowMetrics).
+const statsRowGap = rotheme.TableGap
 
 func statsWindowWidthFor(pad, sectionGap float32) int {
 	return int(2*pad + statsPrimaryColumnWidth + sectionGap + statsDerivedColumnWidth)
 }
 
 func statsWindowHeightFor(rowH int, pad float32) int {
-	return ROWindowTitleHeight + int(2*pad) + statsPrimaryRows*rowH + int((statsPrimaryRows-1)*statsRowGap)
+	return ROWindowTitleHeight + int(2*pad) + statsPrimaryRows*rowH + int(float32(statsPrimaryRows-1)*statsRowGap)
 }
 
 func recomputeStatsWindowMetrics() {
+	statsPrimaryColumnWidth = statsPrimaryLabelWidth + statsPrimaryValueWidth + statsPrimaryCostWidth + rotheme.IconButtonSize + statsPrimaryButtonGap
+	statsDerivedPairWidth = statsDerivedLabelWidth + rotheme.TableGap + statsDerivedValueWidth
+	statsDerivedColumnWidth = 2*(statsDerivedLabelWidth+statsDerivedValueWidth) + 3*rotheme.TableGap
 	statsWindowWidth = statsWindowWidthFor(statsWindowPad, statsSectionGap)
 	statsWindowHeight = statsWindowHeightFor(statsRowH, statsWindowPad)
 }
@@ -86,6 +66,7 @@ func (w *StatsWindow) OpenWindow(ctx Context) {
 	w.snapshot = statsWindowSnapshot(ctx.Session)
 	w.SetAutoPosition(x, y)
 	w.Open(ctx, w.widgetTree(ctx))
+	w.bindLayoutReload()
 	w.Publish(ctx)
 }
 
@@ -121,6 +102,11 @@ func (w *StatsWindow) Rebind(ctx Context) {
 		return
 	}
 	w.refresh(ctx)
+	w.bindLayoutReload()
+}
+
+func (w *StatsWindow) bindLayoutReload() {
+	w.OnLayoutReload(func() { w.refresh(w.ctx) })
 }
 
 func (w *StatsWindow) refresh(ctx Context) {
@@ -142,7 +128,7 @@ func (w *StatsWindow) close(ctx Context) {
 
 func statsWindowPosition(ctx Context) (int, int) {
 	width, height := ctx.ScreenSize()
-	x := minInt(characterWindowX+characterWindowWidth+12, maxInt(windowScreenMargin, width-statsWindowWidth-windowScreenMargin))
+	x := minInt(characterWindowX+characterWindowWidth+statsPositionGap, maxInt(windowScreenMargin, width-statsWindowWidth-windowScreenMargin))
 	y := minInt(characterWindowY, maxInt(windowScreenMargin, height-statsWindowHeight-windowScreenMargin))
 	if x < windowScreenMargin {
 		x = windowScreenMargin
@@ -377,7 +363,7 @@ func statPointCost(current int) int {
 	if current < 1 {
 		current = 1
 	}
-	return 1 + (current+9)/10
+	return 1 + (current+9)/10 // theme:ok stat point cost formula
 }
 
 func formatStatValue(value, bonus int) string {

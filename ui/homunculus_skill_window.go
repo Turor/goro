@@ -21,8 +21,11 @@ const (
 	homunculusSkillWindowWidth  = 360
 	homunculusSkillWindowHeight = 300
 	homunculusSkillTableViewH   = homunculusSkillWindowHeight - ROWindowTitleHeight - ROWindowFooterHeight
-	homunculusSkillTableBodyH   = homunculusSkillTableViewH - skillHeaderH
 )
+
+func homunculusSkillTableBodyH() int {
+	return homunculusSkillTableViewH - skillHeaderH
+}
 
 var companionSkillTableColumns = []rotheme.TableViewColumn{
 	{Key: "icon", Width: 34},
@@ -288,8 +291,8 @@ func (w *HomunculusSkillWindow) skillTableWidget(ctx Context, assets AssetProvid
 	return rotheme.TableView(
 		rotheme.TableViewColumns(companionSkillTableColumns),
 		rotheme.TableViewRowCount(len(skills)),
-		rotheme.TableViewRowHeight(skillRowH),
-		rotheme.TableViewHeaderHeight(skillHeaderH),
+		rotheme.TableViewRowHeight(float32(skillRowH)),
+		rotheme.TableViewHeaderHeight(float32(skillHeaderH)),
 		rotheme.TableViewEmptyText(fmt.Sprintf("No %s skills received from server yet.", w.kindLabelLower())),
 		rotheme.TableViewScrollYSignal(w.ensureScrollSignal()),
 		rotheme.TableViewDispatchHoverToCells(false),
@@ -527,10 +530,10 @@ func (w *HomunculusSkillWindow) updateTooltipHover(ctx Context) {
 
 func (w *HomunculusSkillWindow) skillAtMouse(ctx Context, mouseX, mouseY int) (session.Skill, bool) {
 	x, y := w.skillTableBodyOrigin()
-	if !pointInRect(mouseX, mouseY, x, y, scrollbarSafeIntWidth(homunculusSkillWindowWidth), homunculusSkillTableBodyH) {
+	if !pointInRect(mouseX, mouseY, x, y, scrollbarSafeIntWidth(homunculusSkillWindowWidth), homunculusSkillTableBodyH()) {
 		return session.Skill{}, false
 	}
-	row := int((float32(mouseY-y) + w.ensureScrollSignal().Get()) / skillRowH)
+	row := int((float32(mouseY-y) + w.ensureScrollSignal().Get()) / float32(skillRowH))
 	skills := w.visibleSkills(ctx)
 	if row < 0 || row >= len(skills) {
 		return session.Skill{}, false
@@ -578,7 +581,7 @@ func (w *HomunculusSkillWindow) clampScroll(ctx Context) {
 }
 
 func (w *HomunculusSkillWindow) clampScrollCount(skillCount int) {
-	maxScroll := float32(maxInt(0, skillCount*skillRowH-homunculusSkillTableBodyH))
+	maxScroll := float32(maxInt(0, skillCount*skillRowH-homunculusSkillTableBodyH()))
 	scroll := w.ensureScrollSignal()
 	switch value := scroll.Get(); {
 	case value < 0:

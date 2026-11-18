@@ -349,7 +349,7 @@ func TestInventoryGridStartsAtLeftEdge(t *testing.T) {
 		items:     []session.InventoryItem{{Index: 1, ItemID: 501}},
 		viewWidth: inventoryBagViewW,
 	})
-	grid.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(inventoryBagViewW, float32(inventoryBagViewH))))
+	grid.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(float32(inventoryBagViewW), float32(inventoryBagViewH))))
 
 	if got := grid.indexAt(geometry.Pt(float32(inventoryBagCell/2), float32(inventoryBagCell/2))); got != 0 {
 		t.Fatalf("first cell hit index %d, want 0", got)
@@ -364,7 +364,7 @@ func TestInventoryGridDrawsOnlyBottomShadowInEveryCell(t *testing.T) {
 		items:     []session.InventoryItem{{Index: 1, ItemID: 501}},
 		viewWidth: inventoryBagViewW,
 	})
-	grid.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(inventoryBagViewW, float32(inventoryBagViewH))))
+	grid.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(float32(inventoryBagViewW), float32(inventoryBagViewH))))
 	canvas := &uitest.MockCanvas{}
 	grid.Draw(widget.NewContext(), canvas)
 
@@ -422,8 +422,8 @@ func TestInventoryGridUsesScrollableContentCoordinates(t *testing.T) {
 	}
 	grid := newInventoryGridWidget(inventoryGridConfig{items: items})
 	size := grid.Layout(widget.NewContext(), geometry.Constraints{
-		MinWidth:  inventoryBagViewW,
-		MaxWidth:  inventoryBagViewW,
+		MinWidth:  float32(inventoryBagViewW),
+		MaxWidth:  float32(inventoryBagViewW),
 		MinHeight: 0,
 		MaxHeight: geometry.Infinity,
 	})

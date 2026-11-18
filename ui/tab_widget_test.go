@@ -50,7 +50,7 @@ func TestTabWidgetDrawsCounterClockwiseLabelAsCenteredImage(t *testing.T) {
 		width:         inventoryBagTabW,
 		height:        inventoryBagTabH,
 	})
-	tab.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(inventoryBagTabW, inventoryBagTabH)))
+	tab.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(float32(inventoryBagTabW), float32(inventoryBagTabH))))
 	canvas := &uitest.MockCanvas{}
 
 	tab.Draw(widget.NewContext(), canvas)
@@ -88,7 +88,7 @@ func TestTabWidgetDrawsCounterClockwiseLabelAsCenteredImage(t *testing.T) {
 func TestInventoryBagUsesOnlyVerticalCategoryTabs(t *testing.T) {
 	window := InventoryBagWindow{}
 	column := window.tabColumn(Context{})
-	column.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(inventoryBagTabRail, float32(inventoryBagViewH))))
+	column.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(float32(inventoryBagTabRail), float32(inventoryBagViewH))))
 
 	children := column.Children()
 	if len(children) != len(inventoryBagTabs) {

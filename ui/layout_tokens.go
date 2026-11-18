@@ -21,16 +21,6 @@ func init() {
 	rotheme.RegisterInt("hotbar", "row_gap", &shortcutRowGap, 0, 32, "gap between hotbar rows")
 	rotheme.RegisterInt("hotbar", "padding", &shortcutPad, 0, 32, "padding around the hotbar grid")
 
-	rotheme.RegisterInt("inventory", "cell_size", &inventoryBagCell, 16, 96, "inventory cell size")
-	rotheme.RegisterInt("inventory", "cols", &inventoryBagCols, 1, 16, "inventory columns")
-	rotheme.RegisterInt("inventory", "rows", &inventoryBagRows, 1, 20, "visible inventory rows")
-	rotheme.OnLayoutApplied(recomputeInventoryBagMetrics)
-
-	rotheme.RegisterInt("status", "row_height", &statsRowH, 12, 40, "status window row height")
-	rotheme.RegisterFloat("status", "padding", &statsWindowPad, 0, 32, "status window padding")
-	rotheme.RegisterFloat("status", "section_gap", &statsSectionGap, 0, 48, "gap between the status window's stat columns")
-	rotheme.OnLayoutApplied(recomputeStatsWindowMetrics)
-
 	rotheme.RegisterInt("npc_dialog", "width", &npcDialogWidth, 260, 800, "NPC dialog width")
 	rotheme.RegisterInt("npc_dialog", "height", &npcDialogHeight, 130, 600, "NPC dialog height")
 	rotheme.RegisterInt("npc_dialog", "padding", &npcDialogPad, 0, 32, "NPC dialog text padding")

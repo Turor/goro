@@ -17,24 +17,8 @@ import (
 )
 
 const (
-	characterWindowX                     = windowScreenMargin
-	characterWindowY                     = windowScreenMargin
-	characterWindowWidth                 = 324
-	characterWindowHeight                = 140
-	characterWindowCompactHeight         = 80
-	characterEXPPanelPaddingX    float32 = 6
-	characterEXPPanelPaddingY    float32 = 4
-	characterEXPPanelGap         float32 = 2
-	characterEXPPanelRadius      float32 = 5
-	characterEXPLabelWidth       float32 = 76
-	characterEXPLabelBarGap      float32 = 6
-	characterEXPBarHeight        float32 = 6
-	characterTextLineHeight      float32 = 1.2
-)
-
-var (
-	characterWindowEXPColor    = WindowBorderColor
-	characterWindowJobEXPColor = WindowBorderColor
+	characterWindowX = windowScreenMargin
+	characterWindowY = windowScreenMargin
 )
 
 type CharacterWindow struct {
@@ -57,6 +41,7 @@ func (w *CharacterWindow) Update(ctx Context) bool {
 		w.snapshot = characterWindowSnapshot(ctx.Session)
 		w.SetAutoPosition(characterWindowX, characterWindowY)
 		w.Open(ctx, w.widgetTree(ctx))
+		w.bindLayoutReload()
 	}
 	nextSnapshot := characterWindowSnapshot(ctx.Session)
 	if nextSnapshot != w.snapshot {
@@ -79,8 +64,21 @@ func (w *CharacterWindow) Rebind(ctx Context) {
 	if !w.IsOpen() {
 		return
 	}
+	w.SetSize(characterWindowWidth, w.windowHeight())
 	w.snapshot = characterWindowSnapshot(ctx.Session)
 	w.RebindContent(ctx, w.widgetTree(ctx))
+	w.bindLayoutReload()
+}
+
+func (w *CharacterWindow) bindLayoutReload() {
+	w.OnLayoutReload(func() {
+		if !w.IsOpen() {
+			return
+		}
+		w.SetSize(characterWindowWidth, w.windowHeight())
+		w.snapshot = characterWindowSnapshot(w.ctx.Session)
+		w.SetContent(w.widgetTree(w.ctx))
+	})
 }
 
 func (w *CharacterWindow) windowHeight() int {
@@ -160,26 +158,27 @@ func (w *CharacterWindow) bodyTree(ctx Context) *primitives.BoxWidget {
 			rotheme.Text(fmt.Sprintf("Lv. %d / %s / Lv. %d / Exp. %.1f%%", progress.BaseLevel, jobName, progress.JobLevel, baseEXP)).
 				MaxLines(1).Ellipsis(),
 			primitives.HBox(
-				characterTextCell(fmt.Sprintf("HP %d / %d", vitals.HP, vitals.MaxHP), 146, rotheme.Default.Colors.MutedText),
-				characterTextCell(fmt.Sprintf("SP %d / %d", vitals.SP, vitals.MaxSP), 146, rotheme.Default.Colors.MutedText),
-			).Gap(8),
-		).PaddingXY(12, 9).Gap(4).CrossAlign(primitives.CrossAxisStretch)
+				characterTextCell(fmt.Sprintf("HP %d / %d", vitals.HP, vitals.MaxHP), characterStatCellW, rotheme.Default.Colors.MutedText),
+				characterTextCell(fmt.Sprintf("SP %d / %d", vitals.SP, vitals.MaxSP), characterStatCellW, rotheme.Default.Colors.MutedText),
+			).Gap(characterBodyGap),
+		).PaddingXY(characterBodyPadX, characterBodyPadY).Gap(characterVitalsGap).CrossAlign(primitives.CrossAxisStretch)
 	}
 	weightColor := rotheme.Default.Colors.Text
 	if inventory.MaxWeight > 0 && inventory.Weight*100 >= inventory.MaxWeight*50 {
 		weightColor = Color(ErrorTextColor)
 	}
+	contentWidth := float32(characterWindowWidth) - characterBodyPadX*2
 	return primitives.Box(
 		primitives.Box(
-			vitalsRow("HP", vitals.HP, vitals.MaxHP, characterWindowWidth-24),
-			vitalsRow("SP", vitals.SP, vitals.MaxSP, characterWindowWidth-24),
-		).Gap(4),
-		characterEXPPanel(progress, characterWindowWidth-24),
+			vitalsRow("HP", vitals.HP, vitals.MaxHP, contentWidth),
+			vitalsRow("SP", vitals.SP, vitals.MaxSP, contentWidth),
+		).Gap(characterVitalsGap),
+		characterEXPPanel(progress, contentWidth),
 		primitives.HBox(
-			characterAlignedTextCell(fmt.Sprintf("Weight : %d / %d", displayWeight(inventory.Weight), displayWeight(inventory.MaxWeight)), 146, weightColor, primitives.TextAlignStart),
-			characterAlignedTextCell(fmt.Sprintf("Zeny : %s", formatHUDNumber(inventory.Zeny)), 146, rotheme.Default.Colors.Text, primitives.TextAlignEnd),
+			characterAlignedTextCell(fmt.Sprintf("Weight : %d / %d", displayWeight(inventory.Weight), displayWeight(inventory.MaxWeight)), characterStatCellW, weightColor, primitives.TextAlignStart),
+			characterAlignedTextCell(fmt.Sprintf("Zeny : %s", formatHUDNumber(inventory.Zeny)), characterStatCellW, rotheme.Default.Colors.Text, primitives.TextAlignEnd),
 		),
-	).PaddingXY(12, 9).Gap(8)
+	).PaddingXY(characterBodyPadX, characterBodyPadY).Gap(characterBodyGap)
 }
 
 // characterInfoBody lets the read-only stats refresh without unmounting the
@@ -303,7 +302,7 @@ func characterLevelProgressRow(label string, level int, current, next int64, fil
 }
 
 func characterEXPPanel(progress session.Progress, width float32) widget.Widget {
-	rowWidth := max(float32(0), width-2*characterEXPPanelPaddingX)
+	rowWidth := max(float32(0), width-characterEXPPanelPaddingX*2)
 	return primitives.Box(
 		characterLevelProgressRow("Base", progress.BaseLevel, progress.BaseExp, progress.NextBaseExp, Color(characterWindowEXPColor), rowWidth),
 		characterLevelProgressRow("Job", progress.JobLevel, progress.JobExp, progress.NextJobExp, Color(characterWindowJobEXPColor), rowWidth),
@@ -421,12 +420,12 @@ func formatHUDNumber(value int64) string {
 	var b strings.Builder
 	prefix := len(text) % 3
 	if prefix == 0 {
-		prefix = 3
+		prefix = 3 // theme:ok thousands grouping
 	}
 	b.WriteString(text[:prefix])
 	for i := prefix; i < len(text); i += 3 {
 		b.WriteByte(',')
-		b.WriteString(text[i : i+3])
+		b.WriteString(text[i : i+3]) // theme:ok thousands grouping
 	}
 	return sign + b.String()
 }

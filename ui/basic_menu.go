@@ -9,7 +9,6 @@ import (
 
 const (
 	basicMenuX         = windowScreenMargin
-	basicMenuY         = characterWindowY + characterWindowHeight + basicMenuFollowGap
 	basicMenuFollowGap = 2
 	basicMenuToggleH   = 10
 	basicMenuToggleGap = 2
@@ -64,7 +63,7 @@ func (m *BasicMenu) Update(ctx client.Context, callbacks BasicMenuCallbacks) boo
 		m.CloseOnEsc = false
 	}
 	if !m.IsOpen() {
-		m.OpenAt(basicMenuX, basicMenuY, m.widgetTree())
+		m.OpenAt(basicMenuX, basicMenuY(), m.widgetTree())
 	} else if m.content == nil {
 		m.SetContent(m.widgetTree())
 	}
@@ -154,9 +153,13 @@ func (m *BasicMenu) endFollowDrag(ctx client.Context) {
 	invalidateWindowRect(ctx, damage)
 }
 
+func basicMenuY() int {
+	return characterWindowY + characterWindowHeight + basicMenuFollowGap
+}
+
 func basicMenuBounds() (int, int, int, int) {
 	w, h := basicMenuSize(false)
-	return basicMenuX, basicMenuY, w, h
+	return basicMenuX, basicMenuY(), w, h
 }
 
 func basicMenuSize(collapsed bool) (int, int) {
