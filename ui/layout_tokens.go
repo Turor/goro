@@ -21,7 +21,6 @@ func init() {
 	rotheme.RegisterInt("hotbar", "row_gap", &shortcutRowGap, 0, 32, "gap between hotbar rows")
 	rotheme.RegisterInt("hotbar", "padding", &shortcutPad, 0, 32, "padding around the hotbar grid")
 
-
 	rotheme.RegisterRGBA("theme", "hp_bar", &PlayerHPBarColor, "player HP bar")
 	rotheme.RegisterRGBA("theme", "sp_bar", &PlayerSPBarColor, "player SP bar")
 	rotheme.RegisterRGBA("theme", "hunger_bar", &HungerBarColor, "pet and homunculus hunger bar")

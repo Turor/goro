@@ -3,7 +3,6 @@ package ui
 import (
 	"fmt"
 	"image"
-	"image/color"
 
 	"github.com/gogpu/ui/event"
 	"github.com/gogpu/ui/geometry"
@@ -11,25 +10,16 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-const (
-	pvpCounterWidth  = 240
-	pvpCounterHeight = 96
-)
-
-var (
-	pvpCounterShadow = Color(color.RGBA{R: 20, G: 28, B: 38, A: 190})
-	pvpCounterText   = Color(color.RGBA{R: 245, G: 248, B: 252, A: 255})
-)
-
 type PvPCounter struct {
-	widget  *pvpCounterWidget
-	assets  pvpRankSpriteSet
-	root    widget.Widget
-	visible bool
-	x       int
-	y       int
-	rank    int
-	total   int
+	widget    *pvpCounterWidget
+	assets    pvpRankSpriteSet
+	root      widget.Widget
+	visible   bool
+	x         int
+	y         int
+	rank      int
+	total     int
+	layoutGen uint64
 }
 
 func (c *PvPCounter) Update(ctx Context) {
@@ -43,6 +33,11 @@ func (c *PvPCounter) Update(ctx Context) {
 
 	if c.widget == nil {
 		c.widget = newPvPCounterWidget()
+	}
+	layoutChanged := false
+	if gen := rotheme.Generation(); gen != c.layoutGen {
+		c.layoutGen = gen
+		layoutChanged = true
 	}
 	width, height := ctx.ScreenSize()
 	x, y := pvpCounterBounds(width, height)
@@ -68,7 +63,7 @@ func (c *PvPCounter) Update(ctx Context) {
 		c.visible = true
 		valueChanged = true
 	}
-	if valueChanged || imageChanged {
+	if valueChanged || imageChanged || layoutChanged {
 		c.widget.SetNeedsRedraw(true)
 		if redraw, ok := c.root.(interface{ SetNeedsRedraw(bool) }); ok {
 			redraw.SetNeedsRedraw(true)
@@ -111,7 +106,7 @@ func newPvPCounterWidget() *pvpCounterWidget {
 }
 
 func (w *pvpCounterWidget) Layout(_ widget.Context, constraints geometry.Constraints) geometry.Size {
-	size := constraints.BiggestFinite(pvpCounterWidth, pvpCounterHeight)
+	size := constraints.BiggestFinite(float32(pvpCounterWidth), float32(pvpCounterHeight))
 	w.SetBounds(geometry.FromPointSize(w.Position(), size))
 	return size
 }
@@ -125,10 +120,9 @@ func (w *pvpCounterWidget) Draw(_ widget.Context, canvas widget.Canvas) {
 		return
 	}
 	bounds := w.Bounds()
-	shadow := bounds.Translate(geometry.Pt(1, 2))
-	fontSize := float32(22)
-	rotheme.DrawText(canvas, w.text, shadow, fontSize, pvpCounterShadow, true, widget.TextAlignRight)
-	rotheme.DrawText(canvas, w.text, bounds, fontSize, pvpCounterText, true, widget.TextAlignRight)
+	shadow := bounds.Translate(geometry.Pt(pvpCounterShadowDX, pvpCounterShadowDY))
+	rotheme.DrawText(canvas, w.text, shadow, pvpCounterFont, pvpCounterShadow, true, widget.TextAlignRight)
+	rotheme.DrawText(canvas, w.text, bounds, pvpCounterFont, pvpCounterText, true, widget.TextAlignRight)
 }
 
 func (w *pvpCounterWidget) Event(_ widget.Context, _ event.Event) bool {
