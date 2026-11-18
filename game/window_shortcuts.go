@@ -12,6 +12,7 @@ var windowShortcutKeys = [...]input.KeyCode{
 	gpucontext.KeyE, gpucontext.KeyQ, gpucontext.KeyS, gpucontext.KeyA,
 	gpucontext.KeyZ, gpucontext.KeyH, gpucontext.KeyW, gpucontext.KeyC,
 	gpucontext.KeyV, gpucontext.KeyJ, gpucontext.KeyR, gpucontext.KeyO,
+	gpucontext.KeyP,
 }
 
 // Shared with text filtering so handled shortcuts cannot also type into chat.
@@ -34,6 +35,8 @@ func (m *WorldMode) windowShortcutAllowed(ctx client.Context, code input.KeyCode
 			target = &m.ui.companions.HomunculusInfo.Window
 		case gpucontext.KeyO:
 			target = &m.ui.settingsWindow.Window
+		case gpucontext.KeyP:
+			target = &m.ui.companions.Companion.Window
 		default:
 			return false
 		}
@@ -98,6 +101,8 @@ func (m *WorldMode) toggleWindowFromInput(ctx client.Context) bool {
 			} else {
 				m.ui.settingsWindow.OpenWindow(ctx)
 			}
+		case gpucontext.KeyP:
+			m.companions().ToggleCompanionWindow(ctx)
 		}
 		return true
 	}
