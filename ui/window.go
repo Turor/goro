@@ -376,6 +376,10 @@ type Window struct {
 	fullRedraw   bool
 	CloseOnEsc   bool
 	ctx          client.Context
+	// layoutRebuild rebuilds the content after a layout reload; layoutGen is
+	// the token generation the content was last built with.
+	layoutRebuild func()
+	layoutGen     uint64
 }
 
 func (w *Window) EnsureWindow(width, height int) bool {
@@ -400,6 +404,7 @@ func (w *Window) Close() {
 	w.content = nil
 	w.placed = nil
 	w.Publish(w.ctx)
+	delete(layoutRebuildWindows, w)
 }
 
 func NewWindow(width, height int) Window {
@@ -510,11 +515,13 @@ func (w *Window) Publish(ctx client.Context) {
 		clearPositionedOverlayDamage(old)
 		w.published = root
 		replacer.ReplaceOverlay(old, root)
+		w.trackLayoutRebuild()
 		return
 	}
 	w.Unpublish(ctx)
 	w.published = root
 	ctx.UIManager.AddOverlay(root)
+	w.trackLayoutRebuild()
 }
 
 func (w *Window) Raise(ctx client.Context) {
@@ -534,6 +541,7 @@ func (w *Window) Unpublish(ctx client.Context) {
 	clearPositionedOverlayDamage(w.published)
 	ctx.UIManager.RemoveOverlay(w.published)
 	w.published = nil
+	delete(layoutRebuildWindows, w)
 }
 
 // baseHeight is the height the window asked for, before the title and

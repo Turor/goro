@@ -84,6 +84,8 @@ func tokenID(section, key string) string {
 	return normalizeTokenName(section) + "." + normalizeTokenName(key)
 }
 
+func sortStrings(s []string) { sort.Strings(s) }
+
 func normalizeTokenName(s string) string {
 	return strings.ToLower(strings.TrimSpace(s))
 }
@@ -257,7 +259,7 @@ func formatHex(r, g, b, a uint8) string {
 
 const (
 	// MaxLayoutFileSize bounds what a layout file may cost at startup. The
-	// full default dump is about 3 KiB.
+	// full default dump (every window and screen) is well under half of it.
 	MaxLayoutFileSize = 256 << 10
 	// MaxLayoutWarnings bounds unknown-key warnings; the rest are counted.
 	MaxLayoutWarnings = 20
@@ -424,6 +426,9 @@ func WriteLayout(w io.Writer) error {
 	fmt.Fprintln(bw, "# With --ui-dev (or [ui_layout] watch = true) edits apply while the game runs; F10 reloads.")
 	for _, section := range order {
 		fmt.Fprintf(bw, "\n[%s]\n", section)
+		if doc := sectionDocs[section]; doc != "" {
+			fmt.Fprintf(bw, "# %s\n\n", doc)
+		}
 		for _, t := range sections[section] {
 			doc := t.doc
 			if t.kind == tokenInt || t.kind == tokenFloat {
