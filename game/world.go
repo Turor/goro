@@ -1638,5 +1638,9 @@ func (m *WorldMode) rebuildUIAfterLayoutReload(ctx client.Context) {
 		// Windows not bound to this mode yet are built fresh on map entry.
 		return
 	}
+	if manager, ok := ctx.UIManager.(interface{ KeepOverlayOrder(func()) }); ok {
+		manager.KeepOverlayOrder(func() { m.rebindPersistentUI(ctx) })
+		return
+	}
 	m.rebindPersistentUI(ctx)
 }
