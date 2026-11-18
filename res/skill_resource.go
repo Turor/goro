@@ -2,6 +2,7 @@ package res
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -122,8 +123,10 @@ func (m *Manager) loadSkillResourceNames() {
 	}
 	m.skillResourceNamesLoaded = true
 	m.skillResourceNames = make(map[int]string, len(db.SkillResourceName))
+	m.skillIDNames = make(map[string]int, len(db.SkillResourceName))
 	for id, name := range db.SkillResourceName {
 		m.skillResourceNames[int(id)] = name
+		m.skillIDNames[name] = int(id)
 	}
 	globals := make(map[string]luaValue)
 	_, data, ok := m.ReadFirst(skillIDLuaCandidates)
@@ -140,20 +143,33 @@ func (m *Manager) loadSkillResourceNames() {
 	fileIDs := make(map[string]int, len(table.table))
 	for key, value := range table.table {
 		name, ok := key.(string)
-		if !ok || value.kind != luaNumber || name == "" {
+		if !ok || value.kind != luaNumber || name == "" || value.num <= 0 {
 			continue
 		}
-		id := int(value.num)
-		if id > 0 {
-			m.skillResourceNames[id] = name
-			fileIDs[name] = id
-		}
+		fileIDs[name] = int(value.num)
 	}
-	// A built-in name the client table assigns to another ID would make the
-	// SKID table ambiguous (and its pick random): the client table wins.
+	// The client table wins: drop built-in names it assigns to another ID,
+	// so the SKID table is never ambiguous.
 	for id, name := range m.skillResourceNames {
 		if fileID, ok := fileIDs[name]; ok && fileID != id {
 			delete(m.skillResourceNames, id)
+		}
+	}
+	// Several names may share one ID (renamed skills keep their old name as
+	// an alias). Every name stays resolvable in SKID; the display name per ID
+	// is picked deterministically, the smallest name.
+	names := make([]string, 0, len(fileIDs))
+	for name := range fileIDs {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	fromFile := make(map[int]bool, len(names))
+	for _, name := range names {
+		id := fileIDs[name]
+		m.skillIDNames[name] = id
+		if !fromFile[id] {
+			m.skillResourceNames[id] = name
+			fromFile[id] = true
 		}
 	}
 }
@@ -307,8 +323,8 @@ func (m *Manager) parseSkillRequirements(skillID, job int, list luaValue) []db.S
 // and JOBID from jobidentity.lub, which skillinfolist and skilltreeview key on.
 func (m *Manager) skillIDGlobals() map[string]luaValue {
 	m.loadSkillResourceNames()
-	skillIDs := make(map[interface{}]luaValue, len(m.skillResourceNames))
-	for id, name := range m.skillResourceNames {
+	skillIDs := make(map[interface{}]luaValue, len(m.skillIDNames))
+	for name, id := range m.skillIDNames {
 		if id > 0 && name != "" {
 			skillIDs[name] = luaValue{kind: luaNumber, num: float64(id)}
 		}
@@ -478,8 +494,8 @@ func parseSkillTreePositions(table luaValue) map[int]map[int]int {
 }
 
 func (m *Manager) skillNameToID() map[string]int {
-	out := make(map[string]int, len(m.skillResourceNames))
-	for id, name := range m.skillResourceNames {
+	out := make(map[string]int, len(m.skillIDNames))
+	for name, id := range m.skillIDNames {
 		if name == "" {
 			continue
 		}

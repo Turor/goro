@@ -374,3 +374,25 @@ func TestLuaSkillTreeRealStreamedData(t *testing.T) {
 		t.Logf("job %d tabs %v", job, counts)
 	}
 }
+
+// Renamed skills keep their old SKID name as an alias of the same ID. Both
+// names must resolve every time, not whichever one map order kept.
+func TestLuaSkillTreeSkillIDAliasesAllResolve(t *testing.T) {
+	for i := 0; i < 10; i++ {
+		m := loadSkillTreeFixture(t, map[string]string{
+			skillTreeFixtureDir + "skillid.lub": strings.Replace(skillTreeFixture[skillTreeFixtureDir+"skillid.lub"],
+				"KN_PIERCE = 56,", "KN_PIERCE = 56, KN_PIERCE_OLD = 56, A_PIERCE = 56,", 1),
+			skillTreeFixtureDir + "skilltreeview.lub": strings.Replace(skillTreeFixture[skillTreeFixtureDir+"skilltreeview.lub"],
+				"[1] = SKID.KN_PIERCE", "[1] = SKID.KN_PIERCE_OLD", 1),
+		})
+		if warnings := m.SkillTreeWarnings(); len(warnings) != 0 {
+			t.Fatalf("run %d warned: %v", i, warnings)
+		}
+		if tabs := groupIDs(db.SkillTreeSkillGroups(db.JobKnight)); !sameIDs(tabs[2], []uint16{55, 56}) {
+			t.Fatalf("run %d knight tab 2 = %v", i, tabs[2])
+		}
+		if name, _ := m.SkillResourceName(56); name != "A_PIERCE" {
+			t.Fatalf("run %d display name for 56 = %q, want the smallest alias", i, name)
+		}
+	}
+}
