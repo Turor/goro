@@ -74,7 +74,7 @@ func TestParseAccountAcceptLogin2(t *testing.T) {
 	data[46] = 1
 	for i, name := range []string{"TuroranRO-TEST", "Second"} {
 		row := data[64+i*160:]
-		copy(row[0:4], []byte{192, 168, 11, 110})
+		copy(row[0:4], []byte{192, 0, 2, 110})
 		put16(row, 4, 6131)
 		copy(row[6:26], name)
 		put16(row, 26, 3)
@@ -86,7 +86,7 @@ func TestParseAccountAcceptLogin2(t *testing.T) {
 	if login.AccountID != 2000031 || login.AuthCode != 0x11223344 || login.Sex != 1 {
 		t.Fatalf("login = %+v", login)
 	}
-	if len(login.CharServer) != 2 || login.CharServer[0].Address != "192.168.11.110" || login.CharServer[0].Port != 6131 ||
+	if len(login.CharServer) != 2 || login.CharServer[0].Address != "192.0.2.110" || login.CharServer[0].Port != 6131 ||
 		login.CharServer[0].Name != "TuroranRO-TEST" || login.CharServer[1].Name != "Second" {
 		t.Fatalf("servers = %+v", login.CharServer)
 	}
@@ -205,13 +205,13 @@ func TestParseZoneServerNotify2(t *testing.T) {
 	put16(data, 0, PacketHCNotifyZoneServer2)
 	put32(data, 2, 150051)
 	copy(data[6:22], "int_land.gat")
-	copy(data[22:26], []byte{192, 168, 11, 110})
+	copy(data[22:26], []byte{192, 0, 2, 110})
 	put16(data, 26, 5131)
 	zone, err := ParseZoneServerNotify(Packet{ID: PacketHCNotifyZoneServer2, Data: data})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if zone.CharID != 150051 || zone.MapName != "int_land" || zone.Address != "192.168.11.110" || zone.Port != 5131 {
+	if zone.CharID != 150051 || zone.MapName != "int_land" || zone.Address != "192.0.2.110" || zone.Port != 5131 {
 		t.Fatalf("zone = %+v", zone)
 	}
 }

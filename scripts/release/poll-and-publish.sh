@@ -26,7 +26,12 @@ SIGNING="${SIGNING:-$HOME/Work/korangar-signing}"
 SEED="${SEED:-$SIGNING/update.seed}"
 STATE="${STATE:-$SIGNING/goro-last-published-sha}"
 LOG="${LOG:-$WORK/publish.log}"
-BUILD_HOST="${BUILD_HOST:-root@192.168.11.54}"
+# Hosts are operator config, never committed: GORO_PUBLISH_CONFIG (default
+# $WORK/publish.env, see publish.env.example), overridable from the environment.
+export GORO_PUBLISH_CONFIG="${GORO_PUBLISH_CONFIG:-$WORK/publish.env}"
+pconf() { [[ -f "$GORO_PUBLISH_CONFIG" ]] || return 0; sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" "$GORO_PUBLISH_CONFIG" | tail -n1 | tr -d '\r"' | sed 's/[[:space:]]*$//'; }
+BUILD_HOST="${BUILD_HOST:-$(pconf build_host)}"
+[[ -n "$BUILD_HOST" ]] || { echo "set build_host in $GORO_PUBLISH_CONFIG" >&2; exit 1; }
 BUILD_USER="${BUILD_USER:-gorobuild}"
 DRY_RUN="${DRY_RUN:-0}"
 ALLOW_NON_MAIN="${ALLOW_NON_MAIN:-0}"

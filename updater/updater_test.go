@@ -97,23 +97,32 @@ func TestNonCanonicalPayloadRejected(t *testing.T) {
 	}
 }
 
+func linkTestURLs(t *testing.T) {
+	t.Helper()
+	oldCat, oldPrefix := DefaultCatalogURL, ReleaseURLPrefix
+	DefaultCatalogURL = "https://updates.example.invalid/client/goro/main/latest"
+	ReleaseURLPrefix = "https://objects.example.invalid/releases/goro/main/"
+	t.Cleanup(func() { DefaultCatalogURL, ReleaseURLPrefix = oldCat, oldPrefix })
+}
+
 func TestAllowedURL(t *testing.T) {
+	linkTestURLs(t)
 	ok := []string{
-		"https://ro.turoran.com/client/goro/main/latest",
-		"https://garage.turoran.com/korangar-releases/goro/main/manifest.goroup?X-Amz-Signature=abc",
-		"https://garage.turoran.com/korangar-releases/goro/main/goro-linux-amd64-" + testSHA,
+		"https://updates.example.invalid/client/goro/main/latest",
+		"https://objects.example.invalid/releases/goro/main/manifest.goroup?X-Amz-Signature=abc",
+		"https://objects.example.invalid/releases/goro/main/goro-linux-amd64-" + testSHA,
 		"http://127.0.0.1:8080/x",
 		"file:///tmp/m",
 	}
 	bad := []string{
-		"https://ro.turoran.com/client/korangar/main/latest",
-		"https://garage.turoran.com/korangar-releases/main/korangar-linux-" + testSHA,
-		"https://garage.turoran.com/korangar-releases/goro/main/../main/x",
+		"https://updates.example.invalid/client/korangar/main/latest",
+		"https://objects.example.invalid/releases/main/korangar-linux-" + testSHA,
+		"https://objects.example.invalid/releases/goro/main/../main/x",
 		"https://evil.example/client/goro/main/latest",
-		"http://ro.turoran.com/client/goro/main/latest",
-		"https://ro.turoran.com:8443/client/goro/main/latest",
-		"https://user@ro.turoran.com/client/goro/main/latest",
-		"http://192.168.11.54/x",
+		"http://updates.example.invalid/client/goro/main/latest",
+		"https://updates.example.invalid:8443/client/goro/main/latest",
+		"https://user@updates.example.invalid/client/goro/main/latest",
+		"http://10.0.0.54/x",
 		"file://host/tmp/m",
 	}
 	for _, u := range ok {
@@ -123,8 +132,30 @@ func TestAllowedURL(t *testing.T) {
 	}
 	for _, u := range bad {
 		if allowedURL(u) {
-			t.Errorf("accepted %s", u)
+			t.Errorf("accepted %q", u)
 		}
+	}
+}
+
+func TestAllowedURLWithoutLinkedURLs(t *testing.T) {
+	oldCat, oldPrefix := DefaultCatalogURL, ReleaseURLPrefix
+	DefaultCatalogURL, ReleaseURLPrefix = "", ""
+	t.Cleanup(func() { DefaultCatalogURL, ReleaseURLPrefix = oldCat, oldPrefix })
+	for _, u := range []string{
+		"https://updates.example.invalid/client/goro/main/latest",
+		"https://objects.example.invalid/releases/goro/main/manifest.goroup",
+	} {
+		if allowedURL(u) {
+			t.Errorf("accepted %q with no linked URLs", u)
+		}
+	}
+	if !allowedURL("file:///tmp/m") || !allowedURL("http://127.0.0.1:8080/x") {
+		t.Error("file and loopback must stay allowed")
+	}
+	// A malformed link-time value allowlists nothing.
+	DefaultCatalogURL, ReleaseURLPrefix = "http://updates.example.invalid/latest", "https://user@objects.example.invalid/x/"
+	if allowedURL("http://updates.example.invalid/latest") || allowedURL("https://objects.example.invalid/x/manifest.goroup") {
+		t.Error("non-https or credentialed link-time URLs must not allowlist")
 	}
 }
 
