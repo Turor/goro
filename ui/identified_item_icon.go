@@ -6,7 +6,7 @@ import (
 	"github.com/kivutar/goro/res"
 )
 
-func cachedIdentifiedItemIcon(manager *res.Manager, itemID uint16, icons *map[identifyItemIconKey]image.Image, misses *map[identifyItemIconKey]struct{}) image.Image {
+func cachedIdentifiedItemIcon(manager *res.Manager, itemID uint32, icons *map[identifyItemIconKey]image.Image, misses *map[identifyItemIconKey]struct{}) image.Image {
 	if manager == nil || itemID == 0 {
 		return nil
 	}

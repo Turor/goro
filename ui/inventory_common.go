@@ -76,8 +76,8 @@ func inventoryItemCardNameParts(manager *res.Manager, item session.InventoryItem
 		postfix bool
 		prefix  string
 	}
-	order := make([]uint16, 0, len(item.Cards))
-	cards := make(map[uint16]*cardInfo)
+	order := make([]uint32, 0, len(item.Cards))
+	cards := make(map[uint32]*cardInfo)
 	for _, cardID := range item.Cards {
 		if cardID == 0 || cardID == 0x00ff || cardID == 0x00fe || cardID == 0xff00 {
 			continue

@@ -2250,7 +2250,7 @@ func TestUseItemAckAddsItemUseEffect(t *testing.T) {
 func TestMercenaryPotionItemEffectsTargetVisibleMercenary(t *testing.T) {
 	testCases := []struct {
 		name     string
-		itemID   uint16
+		itemID   uint32
 		effectID int
 	}{
 		{"red", 12184, Food},
@@ -2329,7 +2329,7 @@ func TestRemoteMercenaryPotionItemEffectKeepsAckActor(t *testing.T) {
 }
 
 func TestUseItemAckDispatchesAllMappedItemEffectArrays(t *testing.T) {
-	const itemID uint16 = 65000
+	const itemID uint32 = 65000
 	itemEffectSpecs[itemID] = itemEffectSpec{
 		effectIDs:         []int{PotionRed, Blessing},
 		effectIDsOnCaster: []int{Endure},
