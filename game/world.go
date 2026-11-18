@@ -64,9 +64,10 @@ type WorldMode struct {
 	cursorAction   int
 	cursorStarted  time.Time
 
-	itemMarker   *render.Image
-	itemViews    map[itemSpriteKey]*scene.SpriteView
-	itemViewMiss map[itemSpriteKey]struct{}
+	itemMarker    *render.Image
+	itemMarkerGen uint64
+	itemViews     map[itemSpriteKey]*scene.SpriteView
+	itemViewMiss  map[itemSpriteKey]struct{}
 
 	pendingWarp      bool
 	deferredPackets  []network.Packet

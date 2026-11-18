@@ -115,7 +115,7 @@ func (m *System) drawActorAilments(screen *render.Frame, ctx client.Context, pro
 		id = scene.LocalSkillTarget(ctx)
 	}
 	visual := m.Ailments[id]
-	height := 3.0 // The original uses a 90-pixel head height for player characters.
+	height := 3.0 // The original uses a 90-pixel head height for player characters. // theme:ok head height in world units from the original client
 	if body != nil && body.Image != nil && !res.HasPlayerJobToken(scene.ActorVisualJob(entry.Actor)) {
 		height = float64(body.Image.Bounds().Dy()) / 30
 	}
@@ -170,7 +170,7 @@ func (m *System) drawAilmentSprite(screen *render.Frame, ctx client.Context, pro
 		delay = float64(sprite.delay) / float64(time.Millisecond)
 	}
 	if delay <= 0 {
-		delay = 150
+		delay = 150 // theme:ok frame delay in ms
 	}
 	if !sprite.repeat && now.Sub(sprite.started) >= time.Duration(float64(len(action.Animations))*delay*float64(time.Millisecond)) {
 		return false
@@ -191,7 +191,7 @@ func (m *System) drawAilmentSprite(screen *render.Frame, ctx client.Context, pro
 	opts := scene.SpriteBillboardTriangleDrawOptions()
 	opts.DepthTest = !sprite.overlay
 	opts.DepthWrite = false
-	scene.DrawSpriteBillboardTintAlphaWorld3DWithOptions(screen, projection, billboard, entry.WorldX, entry.WorldY, entry.WorldZ+sprite.height, scene.PixelRatio, 0, sprite.alpha, 1, color.RGBA{255, 255, 255, 255}, opts)
+	scene.DrawSpriteBillboardTintAlphaWorld3DWithOptions(screen, projection, billboard, entry.WorldX, entry.WorldY, entry.WorldZ+sprite.height, scene.PixelRatio, 0, sprite.alpha, 1, color.RGBA{255, 255, 255, 255}, opts) // theme:ok untinted sprite
 	return true
 }
 

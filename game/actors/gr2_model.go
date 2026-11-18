@@ -16,7 +16,7 @@ import (
 	worldstate "github.com/kivutar/goro/world"
 )
 
-const gr2ModelWorldScale = 0.2
+const gr2ModelWorldScale = 0.2 // theme:ok 3D model world scale
 
 type GR2ModelView struct {
 	geometry       *res.GR2Geometry
@@ -83,10 +83,10 @@ func (m *System) drawNonPCGR2Model3D(screen *render.Frame, ctx client.Context, e
 		if end > len(view.geometry.Indices) {
 			end = len(view.geometry.Indices)
 		}
-		for i := start; i+2 < end; i += 3 {
+		for i := start; i+2 < end; i += 3 { // theme:ok vertex index math
 			a, okA := gr2ModelVertex3D(view.geometry, int(view.geometry.Indices[i]), matrix, palette, lighting, tint, shadow, alpha, textureWidth, textureHeight)
 			b, okB := gr2ModelVertex3D(view.geometry, int(view.geometry.Indices[i+1]), matrix, palette, lighting, tint, shadow, alpha, textureWidth, textureHeight)
-			c, okC := gr2ModelVertex3D(view.geometry, int(view.geometry.Indices[i+2]), matrix, palette, lighting, tint, shadow, alpha, textureWidth, textureHeight)
+			c, okC := gr2ModelVertex3D(view.geometry, int(view.geometry.Indices[i+2]), matrix, palette, lighting, tint, shadow, alpha, textureWidth, textureHeight) // theme:ok vertex index math
 			if okA && okB && okC {
 				drawBatch.AddTriangle(a, b, c)
 			}
@@ -234,7 +234,7 @@ func gr2ModelVertex3D(geometry *res.GR2Geometry, index int, matrix scene.Mat4, p
 		normal = scene.Point3{Y: 1}
 	}
 	scale := lighting.ModelScaleNormalized(normal)
-	color := color.RGBA{
+	color := color.RGBA{ // theme:ok lit vertex color
 		R: scene.ClampColor(float64(tint.R) * scale.X * shadow),
 		G: scene.ClampColor(float64(tint.G) * scale.Y * shadow),
 		B: scene.ClampColor(float64(tint.B) * scale.Z * shadow),

@@ -3,8 +3,8 @@ package game
 import (
 	"errors"
 	"fmt"
+	"github.com/kivutar/goro/ui/rotheme"
 	"image"
-	"image/color"
 	"math"
 	"strings"
 	"time"
@@ -45,33 +45,31 @@ type itemSpriteKey struct {
 }
 
 const (
-	itemBillboardWidth    = 96
-	itemBillboardHeight   = 96
-	itemBillboardAnchorX  = 48
-	itemBillboardAnchorY  = 72
-	groundItemScreenScale = 0.8
+	itemBillboardWidth    = 96  // theme:ok item sprite canvas
+	itemBillboardHeight   = 96  // theme:ok item sprite canvas
+	itemBillboardAnchorX  = 48  // theme:ok item sprite anchor
+	itemBillboardAnchorY  = 72  // theme:ok item sprite anchor
+	groundItemScreenScale = 0.8 // theme:ok world sprite scale from roBrowser
 	// ItemObject in roBrowser uses a quarter-size copy of the shared entity
 	// shadow. Besides matching its footprint, scaling around the ACT origin
 	// keeps the ellipse from extending too far north of the item sprite.
-	groundItemShadowScale    = 0.25
-	groundItemShadowOffsetY  = 12.0
-	itemDropStartOffset      = 2.2
-	itemDropStartSpeed       = -0.28
-	itemDropGravityPerFrame  = 0.18
-	itemDropBounceFactor     = 0.35
-	itemDropSpeedDampening   = 0.45
-	itemDropStopSpeed        = 0.45
-	itemDropSimulationFPS    = 60
-	itemDropSimulationFrames = 120
-	pickupAnimationDuration  = 450 * time.Millisecond
+	groundItemShadowScale    = 0.25                   // theme:ok world shadow scale from roBrowser
+	groundItemShadowOffsetY  = 12.0                   // theme:ok world shadow offset from roBrowser
+	itemDropStartOffset      = 2.2                    // theme:ok drop physics
+	itemDropStartSpeed       = -0.28                  // theme:ok drop physics
+	itemDropGravityPerFrame  = 0.18                   // theme:ok drop physics
+	itemDropBounceFactor     = 0.35                   // theme:ok drop physics
+	itemDropSpeedDampening   = 0.45                   // theme:ok drop physics
+	itemDropStopSpeed        = 0.45                   // theme:ok drop physics
+	itemDropSimulationFPS    = 60                     // theme:ok drop physics
+	itemDropSimulationFrames = 120                    // theme:ok drop physics
+	pickupAnimationDuration  = 450 * time.Millisecond // theme:ok timer
 )
 
 const (
 	itemPickupResultSuccess = 0
-	itemPickupResultReceive = 3
+	itemPickupResultReceive = 3 // theme:ok packet result code
 )
-
-var itemNameLabelForeground = color.RGBA{R: 255, G: 239, B: 148, A: 255}
 
 func (m *WorldMode) applyFloorItemEntry(ctx client.Context, entry network.FloorItemEntry) {
 	if ctx.World == nil {
@@ -347,7 +345,7 @@ func (m *WorldMode) collectSceneItemEntries(screen *render.Frame, ctx client.Con
 		groundZ := scene.TerrainHeightAt(ctx.World, x, y)
 		z := floorItemRenderHeight(ctx.World, item, now)
 		point := projection.Project(worldX, worldY, z)
-		if point.X < -48 || point.Y < -80 || point.X > float32(width+48) || point.Y > float32(height+48) {
+		if point.X < -48 || point.Y < -80 || point.X > float32(width+48) || point.Y > float32(height+48) { // theme:ok off-screen culling margin
 			continue
 		}
 		scale := scene.ActorBillboardScreenScale(projection, worldX, worldY, z) * groundItemScreenScale
@@ -482,7 +480,7 @@ func groundItemPickBoundsCenter(centerX, centerY, scale float64) (float64, float
 }
 
 func floorItemWorldPosition(item worldstate.FloorItem) (float64, float64) {
-	return float64(item.X) - 0.5 + float64(item.SubX)/12, float64(item.Y) - 0.5 + float64(item.SubY)/12
+	return float64(item.X) - 0.5 + float64(item.SubX)/12, float64(item.Y) - 0.5 + float64(item.SubY)/12 // theme:ok cell center
 }
 
 func floorItemRenderHeight(world *worldstate.World, item worldstate.FloorItem, now time.Time) float64 {
@@ -512,8 +510,8 @@ func drawGroundItemNameLabel(screen *render.Frame, label string, centerX, baseY,
 	if scale <= 0 || math.IsNaN(scale) || math.IsInf(scale, 0) {
 		scale = 1
 	}
-	labelY := baseY + 12*scale
-	render.DrawCenteredUIOutlinedTextAt(screen, label, centerX, labelY, itemNameLabelForeground, color.RGBA{A: 196})
+	labelY := baseY + itemNameLabelOffset*scale
+	render.DrawCenteredUIOutlinedTextAt(screen, label, centerX, labelY, itemNameLabelForeground, itemNameLabelOutline)
 }
 
 func (m *WorldMode) itemSpriteBillboard(manager *res.Manager, item worldstate.FloorItem, now time.Time) *scene.Billboard {
@@ -571,7 +569,7 @@ func (m *WorldMode) drawInventoryItemIcon(screen *render.Frame, manager *res.Man
 	if width <= 0 || height <= 0 {
 		return
 	}
-	scale := math.Min(float64(inventoryIconSize-2)/width, float64(inventoryIconSize-2)/height)
+	scale := math.Min(float64(inventoryIconSize-2)/width, float64(inventoryIconSize-2)/height) // theme:ok icon inset inside the inventory slot
 	if scale <= 0 || math.IsNaN(scale) || math.IsInf(scale, 0) {
 		scale = 1
 	}
@@ -783,7 +781,7 @@ func (m *WorldMode) drawFallbackGroundItemMarker(screen *render.Frame, entry sce
 	}
 	width, height := img.Bounds().Dx(), img.Bounds().Dy()
 	var opts render.DrawImageOptions
-	opts.GeoM.Translate(float64(-width)/2, float64(-height)+4)
+	opts.GeoM.Translate(float64(-width)/2, float64(-height)+4) // theme:ok sprite anchor nudge
 	opts.GeoM.Scale(scale, scale)
 	opts.GeoM.Translate(entry.screenX, entry.screenY)
 	opts.Filter = scene.SpriteDrawFilter()
@@ -820,33 +818,35 @@ func itemDropBounceOffset(started, now time.Time) float64 {
 }
 
 func (m *WorldMode) itemMarkerTexture() *render.Image {
-	if m.itemMarker != nil {
+	if m.itemMarker != nil && m.itemMarkerGen == rotheme.Generation() {
 		return m.itemMarker
 	}
-	const size = 32
+	const size = 32 // theme:ok procedural marker texture size
 	img := image.NewRGBA(image.Rect(0, 0, size, size))
 	for y := 0; y < size; y++ {
 		for x := 0; x < size; x++ {
-			dx := float64(x) - 16
-			dy := float64(y) - 14
+			dx := float64(x) - 16 // theme:ok procedural marker shape
+			dy := float64(y) - 14 // theme:ok procedural marker shape
 			r := math.Sqrt(dx*dx/1.8 + dy*dy)
 			if r > 12 {
 				continue
 			}
 			alpha := uint8(210)
 			if r > 9 {
-				alpha = uint8(180 - (r-9)*35)
+				alpha = uint8(180 - (r-9)*35) // theme:ok procedural marker shape
 			}
-			img.SetRGBA(x, y, color.RGBA{R: 245, G: 220, B: 96, A: alpha})
+			fill := itemMarkerFill
+			fill.A = uint8(int(alpha) * int(itemMarkerFill.A) / 255) // theme:ok alpha scale
+			img.SetRGBA(x, y, fill)
 		}
 	}
-	for y := 8; y < 22; y++ {
-		for x := 10; x < 23; x++ {
+	for y := 8; y < 22; y++ { // theme:ok procedural marker shape
+		for x := 10; x < 23; x++ { // theme:ok procedural marker shape
 			if x == 10 || x == 22 || y == 8 || y == 21 {
-				img.SetRGBA(x, y, color.RGBA{R: 80, G: 48, B: 16, A: 230})
+				img.SetRGBA(x, y, itemMarkerBorder)
 			}
 		}
 	}
-	m.itemMarker = render.NewImageFromImage(img)
+	m.itemMarker, m.itemMarkerGen = render.NewImageFromImage(img), rotheme.Generation()
 	return m.itemMarker
 }

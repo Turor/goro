@@ -17,13 +17,13 @@ import (
 
 const (
 	actorPersistentEffectOptionMask = ActorEffectCartMask | db.EffectStateFalcon | db.EffectStateWedding
-	falconGlideHeight               = 5.0
-	falconFollowRange               = 2
+	falconGlideHeight               = 5.0 // theme:ok falcon flight height in world units
+	falconFollowRange               = 2   // theme:ok cells
 	falconStopRange                 = 1
 	FalconRetargetInterval          = time.Second
-	FalconAttackMoveSpeedMS         = 35
-	FalconAttackReturnDelay         = 432 * time.Millisecond
-	falconAttackOvershoot           = 5
+	FalconAttackMoveSpeedMS         = 35                     // theme:ok movement timing
+	FalconAttackReturnDelay         = 432 * time.Millisecond // theme:ok timer
+	falconAttackOvershoot           = 5                      // theme:ok cells
 )
 
 type FalconRenderState struct {
@@ -67,7 +67,7 @@ func falconMoveSpeedMS(ownerSpeed int) int {
 	if ownerSpeed <= 0 {
 		return 100
 	}
-	speed := ownerSpeed - 50
+	speed := ownerSpeed - 50 // theme:ok movement timing
 	if speed < 1 {
 		return 1
 	}
@@ -314,7 +314,7 @@ func (m *System) drawActorFalcon3D(screen *render.Frame, ctx client.Context, pro
 	worldZ := terrainZ + falconGlideHeight
 	scale := scene.ActorBillboardScreenScale(projection, worldX, worldY, worldZ)
 	shadow := ActorShadowFactor(ctx.World, falcon.X, falcon.Y)
-	m.DrawActorSpriteBillboardTintAlpha3D(screen, projection, billboard, worldX, worldY, worldZ, scale, alpha, shadow, color.RGBA{R: 255, G: 255, B: 255, A: 255}, render.BlendSourceOver)
+	m.DrawActorSpriteBillboardTintAlpha3D(screen, projection, billboard, worldX, worldY, worldZ, scale, alpha, shadow, color.RGBA{R: 255, G: 255, B: 255, A: 255}, render.BlendSourceOver) // theme:ok untinted sprite
 	return true
 }
 

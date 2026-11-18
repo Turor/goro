@@ -97,7 +97,7 @@ func ActorStateTint(actor worldstate.Actor) color.RGBA {
 		b *= vb
 	}
 	a *= va
-	return color.RGBA{R: byte(scene.ClampUnit(r) * 255), G: byte(scene.ClampUnit(g) * 255), B: byte(scene.ClampUnit(b) * 255), A: byte(scene.ClampUnit(a) * 255)}
+	return color.RGBA{R: byte(scene.ClampUnit(r) * 255), G: byte(scene.ClampUnit(g) * 255), B: byte(scene.ClampUnit(b) * 255), A: byte(scene.ClampUnit(a) * 255)} // theme:ok computed sprite tint
 }
 
 func actorOpt3StateTint(opt3State uint32) (float64, float64, float64, float64) {
@@ -190,12 +190,12 @@ func (m *System) ActorBodyColorTint(actorID uint32, tint color.RGBA, now time.Ti
 			frame := now.Sub(effect.Starts) / db.EffectFrameDuration
 			if effects.MagicCrasherFlashActive(now.Sub(effect.Starts)) {
 				seed := uint64(actorID)*0x9e3779b185ebca87 ^ uint64(effect.Starts.UnixNano()) ^ uint64(frame)*0xc2b2ae3d27d4eb4f
-				tint = scene.MultiplyTint(base, randomBodyColorChannel(seed), randomBodyColorChannel(seed+1), randomBodyColorChannel(seed+2), 1)
+				tint = scene.MultiplyTint(base, randomBodyColorChannel(seed), randomBodyColorChannel(seed+1), randomBodyColorChannel(seed+2), 1) // theme:ok random seed
 			}
 		case effects.TransBlueBody:
 			frame := now.Sub(effect.Starts) / db.EffectFrameDuration
 			if frame < 200 {
-				channel := float64(205-frame) / 255
+				channel := float64(205-frame) / 255 // theme:ok original client body color fade
 				tint = scene.MultiplyTint(base, channel, channel, 1, 1)
 			}
 		}
@@ -205,7 +205,7 @@ func (m *System) ActorBodyColorTint(actorID uint32, tint color.RGBA, now time.Ti
 
 func effectBodyColorTint(tint color.RGBA, elapsed time.Duration) color.RGBA {
 	alpha := scene.ClampFloat(float64(elapsed)/float64(100*time.Millisecond), 0, 1)
-	return color.RGBA{
+	return color.RGBA{ // theme:ok original client body color tint
 		R: mixTintChannel(tint.R, 255, alpha),
 		G: mixTintChannel(tint.G, 0, alpha),
 		B: mixTintChannel(tint.B, 0, alpha),
@@ -219,7 +219,7 @@ func magicCrasher2BodyColorTint(tint color.RGBA, actorID uint32, starts time.Tim
 	}
 	bucket := uint64(elapsed / db.EffectFrameDuration)
 	seed := uint64(actorID)*0x9e3779b185ebca87 ^ uint64(starts.UnixNano()) ^ bucket*0xc2b2ae3d27d4eb4f
-	return scene.MultiplyTint(tint, randomBodyColorChannel(seed), randomBodyColorChannel(seed+1), randomBodyColorChannel(seed+2), 1)
+	return scene.MultiplyTint(tint, randomBodyColorChannel(seed), randomBodyColorChannel(seed+1), randomBodyColorChannel(seed+2), 1) // theme:ok random seed
 }
 
 func randomBodyColorChannel(seed uint64) float64 {
@@ -289,9 +289,9 @@ func (m *System) actorBodySizeMultiplierFrom(actorID uint32, now time.Time, base
 		if effect.EffectID == effects.BabyBodyBack || (effect.EffectID == effects.BabyBody && effect.Persistent) {
 			frame := float64(now.Sub(effect.Starts) / db.EffectFrameDuration)
 			if effect.EffectID == effects.BabyBodyBack {
-				frame = 45 - frame*3
+				frame = 45 - frame*3 // theme:ok original client body size animation
 			}
-			multiplier = baseMultiplier * (.75 + .25*math.Cos(scene.DegreesToRadians(scene.ClampFloat(frame, 0, 45)*4)))
+			multiplier = baseMultiplier * (.75 + .25*math.Cos(scene.DegreesToRadians(scene.ClampFloat(frame, 0, 45)*4))) // theme:ok original client body size animation
 			latest = effect.Starts
 			continue
 		}
@@ -317,13 +317,13 @@ func (m *System) actorBodySizeMultiplierFrom(actorID uint32, now time.Time, base
 func actorBodySizeTarget(effectID int) (targetSize float64, transition bool, ok bool) {
 	switch effectID {
 	case effects.BabyBody:
-		return 2.5, true, true
+		return 2.5, true, true // theme:ok original client body size
 	case effects.BabyBody2:
-		return 2.5, false, true
+		return 2.5, false, true // theme:ok original client body size
 	case effects.GiantBody:
-		return 7.5, true, true
+		return 7.5, true, true // theme:ok original client body size
 	case effects.GiantBody2:
-		return 7.5, false, true
+		return 7.5, false, true // theme:ok original client body size
 	default:
 		return 0, false, false
 	}
