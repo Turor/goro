@@ -1,6 +1,7 @@
 package effects
 
 import (
+	"image"
 	"image/color"
 	"math"
 	"strconv"
@@ -10,7 +11,6 @@ import (
 	"github.com/kivutar/goro/client"
 	"github.com/kivutar/goro/db"
 	"github.com/kivutar/goro/game/scene"
-	"github.com/kivutar/goro/glog"
 	"github.com/kivutar/goro/render"
 	"github.com/kivutar/goro/res"
 )
@@ -861,6 +861,12 @@ type Spec struct {
 	Components       []Component
 }
 
+// DrawsBeforeEntities reports whether this component is submitted in the
+// pre-actor world pass. Negative Layer is the G60 order hook.
+func (c Component) DrawsBeforeEntities() bool {
+	return c.RenderBefore || c.Layer < 0
+}
+
 type Component struct {
 	Kind               ComponentKind
 	hitRing            *db.EffectHitRing
@@ -882,6 +888,7 @@ type Component struct {
 	StrRandMax         int
 	AttachedEntity     bool
 	RenderBefore       bool
+	Layer              int
 	TexturePath        string
 	TextureName        string
 	TextureFile        string
@@ -1582,6 +1589,7 @@ func convertDBWorldEffectComponent(component db.EffectComponent) Component {
 		StrRandMax:         component.STRRandMax,
 		AttachedEntity:     component.AttachedEntity,
 		RenderBefore:       component.RenderBefore,
+		Layer:              component.Layer,
 		TexturePath:        component.TexturePath,
 		TextureName:        component.TextureName,
 		TextureFile:        component.TextureFile,
@@ -1790,7 +1798,7 @@ func (m *System) Draw(screen *render.Frame, ctx client.Context, projection scene
 			anchor = effect.ActorOrigin
 		}
 		for index, component := range spec.Components {
-			if component.RenderBefore != beforeEntities {
+			if component.DrawsBeforeEntities() != beforeEntities {
 				continue
 			}
 			// These persistent effects play their startup STR only once.
@@ -2030,17 +2038,8 @@ func (m *System) EffectFileTextureWithBlackKey(manager *res.Manager, path string
 		return nil
 	}
 	key := "__effectfile_" + path + "|blackkey=" + strconv.FormatBool(blackKey)
-	if m.textures == nil {
-		m.textures = make(map[string]*render.Image)
-	}
-	if m.textureMiss == nil {
-		m.textureMiss = make(map[string]struct{})
-	}
-	if texture, ok := m.textures[key]; ok {
+	if texture, ok := m.cachedTexture(key); ok {
 		return texture
-	}
-	if _, ok := m.textureMiss[key]; ok {
-		return nil
 	}
 	normalized := strings.ReplaceAll(path, "/", "\\")
 	candidates := []string{
@@ -2049,19 +2048,17 @@ func (m *System) EffectFileTextureWithBlackKey(manager *res.Manager, path string
 		normalized,
 		strings.ReplaceAll(normalized, "\\", "/"),
 	}
-	img, _, err := res.LoadImageExact(manager, candidates)
+	img, _, err := res.LoadTextureExact(manager, candidates)
 	if err != nil {
-		m.textureMiss[key] = struct{}{}
-		glog.Warnf("effect texture missing path=%s: %v", path, err)
 		return nil
 	}
-	out := res.ApplyEffectTransparencyWithBlackKey(img, blackKey)
-	texture := render.NewImageFromImage(out)
-	if !blackKey {
-		texture = render.NewImageFromStraightAlpha(out)
-	}
-	m.textures[key] = texture
-	return texture
+	return m.storeLoadedTexture(key, img, func(src image.Image) *render.Image {
+		out := res.ApplyEffectTransparencyWithBlackKey(src, blackKey)
+		if !blackKey {
+			return render.NewImageFromStraightAlpha(out)
+		}
+		return render.NewImageFromImage(out)
+	})
 }
 
 func (m *System) effectTexture(manager *res.Manager, name string) *render.Image {
@@ -2069,24 +2066,14 @@ func (m *System) effectTexture(manager *res.Manager, name string) *render.Image 
 		return nil
 	}
 	key := "__effect_" + strings.TrimSpace(name)
-	if m.textures == nil {
-		m.textures = make(map[string]*render.Image)
-	}
-	if m.textureMiss == nil {
-		m.textureMiss = make(map[string]struct{})
-	}
-	if texture, ok := m.textures[key]; ok {
+	if texture, ok := m.cachedTexture(key); ok {
 		return texture
 	}
-	if _, ok := m.textureMiss[key]; ok {
-		return nil
-	}
-	img, _, err := res.LoadImage(manager, res.EffectTextureCandidates(name))
+	img, _, err := res.LoadTexture(manager, res.EffectTextureCandidates(name))
 	if err != nil {
-		m.textureMiss[key] = struct{}{}
 		return nil
 	}
-	texture := render.NewImageFromImage(res.ApplyEffectTransparency(img))
-	m.textures[key] = texture
-	return texture
+	return m.storeLoadedTexture(key, img, func(src image.Image) *render.Image {
+		return render.NewImageFromImage(res.ApplyEffectTransparency(src))
+	})
 }

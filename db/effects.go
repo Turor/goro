@@ -807,26 +807,35 @@ type EffectSpec struct {
 	Components       []EffectComponent
 }
 
+// DrawsBeforeEntities reports whether this component is submitted in the
+// pre-actor world pass. Negative Layer matches G60's planned order field.
+func (c EffectComponent) DrawsBeforeEntities() bool {
+	return c.RenderBefore || c.Layer < 0
+}
+
 type EffectComponent struct {
-	Kind               EffectComponentKind
-	HitRing            *EffectHitRing
-	HitParticles       *EffectHitParticles
-	FuncName           string
-	Color              color.RGBA
-	Duration           time.Duration
-	DurationRandMin    time.Duration
-	DurationRandMax    time.Duration
-	Delay              time.Duration
-	DuplicateDelay     time.Duration
-	DelayOffsetDelta   time.Duration
-	Repeat             bool
-	RepeatDelay        time.Duration
-	STRFile            string
-	STRMinFile         string
-	STRRandMin         int
-	STRRandMax         int
-	AttachedEntity     bool
-	RenderBefore       bool // robr renderBeforeEntities
+	Kind             EffectComponentKind
+	HitRing          *EffectHitRing
+	HitParticles     *EffectHitParticles
+	FuncName         string
+	Color            color.RGBA
+	Duration         time.Duration
+	DurationRandMin  time.Duration
+	DurationRandMax  time.Duration
+	Delay            time.Duration
+	DuplicateDelay   time.Duration
+	DelayOffsetDelta time.Duration
+	Repeat           bool
+	RepeatDelay      time.Duration
+	STRFile          string
+	STRMinFile       string
+	STRRandMin       int
+	STRRandMax       int
+	AttachedEntity   bool
+	RenderBefore     bool // robr renderBeforeEntities
+	// Layer is the data-driven draw order G60 will load. Negative draws before
+	// entities; 0 and positive draw after. RenderBefore still draws first.
+	Layer              int
 	TexturePath        string
 	TextureName        string
 	TextureFile        string
