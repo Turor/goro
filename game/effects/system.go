@@ -1,6 +1,8 @@
 package effects
 
 import (
+	"image"
+	"sync"
 	"time"
 
 	"github.com/kivutar/goro/client"
@@ -8,6 +10,28 @@ import (
 	"github.com/kivutar/goro/render"
 	"github.com/kivutar/goro/res"
 )
+
+var (
+	missingTextureImageOnce sync.Once
+	missingTextureImage     *render.Image
+)
+
+func missingTextureRenderImage() *render.Image {
+	missingTextureImageOnce.Do(func() {
+		missingTextureImage = render.NewImageFromImage(res.MissingCheckerboard())
+	})
+	return missingTextureImage
+}
+
+// IsMissingTexture reports whether img is the shared missing-texture placeholder.
+func IsMissingTexture(img *render.Image) bool {
+	return img != nil && img == missingTextureRenderImage()
+}
+
+// TextureLoaded reports a real texture, not a missing-file placeholder.
+func TextureLoaded(img *render.Image) bool {
+	return img != nil && !IsMissingTexture(img)
+}
 
 // Host connects visual effects to the game's sound, camera and actor presentation.
 type Host interface {
@@ -44,6 +68,35 @@ func (m *System) Bind(host Host, textures map[string]*render.Image, missing map[
 	m.host = host
 	m.textures = textures
 	m.textureMiss = missing
+}
+
+func (m *System) cachedTexture(key string) (*render.Image, bool) {
+	if m.textures == nil {
+		return nil, false
+	}
+	texture, ok := m.textures[key]
+	return texture, ok
+}
+
+func (m *System) storeLoadedTexture(key string, img image.Image, convert func(image.Image) *render.Image) *render.Image {
+	if img == nil {
+		return nil
+	}
+	if m.textures == nil {
+		m.textures = make(map[string]*render.Image)
+	}
+	if m.textureMiss == nil {
+		m.textureMiss = make(map[string]struct{})
+	}
+	var texture *render.Image
+	if res.IsMissingCheckerboard(img) {
+		m.textureMiss[key] = struct{}{}
+		texture = missingTextureRenderImage()
+	} else {
+		texture = convert(img)
+	}
+	m.textures[key] = texture
+	return texture
 }
 
 func (m *System) scheduleSound(at time.Time, paths ...string) {

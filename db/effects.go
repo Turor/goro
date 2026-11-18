@@ -814,6 +814,21 @@ type EffectSpec struct {
 	Components []EffectComponent
 }
 
+// DrawsBeforeEntities reports whether this component is submitted in the
+// pre-actor world pass on its own Layer: negative draws before entities,
+// positive after, and 0 keeps RenderBefore. EffectDrawsBeforeEntities also
+// falls back to the spec Layer.
+func (c EffectComponent) DrawsBeforeEntities() bool {
+	switch {
+	case c.Layer < 0:
+		return true
+	case c.Layer > 0:
+		return false
+	default:
+		return c.RenderBefore
+	}
+}
+
 type EffectComponent struct {
 	Kind               EffectComponentKind
 	HitRing            *EffectHitRing

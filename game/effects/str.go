@@ -2,6 +2,7 @@ package effects
 
 import (
 	"fmt"
+	"image"
 	"image/color"
 	"math"
 	"strings"
@@ -45,7 +46,7 @@ func (m *System) drawSTREffect(screen *render.Frame, ctx client.Context, project
 		}
 		anim.Pos[0] += float32(component.spriteXOffset)
 		anim.Pos[1] += float32(component.SpriteYOffset)
-		drawSTRAnimation(screen, projection, texture, worldX, worldY, worldZ, anim, component.AttachedEntity, component.Depth)
+		drawSTRAnimation(screen, projection, texture, worldX, worldY, worldZ, anim, component.AttachedEntity, !component.DrawsBeforeEntities(), component.Depth)
 		drawn = true
 	}
 	return drawn
@@ -133,28 +134,17 @@ func (m *System) strEffectTexture(manager *res.Manager, path string) *render.Ima
 		return nil
 	}
 	key := "__strtex_" + path
-	if m.textures == nil {
-		m.textures = make(map[string]*render.Image)
-	}
-	if m.textureMiss == nil {
-		m.textureMiss = make(map[string]struct{})
-	}
-	if texture, ok := m.textures[key]; ok {
+	if texture, ok := m.cachedTexture(key); ok {
 		return texture
 	}
-	if _, ok := m.textureMiss[key]; ok {
-		return nil
-	}
 	candidates := []string{path, strings.ReplaceAll(path, "\\", "/")}
-	img, _, err := res.LoadImageExact(manager, candidates)
+	img, _, err := res.LoadTextureExact(manager, candidates)
 	if err != nil {
-		m.textureMiss[key] = struct{}{}
-		glog.Warnf("str effect texture missing path=%s: %v", path, err)
 		return nil
 	}
-	texture := render.NewImageFromImage(res.ApplyEffectTransparency(img))
-	m.textures[key] = texture
-	return texture
+	return m.storeLoadedTexture(key, img, func(src image.Image) *render.Image {
+		return render.NewImageFromImage(res.ApplyEffectTransparency(src))
+	})
 }
 
 func strEffectDuration(str *res.STR, fallback time.Duration) time.Duration {
@@ -248,7 +238,7 @@ func strAnimFrame(from, to res.STRAnimation, delta float32, texCount int) float3
 	}
 }
 
-func drawSTRAnimation(screen *render.Frame, projection scene.Projection, texture *render.Image, worldX, worldY, worldZ float64, anim res.STRAnimation, attached bool, depth float64) {
+func drawSTRAnimation(screen *render.Frame, projection scene.Projection, texture *render.Image, worldX, worldY, worldZ float64, anim res.STRAnimation, attached, afterBillboards bool, depth float64) {
 	right, up, _, ok := projection.BillboardBasis(worldX, worldY, worldZ)
 	if !ok {
 		return
@@ -267,7 +257,7 @@ func drawSTRAnimation(screen *render.Frame, projection scene.Projection, texture
 		StrAnimationVertex3D(vertexPoint(anim.XY[3], anim.XY[7]), scene.UV{U: 0, V: 1}, tint, w, h, center),
 		StrAnimationVertex3D(vertexPoint(anim.XY[2], anim.XY[6]), scene.UV{U: 1, V: 1}, tint, w, h, center),
 	}
-	options := StrAnimationDrawOptions(anim)
+	options := StrAnimationDrawOptionsAfterBillboards(anim, afterBillboards)
 	if depth != 0 {
 		options.DepthBias = float32(depth)
 	}
@@ -295,6 +285,10 @@ func StrAnimationVertex3D(point scene.Point3, uv scene.UV, tint color.RGBA, text
 }
 
 func StrAnimationDrawOptions(anim res.STRAnimation) *render.DrawTrianglesOptions {
+	return StrAnimationDrawOptionsAfterBillboards(anim, true)
+}
+
+func StrAnimationDrawOptionsAfterBillboards(anim res.STRAnimation, afterBillboards bool) *render.DrawTrianglesOptions {
 	options := scene.TriangleDrawOptions(render.FilterLinear, render.AddressClampToZero)
 	options.Blend = StrAnimationBlend(anim)
 	// robr's STR shader keeps the quad on the camera plane and subtracts
@@ -303,6 +297,10 @@ func StrAnimationDrawOptions(anim res.STRAnimation) *render.DrawTrianglesOptions
 	// robr's StrEffect shader has uFogUse, but StrEffect.beforeRender never sets
 	// it; WebGL initializes uniforms to false, so STR effects render unfogged.
 	options.DisableFog = true
+	// After-entity STR is world geometry. Without AfterBillboards the GPU draws
+	// it in the first alpha pass, then actor sprites write depth and cover it
+	// (Crazy Uproar behind NPCs).
+	options.AfterBillboards = afterBillboards
 	return options
 }
 
