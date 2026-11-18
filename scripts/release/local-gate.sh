@@ -33,4 +33,5 @@ step go test -tags "$TAGS" -count=1 ./...
 step env GOOS=linux GOARCH=amd64 go build -tags "$TAGS" -trimpath -o "$out/goro" .
 step env GOOS=windows GOARCH=amd64 go build -tags "$TAGS" -trimpath -o "$out/goro.exe" .
 step go build -trimpath -o "$out/goro-sign-release" ./cmd/goro-sign-release
+step go build -trimpath -o "$out/goro-replay" ./cmd/goro-replay
 echo "LOCAL GATE PASS $(git rev-parse --short=12 HEAD) in $((SECONDS - start))s"

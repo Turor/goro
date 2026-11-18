@@ -33,6 +33,13 @@ var (
 	worldMapPreviewRowsTop float32 = 164
 	worldMapPreviewMax             = 128
 	worldMapDotSize                = 4
+	worldMapMarkSize       float32 = 10
+	worldMapMarkInset      float32 = 3
+	worldMapMarkArm        float32 = 4
+	worldMapMarkNotch      float32 = 1
+	worldMapMarkDrop       float32 = 4
+	worldMapMarkTip        float32 = 5
+	worldMapMarkStroke     float32 = 2
 )
 
 func init() {
@@ -62,4 +69,11 @@ func init() {
 	s.Float("preview_rows_top", &worldMapPreviewRowsTop, 0, 400, "atlas height reserved above the party name rows")
 	s.Int("preview_max", &worldMapPreviewMax, 32, 512, "longest side of a preview minimap")
 	s.Int("dot_size", &worldMapDotSize, 1, 16, "player and party dot size")
+	s.Float("mark_size", &worldMapMarkSize, 4, 32, "warp lock or check mark size")
+	s.Float("mark_inset", &worldMapMarkInset, 0, 24, "warp mark inset from the tile corner")
+	s.Float("mark_arm", &worldMapMarkArm, 1, 16, "warp mark arm length")
+	s.Float("mark_notch", &worldMapMarkNotch, 0, 12, "check mark notch inset")
+	s.Float("mark_drop", &worldMapMarkDrop, 1, 16, "check mark drop")
+	s.Float("mark_tip", &worldMapMarkTip, 1, 16, "check mark tip reach")
+	s.Float("mark_stroke", &worldMapMarkStroke, 1, 8, "warp mark stroke width")
 }

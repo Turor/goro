@@ -9,22 +9,39 @@ import (
 	"github.com/gogpu/ui/event"
 	"github.com/gogpu/ui/geometry"
 	"github.com/gogpu/ui/widget"
+	"github.com/kivutar/goro/network"
 	"github.com/kivutar/goro/res"
+	"github.com/kivutar/goro/session"
 	"github.com/kivutar/goro/ui/rotheme"
 	xdraw "golang.org/x/image/draw"
 )
 
-// WorldMapWindow is the legacy illustrated atlas, not a navigation service.
-// Artwork and previews are cached; the closed window does no presentation work.
+// WorldMapWindow is the illustrated atlas and the Warpra warper. Artwork and
+// previews are cached; the closed window does no presentation work.
 type WorldMapWindow struct {
 	Window
-	art       image.Image
-	scaled    image.Image
-	board     *worldMapWidget
-	previews  map[string]image.Image
-	showNames bool
-	memberBuf []worldMapMember
-	dotBuf    []worldMapDot
+	Confirm       ConfirmModal
+	Picker        DungeonFloorPicker
+	art           image.Image
+	scaled        image.Image
+	board         *worldMapWidget
+	previews      map[string]image.Image
+	showNames     bool
+	memberBuf     []worldMapMember
+	dotBuf        []worldMapDot
+	marks         []worldMapExploreMark
+	markBuf       []worldMapExploreMark
+	catalog       session.WarpraCatalog
+	onOpen        func()
+	onNeedList    func()
+	onWarp        func(network.WarpraLoc)
+	onBuy         func(network.WarpraLoc)
+	pending       network.WarpraLoc
+	hasPending    bool
+	warpAfter     bool
+	lastDungeon   string
+	pendingMap    string
+	pendingRegion int
 }
 
 type worldMapMember struct {
@@ -74,7 +91,17 @@ func (w *WorldMapWindow) OpenWindow(ctx Context) error {
 	w.OnLayoutReload(w.reloadLayout)
 	w.UpdatePresentation(ctx)
 	w.Publish(ctx)
+	if w.onOpen != nil {
+		w.onOpen()
+	}
 	return nil
+}
+
+func (w *WorldMapWindow) BindWarpra(onOpen, onNeedList func(), onWarp, onBuy func(network.WarpraLoc)) {
+	w.onOpen = onOpen
+	w.onNeedList = onNeedList
+	w.onWarp = onWarp
+	w.onBuy = onBuy
 }
 
 func (w *WorldMapWindow) reloadLayout() {
@@ -99,7 +126,7 @@ func (w *WorldMapWindow) reloadLayout() {
 }
 
 func (w *WorldMapWindow) Rebind(ctx Context) {
-	if w.IsOpen() {
+	if w.IsOpen() && w.art != nil {
 		// Replace callbacks and the presentation snapshot copied across maps.
 		w.RebindContent(ctx, w.widgetTree(ctx))
 		w.UpdatePresentation(ctx)
@@ -107,6 +134,12 @@ func (w *WorldMapWindow) Rebind(ctx Context) {
 }
 
 func (w *WorldMapWindow) Update(ctx Context) bool {
+	if w.Confirm.Update(ctx) {
+		return true
+	}
+	if w.Picker.Update(ctx) {
+		return true
+	}
 	if !w.IsOpen() {
 		return false
 	}
@@ -115,11 +148,21 @@ func (w *WorldMapWindow) Update(ctx Context) bool {
 	return consumed
 }
 
+func (w *WorldMapWindow) Close() {
+	w.Confirm.Close(w.ctx)
+	w.Picker.Close()
+	w.hasPending = false
+	w.warpAfter = false
+	w.lastDungeon = ""
+	w.Window.Close()
+}
+
 func (w *WorldMapWindow) widgetTree(ctx Context) widget.Widget {
 	w.board = &worldMapWidget{
 		resources: ctx.Resources, entries: ctx.Resources.WorldMapEntries(),
 		image: w.scaled, sourceSize: w.art.Bounds().Size(), previews: w.previews,
-		hovered: -1, showNames: w.showNames,
+		hovered: -1, showNames: w.showNames, marks: w.marks,
+		onClick: func(index int) { w.clickEntry(ctx, index) },
 	}
 	w.board.SetVisible(true)
 	w.board.SetEnabled(true)
@@ -164,13 +207,130 @@ func (w *WorldMapWindow) UpdatePresentation(ctx Context) {
 			}
 		}
 	}
-	if b.currentMap == current && b.mapW == mapW && b.mapH == mapH && slices.Equal(b.members, w.memberBuf) && slices.Equal(b.dots, w.dotBuf) {
+	if ctx.Session != nil {
+		w.catalog = ctx.Session.Warpra
+	}
+	w.markBuf = appendWorldMapExploreMarks(w.markBuf[:0], b.entries, w.catalog)
+	if b.currentMap == current && b.mapW == mapW && b.mapH == mapH && slices.Equal(b.members, w.memberBuf) && slices.Equal(b.dots, w.dotBuf) && exploreMarksEqual(b.marks, w.markBuf) {
 		return
 	}
 	b.currentMap, b.mapW, b.mapH = current, mapW, mapH
 	b.members = slices.Clone(w.memberBuf)
 	b.dots = slices.Clone(w.dotBuf)
+	b.marks = append(b.marks[:0], w.markBuf...)
+	w.marks = b.marks
 	w.redraw(ctx)
+}
+
+func exploreMarksEqual(a, b []worldMapExploreMark) bool {
+	return slices.Equal(a, b)
+}
+
+func (w *WorldMapWindow) SetCatalog(ctx Context, catalog session.WarpraCatalog) {
+	w.catalog = catalog
+	if w.lastDungeon != "" && w.Picker.IsOpen() {
+		if info, ok := catalog.DungeonFloors(w.lastDungeon); ok {
+			w.Picker.Refresh(ctx, info, catalog.UnlockPrice(), catalog.Zeny)
+		}
+	}
+	if w.hasPending {
+		if next, ok := catalog.Find(w.pending.Kind, w.pending.ID); ok && next.Unlocked {
+			w.Confirm.Close(ctx)
+			w.hasPending = false
+		}
+	}
+	w.UpdatePresentation(ctx)
+	if w.pendingMap != "" && catalog.Ready() && w.board != nil {
+		name := w.pendingMap
+		w.pendingMap = ""
+		for i, entry := range w.board.entries {
+			if entry.MapName == name {
+				w.clickEntry(ctx, i)
+				break
+			}
+		}
+	}
+}
+
+func (w *WorldMapWindow) clickEntry(ctx Context, index int) {
+	if w.board == nil || index < 0 || index >= len(w.board.entries) {
+		return
+	}
+	entry := w.board.entries[index]
+	if !w.catalog.Ready() {
+		w.pendingMap = entry.MapName
+		w.pendingRegion = entry.Region
+		if w.onNeedList != nil {
+			w.onNeedList()
+		} else if w.onOpen != nil {
+			w.onOpen()
+		}
+		return
+	}
+	regionMaps := regionMapNames(w.board.entries, entry.Region)
+	action := resolveWorldMapWarp(w.catalog, entry.MapName, entry.Region, regionMaps)
+	if !action.OK {
+		return
+	}
+	if action.OpenFloors {
+		w.lastDungeon = action.Loc.Map
+		w.Picker.OpenInfo(ctx, action.Dungeon, w.catalog.UnlockPrice(), w.catalog.Zeny, func(loc network.WarpraLoc) {
+			w.UnlockOrWarp(ctx, loc, true)
+		})
+		return
+	}
+	w.Picker.Close()
+	w.lastDungeon = ""
+	w.UnlockOrWarp(ctx, action.Loc, true)
+}
+
+func (w *WorldMapWindow) UnlockOrWarp(ctx Context, loc network.WarpraLoc, autoWarp bool) {
+	if loc.Unlocked {
+		w.warpAfter = false
+		w.hasPending = false
+		if w.onWarp != nil {
+			w.onWarp(loc)
+		}
+		return
+	}
+	if session.WarpraLevelGate(loc) > 0 {
+		if w.onWarp != nil {
+			w.onWarp(loc)
+		}
+		return
+	}
+	w.pending = loc
+	w.hasPending = true
+	w.warpAfter = autoWarp
+	title, body := warpraUnlockMessage(loc, w.catalog.UnlockPrice(), w.catalog.Zeny)
+	w.Confirm.Open(ctx, title, body, func() {
+		if w.onBuy != nil {
+			w.onBuy(w.pending)
+		}
+	}, func() {
+		w.warpAfter = false
+		w.hasPending = false
+	})
+}
+
+func (w *WorldMapWindow) ConsumePendingBuy() (network.WarpraLoc, bool, bool) {
+	if !w.hasPending {
+		return network.WarpraLoc{}, false, false
+	}
+	return w.pending, w.warpAfter, true
+}
+
+func (w *WorldMapWindow) ClearPending() {
+	w.hasPending = false
+	w.warpAfter = false
+}
+
+func (w *WorldMapWindow) CloseAfterWarp() {
+	w.Picker.Close()
+	w.lastDungeon = ""
+	w.Confirm.Close(w.ctx)
+	w.ClearPending()
+	w.Window.Close()
 }
 
 func (w *WorldMapWindow) redraw(ctx Context) {
@@ -202,6 +362,8 @@ type worldMapWidget struct {
 	currentMap string
 	members    []worldMapMember
 	dots       []worldMapDot
+	marks      []worldMapExploreMark
+	onClick    func(int)
 	mapW, mapH int
 }
 
@@ -251,7 +413,10 @@ func (w *worldMapWidget) Event(ctx widget.Context, e event.Event) bool {
 		w.SetNeedsRedraw(true)
 		ctx.InvalidateRect(w.Bounds())
 	}
-	// This is a map browser: clicking must never issue a movement command.
+	if mouse.MouseType == event.MousePress && mouse.Button == event.ButtonLeft && w.hovered >= 0 && w.onClick != nil {
+		w.onClick(w.hovered)
+	}
+	// Clicks never issue a movement command; they warp through Warpra instead.
 	return true
 }
 
@@ -300,10 +465,36 @@ func (w *worldMapWidget) Draw(_ widget.Context, canvas widget.Canvas) {
 		if entry.MapName == w.currentMap {
 			drawWorldMapStar(canvas, geometry.Pt(r.Min.X+r.Width()/2, r.Min.Y+r.Height()/2))
 		}
+		if i < len(w.marks) && w.marks[i].Present {
+			drawWorldMapExploreMark(canvas, r, w.marks[i].Unlocked)
+		}
 	}
 	if w.hovered >= 0 {
 		w.drawPreview(canvas, w.entries[w.hovered])
 	}
+}
+
+func drawWorldMapExploreMark(canvas widget.Canvas, tile geometry.Rect, unlocked bool) {
+	size := worldMapMarkSize
+	cx := tile.Max.X - size/2 - worldMapMarkInset
+	cy := tile.Min.Y + size/2 + worldMapMarkInset
+	if cx < tile.Min.X+size/2 {
+		cx = tile.Min.X + tile.Width()/2
+	}
+	if cy > tile.Max.Y-size/2 {
+		cy = tile.Min.Y + tile.Height()/2
+	}
+	color := Color(ErrorTextColor)
+	if unlocked {
+		color = Color(GoodTextColor)
+	}
+	if unlocked {
+		canvas.DrawLine(geometry.Pt(cx-worldMapMarkArm, cy), geometry.Pt(cx-worldMapMarkNotch, cy+worldMapMarkDrop), color, worldMapMarkStroke)
+		canvas.DrawLine(geometry.Pt(cx-worldMapMarkNotch, cy+worldMapMarkDrop), geometry.Pt(cx+worldMapMarkTip, cy-worldMapMarkDrop), color, worldMapMarkStroke)
+		return
+	}
+	canvas.DrawLine(geometry.Pt(cx-worldMapMarkArm, cy-worldMapMarkArm), geometry.Pt(cx+worldMapMarkArm, cy+worldMapMarkArm), color, worldMapMarkStroke)
+	canvas.DrawLine(geometry.Pt(cx+worldMapMarkArm, cy-worldMapMarkArm), geometry.Pt(cx-worldMapMarkArm, cy+worldMapMarkArm), color, worldMapMarkStroke)
 }
 
 func drawWorldMapStar(canvas widget.Canvas, center geometry.Point) {

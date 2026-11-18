@@ -140,6 +140,7 @@ type worldUI struct {
 	questWindow     gameui.QuestWindow
 	instanceWindow  gameui.InstanceWindow
 	worldMap        gameui.WorldMapWindow
+	warpra          gameui.WarpraWindow
 	emoteWindow     gameui.EmoteWindow
 	chatShortcuts   gameui.ChatShortcutsWindow
 	skillTextPrompt gameui.TextPromptWindow
@@ -170,6 +171,9 @@ func (u *worldUI) nonConsoleKeyboardInputBlockedExcept(ctx client.Context, excep
 	open := func(w *gameui.Window) bool { return w != except && w.IsOpen() }
 	return u.npc.Dialog.IsOpen() ||
 		u.instanceWindow.Confirm.IsOpen() ||
+		u.worldMap.Confirm.IsOpen() ||
+		u.worldMap.Picker.IsOpen() ||
+		u.warpra.Confirm.IsOpen() ||
 		!u.npcInputAvailable() ||
 		open(&u.settingsWindow.Window) ||
 		u.chatShortcuts.IsOpen() ||
@@ -207,6 +211,9 @@ func (u *worldUI) interactionModalOpen() bool {
 	}
 	return u.teleportModal.IsOpen() ||
 		u.instanceWindow.Confirm.IsOpen() ||
+		u.worldMap.Confirm.IsOpen() ||
+		u.worldMap.Picker.IsOpen() ||
+		u.warpra.Confirm.IsOpen() ||
 		u.social.MailWindow.ModalOpen() ||
 		u.battle.AutoSpell.IsOpen() ||
 		u.npc.StoragePassword.IsOpen() ||
@@ -415,6 +422,7 @@ func (m *WorldMode) rebindPersistentUI(ctx client.Context) {
 	m.ui.skillWindow.Rebind(ctx, m)
 	m.ui.questWindow.Rebind(ctx, func(id uint32, active bool) { m.setQuestActive(ctx, id, active) })
 	m.ui.instanceWindow.Rebind(ctx, func() { m.destroyInstance(ctx) })
+	m.bindWarpra(ctx)
 	m.ui.worldMap.Rebind(ctx)
 	m.ui.levelUpNotifications.Rebind(ctx)
 	m.ui.emoteWindow.OnSelect = m.ui.chatShortcuts.SelectEmotion
@@ -817,6 +825,9 @@ func (m *WorldMode) Update(ctx client.Context) (Mode, error) {
 	if m.ui.weaponRefine.Update(ctx) {
 		return nil, nil
 	}
+	if m.ui.warpra.Update(ctx) {
+		return nil, nil
+	}
 	// Let the atlas close on Escape before the console handles that key.
 	if m.ui.worldMap.Update(ctx) {
 		return nil, nil
@@ -1103,6 +1114,7 @@ func (m *WorldMode) basicMenuCallbacks(ctx client.Context) gameui.BasicMenuCallb
 		OnMap:    func() { m.ui.minimap.Toggle(ctx) },
 		OnComm:   func() { m.ui.social.ChatRoomCreate.Open(ctx) },
 		OnFriend: func() { m.ui.social.FriendsWindow.Toggle(ctx) },
+		OnWarpra: func() { m.ui.warpra.Toggle(ctx) },
 	}
 }
 
@@ -1238,6 +1250,7 @@ func (m *WorldMode) nextWorldMode() *WorldMode {
 	next.ui.questWindow = m.ui.questWindow
 	next.ui.instanceWindow = m.ui.instanceWindow
 	next.ui.worldMap = m.ui.worldMap
+	next.ui.warpra = m.ui.warpra
 	next.ui.emoteWindow = m.ui.emoteWindow
 	next.ui.chatShortcuts = m.ui.chatShortcuts
 	next.ui.social.FriendsWindow = m.ui.social.FriendsWindow
