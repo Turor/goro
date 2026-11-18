@@ -231,7 +231,7 @@ func (v *GR2ModelView) skinningPalette(action res.GR2Action, elapsed float64) []
 			elapsed = 0
 		}
 		if action == res.GR2ActionDead {
-			t = math.Min(elapsed, math.Max(clip.duration-0.0001, 0))
+			t = math.Min(elapsed, math.Max(clip.duration-0.0001, 0)) // theme:ok animation time epsilon
 		} else {
 			t = math.Mod(elapsed, clip.duration)
 			if t < 0 {
@@ -422,14 +422,14 @@ func gr2Deboor2(knots, controls []float32, dim int, t float64) ([]float64, bool)
 		point = scene.ClampInt(point, 0, pointCount-1)
 		return float64(controls[point*dim+d])
 	}
-	ka := knot(span - 2)
+	ka := knot(span - 2) // theme:ok keyframe index math
 	kb := knot(span - 1)
 	kc := knot(span)
 	kd := knot(span + 1)
 	a := gr2SafeDiv(t-kb, kc-kb)
 	b := gr2SafeDiv(t-ka, kc-ka)
 	c := gr2SafeDiv(t-kb, kd-kb)
-	i0, i1, i2 := span-2, span-1, span
+	i0, i1, i2 := span-2, span-1, span // theme:ok keyframe index math
 	out := make([]float64, dim)
 	for d := range out {
 		e1 := (1-b)*control(i0, d) + b*control(i1, d)

@@ -95,10 +95,22 @@ func TestNoHardcodedUILiterals(t *testing.T) {
 	}
 }
 
-// Each entry is a package directory, or a glob for UI files in a package that
-// also holds non-UI code (the map loading screen lives in game/map; its
-// tokens are in rotheme/theme_loading.go).
-var uiLiteralDirs = []string{".", "rotheme", filepath.Join("..", "game", "login"), filepath.Join("..", "game", "map", "loading.go")}
+// Each entry is a package directory, a single file, or a glob for the UI
+// files of a package that also holds non-UI code (the map loading screen lives
+// in game/map, its tokens in rotheme/theme_loading.go; ground item labels in
+// game/items.go with game/theme_items.go; the Blind overlay in
+// game/effects/blind.go with theme_blind.go). The world overlays in
+// game/battle (HP/SP/cast bars, damage numbers) and game/actors (names,
+// boards, speech bubbles) are checked as whole packages.
+var uiLiteralDirs = []string{
+	".", "rotheme",
+	filepath.Join("..", "game", "login"),
+	filepath.Join("..", "game", "map", "loading.go"),
+	filepath.Join("..", "game", "battle"),
+	filepath.Join("..", "game", "actors"),
+	filepath.Join("..", "game", "*items.go"),
+	filepath.Join("..", "game", "effects", "*blind.go"),
+}
 
 func TestHardcodedUILiteralScannerCatchesEachRule(t *testing.T) {
 	dir := t.TempDir()

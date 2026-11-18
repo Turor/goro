@@ -228,3 +228,8 @@ var monsterPropertyNames = [...]string{
 	"Ghost",
 	"Undead",
 }
+
+// MonsterInfoPreviewWidth and MonsterInfoPreviewHeight are the preview image
+// size ([monster_info] preview_width/height), for the code that renders it.
+func MonsterInfoPreviewWidth() int  { return monsterInfoPreviewW }
+func MonsterInfoPreviewHeight() int { return monsterInfoPreviewH }

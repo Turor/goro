@@ -17,28 +17,37 @@ type TokenInfo struct {
 	Numeric, Integer bool
 	Min, Max         float64
 	Value, Default   string
+	// Color is the resolved #rrggbb[aa] of a color token (Value may be a
+	// palette reference); empty for other tokens.
+	Color string
 }
 
 // Tokens lists every token in registration order with its current value.
 func Tokens() []TokenInfo {
 	out := make([]TokenInfo, 0, len(tokens))
 	for _, t := range tokens {
-		out = append(out, TokenInfo{
+		info := TokenInfo{
 			Section: t.section, Key: t.key, Doc: t.doc,
 			Numeric: t.kind == tokenInt || t.kind == tokenFloat || t.kind == tokenFloat64,
 			Integer: t.kind == tokenInt,
 			Min:     t.min, Max: t.max,
-			Value: t.format(t.current()), Default: t.format(t.def),
-		})
+			Value: t.format(t.value()), Default: t.format(t.def),
+		}
+		if isColorToken(t) {
+			info.Color = t.format(t.current())
+		}
+		out = append(out, info)
 	}
 	return out
 }
 
-// currentLayout captures every value that differs from its default.
+// currentLayout captures every value that differs from its default. A color
+// that follows a palette reference is kept as the reference, so saving after
+// a palette change does not freeze the derived colors.
 func currentLayout() Layout {
 	layout := Layout{values: map[*token]tokenValue{}}
 	for _, t := range tokens {
-		if v := t.current(); v != t.def {
+		if v := t.value(); !sameSource(v, t.def) {
 			layout.values[t] = v
 		}
 	}

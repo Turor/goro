@@ -58,6 +58,10 @@ type token struct {
 	allowEmpty bool
 
 	def tokenValue
+	// src is the value in effect as written (a palette reference keeps its
+	// expression); applied is what the last Apply stored in the variable.
+	src     tokenValue
+	applied tokenValue
 }
 
 type tokenValue struct {
@@ -67,6 +71,9 @@ type tokenValue struct {
 	c    widget.Color
 	rgba color.RGBA
 	s    string
+	// expr is a palette reference ("@panel darken(5%)") for color tokens;
+	// the color fields are then resolved by Apply.
+	expr string
 }
 
 var (
@@ -101,6 +108,10 @@ func register(t *token) {
 		panic("rotheme: duplicate layout token " + id)
 	}
 	t.def = t.current()
+	if isColorToken(t) && t.section != paletteSection {
+		t.def.expr = paletteRefs[id]
+	}
+	t.src, t.applied = t.def, t.current()
 	tokenIndex[id] = t
 	tokens = append(tokens, t)
 }
@@ -180,6 +191,9 @@ func (t *token) set(v tokenValue) {
 }
 
 func (t *token) format(v tokenValue) string {
+	if v.expr != "" {
+		return v.expr
+	}
 	switch t.kind {
 	case tokenInt:
 		return strconv.Itoa(v.i)
@@ -227,6 +241,16 @@ func (t *token) parse(raw string) (tokenValue, error) {
 	case tokenString:
 		return t.parseString(raw)
 	default:
+		if strings.HasPrefix(raw, "@") {
+			if t.section == paletteSection {
+				return tokenValue{}, fmt.Errorf("%s.%s: palette colors must be #rrggbb or #rrggbbaa", t.section, t.key)
+			}
+			e, err := parseColorExpr(raw)
+			if err != nil {
+				return tokenValue{}, fmt.Errorf("%s.%s: %w", t.section, t.key, err)
+			}
+			return tokenValue{expr: e.String()}, nil
+		}
 		r, g, b, a, err := parseHexColor(raw)
 		if err != nil {
 			return tokenValue{}, fmt.Errorf("%s.%s: %w", t.section, t.key, err)
@@ -374,19 +398,73 @@ func ParseLayout(r io.Reader, path string) (Layout, []string, error) {
 func (l Layout) Len() int { return len(l.values) }
 
 // Apply replaces every token: overridden ones take the file value and the rest
-// return to their compiled defaults. It must run on the UI thread.
+// return to their compiled defaults. The palette is applied first, then every
+// palette reference is resolved against it. It must run on the UI thread.
 func (l Layout) Apply() {
-	for _, t := range tokens {
-		if v, ok := l.values[t]; ok {
+	for _, palette := range []bool{true, false} {
+		for _, t := range tokens {
+			if (t.section == paletteSection) != palette {
+				continue
+			}
+			src, ok := l.values[t]
+			if !ok {
+				src = t.def
+			}
+			v := t.resolve(src)
 			t.set(v)
-		} else {
-			t.set(t.def)
+			t.src, t.applied = src, v
 		}
 	}
 	for _, fn := range derived {
 		fn()
 	}
 	generation.Add(1)
+}
+
+// resolve turns a source value into the value stored in the variable: a
+// palette reference becomes a color from the current palette. A reference
+// that yields the built-in color's bytes stores the built-in value itself.
+func (t *token) resolve(src tokenValue) tokenValue {
+	if src.expr == "" {
+		return src
+	}
+	e, err := parseColorExpr(src.expr)
+	if err != nil {
+		// Only validated expressions reach here; keep the default if the
+		// palette entry disappeared.
+		def := t.def
+		def.expr = ""
+		return def
+	}
+	c := e.resolveWith(currentPaletteColor)
+	if c == tokenRawRGBA(t, t.def) {
+		def := t.def
+		def.expr = ""
+		return def
+	}
+	if t.kind == tokenColor {
+		return tokenValue{c: fromRGBA(c)}
+	}
+	return tokenValue{rgba: c}
+}
+
+// value is the token's current value for display and saving: its source
+// (keeping a palette reference) unless code changed the variable since the
+// last Apply.
+func (t *token) value() tokenValue {
+	if cur := t.current(); cur != t.applied {
+		return cur
+	}
+	return t.src
+}
+
+// sameSource reports whether two values are the same setting: the same
+// palette reference, or the same explicit value.
+func sameSource(a, b tokenValue) bool {
+	if a.expr != "" || b.expr != "" {
+		return a.expr == b.expr
+	}
+	return a == b
 }
 
 // ResetLayout restores every compiled default.
@@ -433,6 +511,12 @@ func LoadLayoutFile(path string) (applied bool, warnings []string, err error) {
 // WriteLayout writes every token with its current value and documentation, so
 // the output is a complete, valid layout file that names every key.
 func WriteLayout(w io.Writer) error {
+	return writeLayout(w, func(t *token) (tokenValue, tokenValue) { return t.value(), t.current() })
+}
+
+// writeLayout writes value(t) for every token; resolved is the color a
+// palette reference stands for, noted in its comment.
+func writeLayout(w io.Writer, value func(t *token) (src, resolved tokenValue)) error {
 	sections := map[string][]*token{}
 	var order []string
 	for _, t := range tokens {
@@ -441,11 +525,19 @@ func WriteLayout(w io.Writer) error {
 		}
 		sections[t.section] = append(sections[t.section], t)
 	}
-	sort.Strings(order)
+	sort.Slice(order, func(i, j int) bool {
+		// The palette comes first: it is what most themes change.
+		if (order[i] == paletteSection) != (order[j] == paletteSection) {
+			return order[i] == paletteSection
+		}
+		return order[i] < order[j]
+	})
 	bw := bufio.NewWriter(w)
 	fmt.Fprintln(bw, "# goro UI layout and theme. Generated by goro --dump-ui-layout.")
 	fmt.Fprintln(bw, "# Copy the lines you want to change into ui-layout.ini next to goro.ini.")
-	fmt.Fprintln(bw, "# Omitted keys keep the built-in default. Colors are #rrggbb or #rrggbbaa.")
+	fmt.Fprintln(bw, "# Omitted keys keep the built-in default. Colors are #rrggbb or #rrggbbaa, or a")
+	fmt.Fprintln(bw, "# [palette] reference such as @panel, @accent darken(15%) or @bad alpha(0.8):")
+	fmt.Fprintln(bw, "# change a palette color and every setting that refers to it follows.")
 	fmt.Fprintln(bw, "# With --ui-dev (or [ui_layout] watch = true) edits apply while the game runs; F10 reloads.")
 	for _, section := range order {
 		fmt.Fprintf(bw, "\n[%s]\n", section)
@@ -457,10 +549,14 @@ func WriteLayout(w io.Writer) error {
 			if t.kind == tokenInt || t.kind == tokenFloat || t.kind == tokenFloat64 {
 				doc = fmt.Sprintf("%s (%g to %g)", doc, t.min, t.max)
 			}
+			src, resolved := value(t)
+			if src.expr != "" {
+				doc = fmt.Sprintf("%s (= %s)", doc, t.format(tokenValue{c: resolved.c, rgba: resolved.rgba}))
+			}
 			if doc != "" {
 				fmt.Fprintf(bw, "# %s\n", doc)
 			}
-			if value := t.format(t.current()); value != "" {
+			if value := t.format(src); value != "" {
 				fmt.Fprintf(bw, "%s = %s\n", t.key, value)
 			} else {
 				fmt.Fprintf(bw, "%s =\n", t.key)
@@ -472,15 +568,9 @@ func WriteLayout(w io.Writer) error {
 
 // WriteDefaultLayout writes the compiled defaults, whatever is applied now.
 func WriteDefaultLayout(w io.Writer) error {
-	saved := make([]tokenValue, len(tokens))
-	for i, t := range tokens {
-		saved[i] = t.current()
-		t.set(t.def)
-	}
-	defer func() {
-		for i, t := range tokens {
-			t.set(saved[i])
-		}
-	}()
-	return WriteLayout(w)
+	return writeLayout(w, func(t *token) (tokenValue, tokenValue) {
+		raw := t.def
+		raw.expr = ""
+		return t.def, raw
+	})
 }

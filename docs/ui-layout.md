@@ -10,10 +10,61 @@ built-in layout is used, exactly as before, and nothing else is read.
 - Copy only the lines you want to change. Omitted keys keep the built-in value,
   and deleting a line puts the default back.
 - Colors are `#rrggbb` or `#rrggbbaa`. The alpha byte makes a surface
-  translucent, for example `window_body = #ffffffc0`.
+  translucent, for example `window_body = #ffffffc0`. A color can also be a
+  palette reference such as `@panel` or `@accent darken(15%)`; see
+  [Palette](#palette-color-themes) below.
 - A file with any malformed line or out-of-range value is rejected as a whole
   with `file:line: reason` in the log, and the previous values stay. Unknown
   keys are only warnings, so a file from an older or newer build still loads.
+
+## Palette (color themes)
+
+A color theme is set at a high level in `[palette]`, the first section of
+the file. It holds the base colors:
+
+| key | used for |
+| --- | --- |
+| `accent` | window borders, title bars, selection, labels |
+| `background` | window background, boards, toasts |
+| `panel` | inset panels and light fills |
+| `panel_alt` | buttons, alternate rows, secondary fills |
+| `text` | body text on windows |
+| `text_dim` | secondary, muted and disabled text |
+| `border` | button, field and control borders |
+| `highlight` | admin names, critical hits, item labels, notices |
+| `good` | positive values, success, healing |
+| `bad` | errors, damage taken, danger |
+| `warning` | warnings, guild markers |
+| `hp`, `sp`, `exp` | HP, SP and experience bars |
+| `world_text` | text over the game world: names, damage numbers, dark chat panels |
+| `shadow` | outlines, shadows, dark translucent backdrops |
+
+Every other color setting defaults to a reference to one of them, written
+`@name` and optionally followed by modifiers, applied left to right in HSL
+space (the same meaning as in Sass):
+
+- `lighten(N%)`, `darken(N%)`: add or subtract N points of lightness;
+- `saturate(N%)`, `desaturate(N%)`: add or subtract N points of saturation;
+- `spin(D)`: rotate the hue by D degrees (-360 to 360);
+- `alpha(A)`: set the opacity, 0 to 1 (or 0% to 100%).
+
+For example `button_down = @panel_alt spin(-0.6) desaturate(2.6%) darken(8.8%)`
+or `panel_background = @shadow ... alpha(0.737)`. The defaults are computed so
+that with the default palette every reference gives exactly the built-in
+color: nothing changes until the palette does. `docs/ui-layout.default.ini`
+shows each reference with the color it gives, for example
+`# window background ... (= #ffffff)`.
+
+Changing a palette color re-colors every setting that refers to it, live with
+`--ui-dev` (the whole file is resolved again on every reload). To change one
+setting only, give it an explicit `#rrggbb[aa]`, which always wins, or its own
+reference (`window_title = @panel_alt lighten(4%)`). Palette entries
+themselves must be explicit colors. The F11 tuner shows and saves references
+as written; after a palette change, Save writes only the palette lines.
+
+[`ui-palette-dark.example.ini`](ui-palette-dark.example.ini) is a complete
+dark theme: a palette plus a few overrides for colors the light theme derives
+as pale fills (title bars, hovers, highlights).
 
 ## Live editing (--ui-dev)
 
@@ -36,7 +87,13 @@ new sizes and colors:
   confirm dialogs, context menus);
 - paint-time HUD elements (hotbar, status icons, notifications, minimap
   markers) read their values on every draw.
-- the map loading screen progress bar (`[loading]`).
+- the map loading screen progress bar (`[loading]`);
+- the game world overlays, read on every draw: HP/SP/hunger/cast bars
+  (`[actor_bars]`), damage, heal, miss and critical numbers
+  (`[damage_numbers]`), names under actors (`[actor_names]`), chat room and
+  vending boards (`[boards]`, redrawn once per reload), speech bubbles
+  (`[speech_bubble]`), ground item names and the fallback item marker
+  (`[item_labels]`), and the Blind/Darkness screen tint (`[blind]`).
 
 ## In-game tuner (F11)
 
@@ -58,7 +115,8 @@ file. Players never see the tuner: without the watch switch F11 does nothing.
 Every window and screen has its own section, named after it (`[shop]`,
 `[trade]`, `[char_select]`, `[login]`, `[guild]`, ...), holding its width and
 height, paddings, gaps, row and header heights, column widths, visible rows,
-offsets and colors. Shared values live in `[theme]` (base colors), `[text]`,
+offsets and colors. The base colors are in `[palette]`; shared values live in
+`[theme]` (shared window colors), `[text]`,
 `[button]`, `[window]` (frame), `[progress_bar]` and the widget sections. The
 full list, with every default, range and description, is
 [`ui-layout.default.ini`](ui-layout.default.ini); in the tuner, pick the
@@ -102,6 +160,24 @@ Values computed from tokens are computed where used, or in an
 After adding a token, regenerate `ui-layout.default.ini`; a test in package
 main (which links every package that registers tokens) fails while it is
 stale.
+
+Every color token needs a default palette reference in
+`ui/rotheme/palette_refs.go`. Add `"section.key": "@base",` with the palette
+color it belongs to and run
+`GORO_UPDATE_PALETTE_REFS=1 go test -run TestPaletteDefaults .`, which writes
+the exact modifiers (a new key missing from the file gets the nearest palette
+color). `TestPaletteDefaultsReproduceBuiltInColors` fails while any color has
+no reference or its reference does not give exactly the built-in color, and
+`TestPaletteChangeReachesEveryReference` checks that changing each palette
+color reaches every setting that refers to it and nothing else.
+
+The literal guard also covers the world overlays: `game/battle`,
+`game/actors`, `game/items.go` (defaults in `game/theme_items.go`) and the
+Blind overlay in `game/effects/blind.go` (`theme_blind.go`). Their
+non-visual numbers (timers, motion curves taken from roBrowser, sprite anchors
+from the original client, drop physics, packet codes) carry `// theme:ok`.
+The skill effects in the rest of `game/effects` reproduce the original
+client's effect data and are not themed.
 
 Offline previews for theming without a server: `GORO_PREVIEW_MAP=prontera`
 with `GORO_PREVIEW_WINDOWS=shop`, or `GORO_PREVIEW_SCREEN=charselect`.
