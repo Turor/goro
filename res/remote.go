@@ -1,6 +1,7 @@
 package res
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -95,8 +96,14 @@ type remoteSource struct {
 	requests     atomic.Int64
 	background   chan struct{}
 	pending      map[string]*remotePending
+	// stale holds paths evicted by InvalidateData: the next read revalidates
+	// them synchronously (a conditional request, so unchanged files cost a 304).
+	stale map[string]struct{}
 	// refreshed is called after a background refresh (tests).
 	refreshed func(string)
+	// updated is called with the server path when a background refresh
+	// stored a changed file, so loaded tables can be rebuilt live.
+	updated func(string)
 }
 
 type remoteIndex struct {
@@ -178,6 +185,7 @@ func newRemoteSource(opts RemoteOptions) (*remoteSource, error) {
 		validated:  make(map[string]struct{}),
 		inflight:   make(map[string]*remoteCall),
 		logged:     make(map[string]struct{}),
+		stale:      make(map[string]struct{}),
 	}, nil
 }
 
@@ -190,6 +198,9 @@ func (m *Manager) EnableRemote(opts RemoteOptions) error {
 		return err
 	}
 	m.remote = source
+	// A background refresh that brought a changed table rebuilds what was
+	// loaded from it on the game thread (ApplyDataInvalidations).
+	source.updated = func(p string) { m.QueueDataInvalidation(p) }
 	// newManager may already have resolved resnametable.txt (reading
 	// clientinfo falls back to aliases) while nothing was streamed; load the
 	// table again so the server's copy counts. EnableRemote must run before
@@ -453,7 +464,11 @@ const (
 func (r *remoteSource) revalidation(p string, meta remoteMeta, generation string) revalidateMode {
 	r.mu.Lock()
 	_, done := r.validated[p]
+	_, stale := r.stale[p]
 	r.mu.Unlock()
+	if stale {
+		return revalidateNow
+	}
 	if done {
 		return revalidateNever
 	}
@@ -475,8 +490,11 @@ func (r *remoteSource) refresh(p, dataPath, metaPath string, meta remoteMeta, ge
 	case err != nil:
 		r.logOnce("refresh", "remote data: cannot refresh cached files: %v", err)
 	case status == http.StatusOK:
+		old, _ := os.ReadFile(dataPath)
 		if err := r.store(dataPath, metaPath, body, remoteMeta{Path: p, ETag: etag, Generation: generation}); err != nil {
 			r.logOnce("cache", "remote data: cannot write cache %s: %v", r.cacheDir, err)
+		} else if r.updated != nil && !bytes.Equal(old, body) {
+			r.updated(p)
 		}
 	case status == http.StatusNotFound:
 		_ = os.Remove(dataPath)
@@ -490,7 +508,25 @@ func (r *remoteSource) refresh(p, dataPath, metaPath string, meta remoteMeta, ge
 func (r *remoteSource) markValidated(p string) {
 	r.mu.Lock()
 	r.validated[p] = struct{}{}
+	delete(r.stale, p)
 	r.mu.Unlock()
+}
+
+// evict marks every server path a client name resolves to as stale, and
+// forgets a cached "not on server" answer, so the next read asks the server
+// again. The cached copy and its ETag stay: the request is conditional.
+func (r *remoteSource) evict(name string) {
+	paths := r.resolve(name)
+	if p := remotePath(name); p != "" {
+		paths = append(paths, p)
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, p := range paths {
+		delete(r.validated, p)
+		delete(r.missing, p)
+		r.stale[p] = struct{}{}
+	}
 }
 
 // fileURL percent-encodes every segment, so Korean names go out as UTF-8.

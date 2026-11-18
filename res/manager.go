@@ -9,6 +9,9 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
+
+	"github.com/kivutar/goro/db"
 )
 
 var errResourceNotFound = errors.New("resource not found")
@@ -55,6 +58,16 @@ type Manager struct {
 	skillTreePositions       map[int]map[int]int
 	skillTreeTextPositions   map[string]map[int]int
 	skillTreePositionsLoaded bool
+	skillTreeViewSource      []byte
+	skillInfoSource          []byte
+	skillInfoReqs            map[int][]db.SkillRequirement
+	skillInfoJobReqs         map[int]map[int][]db.SkillRequirement
+	skillInfoWarnings        []string
+	skillTreeDataLoaded      bool
+	skillTreeData            *db.SkillTreeData
+	skillTreeWarnings        []string
+	skillTreeRetryAt         time.Time
+	invalidations            dataInvalidationQueue
 	songTalks                map[SongTalkKind][]string
 	songTalksLoaded          map[SongTalkKind]bool
 	petTalks                 map[string]map[string]map[string][]string

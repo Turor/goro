@@ -44,8 +44,10 @@ lacks is fetched on first use and kept in
   small and cached after the first time.
 - **Freshness.** Archive files are reused from the cache and revalidated
   (`If-None-Match`) when the server's archive list changes. Cached text
-  tables are served at once and refreshed in the background, so an overlay
-  change shows on the next run.
+  tables are served at once and refreshed in the background. If the refresh
+  brings a changed skill table, the skill tree reloads live; other overlay
+  changes show on the next run. The planned version-based invalidation is
+  in `docs/data-version-invalidation.md`.
 - **Failures.** A 404 is remembered for the run and the lookup falls through
   to the next candidate. A bad file (over 128 MB, cut short) only fails that
   file. If the server cannot be reached (dial, TLS, no response), cached
@@ -59,6 +61,36 @@ lacks is fetched on first use and kept in
   local archives lack; a streamed exact name then wins over a local
   archive's suffix-fallback match. `clientinfo.xml` and `sclientinfo.xml`
   are never streamed, in any directory: the server list stays local.
+
+## Skill trees
+
+Skill trees come from the same client Lua tables roBrowserLegacy reads, all
+streamed, with the Go tables in `db/skill_tree.go` kept only as a fallback.
+The tables are `skillid.turoran4.lub` (SKID),
+`skillinfolist.turoran13.lub` (max level, `_NeedSkillList` and per-job
+`NeedSkillList`), `jobinheritlist.lub` (`JOB_INHERIT_LIST` for the
+1st/2nd/3rd/4th tab lineage, and `JOB_INHERIT_LIST2` for jobs that show
+another job's tree) and `skilltreeview.fourth.lub` (grid positions). Names
+and descriptions come from `skilldescript.turoran.re2.lub`.
+
+- Tabs follow roBrowserLegacy: each job in the inheritance chain adds its
+  skills to its tab, so a Dragon Knight sees Novice and Swordman, then Knight
+  and Lord Knight, then Rune Knight, then Dragon Knight. Mounted and riding
+  variants share their job's tree, and baby jobs show the adult positions.
+- A job the tables do not cover keeps the built-in tree.
+- Loading is lazy (the first skill window, about 70 ms) and validated. The
+  log warns about unknown `SKID.`/`JOBID.` names, skills without
+  `SKILL_INFO_LIST` entries, prerequisites outside a job's tree or above
+  their max level, two skills in one grid cell, unknown parents, and cycles.
+- Live reload: with `--ui-dev`, editing a loose table or pressing F10
+  reloads it. `Manager.QueueDataInvalidation` / `InvalidateData` is the
+  entry point for server-driven invalidation.
+
+Check the real streamed tables (prints warnings and per-job tabs):
+
+```sh
+go test ./res -run TestLuaSkillTreeRealStreamedData -v -skilltree-url "$GORO_DATA_URL"
+```
 
 Check a map without any local data:
 
