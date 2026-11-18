@@ -21,7 +21,7 @@ func TestOverlappingGroundItemsKeepDrawOrder(t *testing.T) {
 	// Different sprites at the same sub-tile position share exactly one depth.
 	// IDs ending in the same digits must still have a deterministic order.
 	for i, id := range []uint32{201, 101, 301} {
-		world.Items[id] = worldstate.FloorItem{ID: id, ItemID: uint16(501 + i), X: 10, Y: 20, SubX: 6, SubY: 6}
+		world.Items[id] = worldstate.FloorItem{ID: id, ItemID: uint32(501 + i), X: 10, Y: 20, SubX: 6, SubY: 6}
 	}
 	projection := testutil.Projection(800, 600, scene.CellCenter(10), scene.CellCenter(20), 0)
 	items := (&WorldMode{}).collectSceneItemEntries(render.NewFrame(800, 600), client.Context{World: world}, projection, time.Now())

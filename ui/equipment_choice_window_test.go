@@ -82,7 +82,7 @@ func TestRepairItemWindowOpensServerList(t *testing.T) {
 	window := RepairItemWindow{}
 	window.OpenList(Context{ScreenW: 800, ScreenH: 600}, network.RepairItemList{
 		Items: []network.RepairItem{
-			{Index: 7, ItemID: 1201, Refine: 5, Cards: [4]uint16{4001, 4002, 0, 0}},
+			{Index: 7, ItemID: 1201, Refine: 5, Cards: [4]uint32{4001, 4002, 0, 0}},
 		},
 	})
 
@@ -103,7 +103,7 @@ func TestWeaponRefineWindowOpensServerList(t *testing.T) {
 	window := WeaponRefineWindow{}
 	window.OpenList(Context{ScreenW: 800, ScreenH: 600}, network.WeaponRefineList{
 		Items: []network.WeaponRefineItem{
-			{Index: 11, ItemID: 1101, Refine: 4, Cards: [4]uint16{4001, 0, 0, 0}},
+			{Index: 11, ItemID: 1101, Refine: 4, Cards: [4]uint32{4001, 0, 0, 0}},
 		},
 	})
 

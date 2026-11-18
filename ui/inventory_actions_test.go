@@ -32,7 +32,7 @@ func TestInventoryActivatesBranches(t *testing.T) {
 		}
 		var bag InventoryBagWindow
 		bag.activateItem(ctx, session.InventoryItem{
-			Index: 12, ItemID: itemID, Type: db.ItemTypeUsable, Amount: 4, Identified: true,
+			Index: 12, ItemID: uint32(itemID), Type: db.ItemTypeUsable, Amount: 4, Identified: true,
 		})
 		// 2008 Sakray CZ_USE_ITEM2: opcode, inventory index, account ID.
 		readIdentifyTestPacket(t, server, []byte{0x39, 0x04, 12, 0, 0x80, 0x84, 0x1E, 0})

@@ -21,7 +21,7 @@ const (
 	makingItemRowH         = 32
 	makingItemRows         = 6
 	makingItemWindowHeight = ROWindowTitleHeight + makingItemTableHeaderH + makingItemRows*makingItemRowH + ROWindowFooterHeight
-	makingItemCancelID     = uint16(0xFFFF)
+	makingItemCancelID     = uint32(0xFFFF)
 )
 
 type MakingItemWindow struct {
@@ -47,7 +47,7 @@ func (w *MakingItemWindow) OpenList(ctx Context, list network.MakingItemList) {
 	w.clampScroll()
 	if len(w.items) == 0 {
 		if w.makeType != 0 && ctx.Network != nil {
-			if err := w.sendRequest(ctx, makingItemCancelID, [3]uint16{}); err != nil {
+			if err := w.sendRequest(ctx, makingItemCancelID, [3]uint32{}); err != nil {
 				glog.Warnf("empty cooking list cancel failed: %v", err)
 			}
 		}
@@ -182,7 +182,7 @@ func (w *MakingItemWindow) rowAtMouse(mouseX, mouseY int) (int, bool) {
 	return row, true
 }
 
-func (w *MakingItemWindow) makeItem(ctx Context, itemID uint16, material [3]uint16) {
+func (w *MakingItemWindow) makeItem(ctx Context, itemID uint32, material [3]uint32) {
 	if ctx.Network == nil {
 		glog.Warnf("item creation failed: not connected")
 		return
@@ -200,14 +200,14 @@ func (w *MakingItemWindow) cancel(ctx Context) {
 		return
 	}
 	if ctx.Network != nil {
-		if err := w.sendRequest(ctx, makingItemCancelID, [3]uint16{}); err != nil {
+		if err := w.sendRequest(ctx, makingItemCancelID, [3]uint32{}); err != nil {
 			glog.Warnf("item creation cancel failed: %v", err)
 		}
 	}
 	w.Close()
 }
 
-func (w *MakingItemWindow) sendRequest(ctx Context, itemID uint16, material [3]uint16) error {
+func (w *MakingItemWindow) sendRequest(ctx Context, itemID uint32, material [3]uint32) error {
 	if w.makeType != 0 {
 		return ctx.Network.SendCooking(w.makeType, itemID)
 	}
@@ -225,7 +225,7 @@ func (w *MakingItemWindow) itemTableRows(ctx Context, items []network.MakingItem
 	return rows
 }
 
-func (w *MakingItemWindow) itemIconImage(manager *res.Manager, itemID uint16) image.Image {
+func (w *MakingItemWindow) itemIconImage(manager *res.Manager, itemID uint32) image.Image {
 	return cachedIdentifiedItemIcon(manager, itemID, &w.icons, &w.iconMiss)
 }
 

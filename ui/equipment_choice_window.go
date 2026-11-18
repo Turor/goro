@@ -26,9 +26,9 @@ const (
 
 type equipmentChoice struct {
 	Index  uint16
-	ItemID uint16
+	ItemID uint32
 	Refine uint8
-	Cards  [4]uint16
+	Cards  [4]uint32
 }
 
 type equipmentChoiceWindow struct {
@@ -220,7 +220,7 @@ func equipmentChoiceDisplayName(ctx Context, item equipmentChoice) string {
 	return name
 }
 
-func (w *equipmentChoiceWindow) itemIconImage(manager *res.Manager, itemID uint16) image.Image {
+func (w *equipmentChoiceWindow) itemIconImage(manager *res.Manager, itemID uint32) image.Image {
 	return cachedIdentifiedItemIcon(manager, itemID, &w.icons, &w.iconMiss)
 }
 

@@ -45,17 +45,17 @@ type ItemInfoWindow struct {
 }
 
 type ItemInfoReadBookRequest struct {
-	ItemID uint16
+	ItemID uint32
 	Title  string
 }
 
 type ItemInfoCardIllustrationRequest struct {
-	ItemID uint16
+	ItemID uint32
 	Title  string
 }
 
 type itemInfoCardRequest struct {
-	ItemID uint16
+	ItemID uint32
 	X, Y   int
 }
 
@@ -225,10 +225,10 @@ func (w *ItemInfoWindow) cardSlotsFooter(ctx Context) []widget.Widget {
 				w.cardSlotIcon(ctx, i, slotCount),
 				itemInfoSlotIcon,
 				itemInfoSlotIcon,
-				cardID,
-				func(cardID uint16) { w.showCardTooltip(ctx, cardID) },
+				uint32(cardID),
+				func(cardID uint32) { w.showCardTooltip(ctx, cardID) },
 				func() { w.tooltip.Hide() },
-				func(cardID uint16, x, y int) { w.openCard(ctx, cardID, x, y) },
+				func(cardID uint32, x, y int) { w.openCard(ctx, cardID, x, y) },
 			),
 		)
 	}
@@ -271,7 +271,7 @@ func (w *ItemInfoWindow) DrawTooltip(ctx Context, screen *render.Frame) {
 	w.tooltip.Draw(ctx, screen)
 }
 
-func (w *ItemInfoWindow) showCardTooltip(ctx Context, cardID uint16) {
+func (w *ItemInfoWindow) showCardTooltip(ctx Context, cardID uint32) {
 	if cardID == 0 || ctx.Input == nil {
 		w.tooltip.Hide()
 		return
@@ -280,14 +280,14 @@ func (w *ItemInfoWindow) showCardTooltip(ctx Context, cardID uint16) {
 	w.tooltip.Show(ctx, inventoryItemDisplayName(ctx.Resources, card), ctx.Input.MouseX, ctx.Input.MouseY+18, ctx.Input.MouseY-6)
 }
 
-func (w *ItemInfoWindow) openCard(ctx Context, cardID uint16, mouseX, mouseY int) {
+func (w *ItemInfoWindow) openCard(ctx Context, cardID uint32, mouseX, mouseY int) {
 	if cardID == 0 {
 		return
 	}
 	w.cardInfoRequest = itemInfoCardRequest{ItemID: cardID, X: mouseX, Y: mouseY}
 }
 
-func (w *ItemInfoWindow) cardSlotCardID(index int) uint16 {
+func (w *ItemInfoWindow) cardSlotCardID(index int) uint32 {
 	if index < 0 || index >= len(w.item.Cards) {
 		return 0
 	}
@@ -295,12 +295,12 @@ func (w *ItemInfoWindow) cardSlotCardID(index int) uint16 {
 	if cardID == 0x00ff || cardID == 0x00fe || cardID == 0xff00 {
 		return 0
 	}
-	return cardID
+	return uint32(cardID)
 }
 
 func (w *ItemInfoWindow) cardSlotIcon(ctx Context, index, slotCount int) image.Image {
 	if cardID := w.cardSlotCardID(index); cardID != 0 {
-		return w.loadItemIcon(ctx.Resources, cardID)
+		return w.loadItemIcon(ctx.Resources, uint32(cardID))
 	}
 	if index < slotCount {
 		return w.loadInterfaceIcon(ctx.Resources, "empty_card_slot")
@@ -316,7 +316,7 @@ func (w *ItemInfoWindow) loadInterfaceIcon(manager *res.Manager, resources ...st
 	return w.loadSlotIcon(manager, "interface:"+strings.Join(resources, "|"), candidates)
 }
 
-func (w *ItemInfoWindow) loadItemIcon(manager *res.Manager, itemID uint16) image.Image {
+func (w *ItemInfoWindow) loadItemIcon(manager *res.Manager, itemID uint32) image.Image {
 	if manager == nil || itemID == 0 {
 		return nil
 	}
@@ -628,13 +628,13 @@ type itemInfoCardSlotWidget struct {
 	image   image.Image
 	width   int
 	height  int
-	cardID  uint16
-	onHover func(uint16)
+	cardID  uint32
+	onHover func(uint32)
 	onLeave func()
-	onOpen  func(uint16, int, int)
+	onOpen  func(uint32, int, int)
 }
 
-func newItemInfoCardSlotWidget(img image.Image, width, height int, cardID uint16, onHover func(uint16), onLeave func(), onOpen func(uint16, int, int)) *itemInfoCardSlotWidget {
+func newItemInfoCardSlotWidget(img image.Image, width, height int, cardID uint32, onHover func(uint32), onLeave func(), onOpen func(uint32, int, int)) *itemInfoCardSlotWidget {
 	w := &itemInfoCardSlotWidget{
 		image:   img,
 		width:   width,

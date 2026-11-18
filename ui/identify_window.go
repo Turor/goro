@@ -36,7 +36,7 @@ type IdentifyWindow struct {
 }
 
 type identifyItemIconKey struct {
-	itemID     uint16
+	itemID     uint32
 	identified bool
 }
 

@@ -27,6 +27,9 @@ type HotkeyList struct {
 }
 
 func ParseHotkeyList(packet Packet) (HotkeyList, bool, error) {
+	if packet.ID == PacketZCShortcutKeyListV3 {
+		return parseHotkeyListV3(packet)
+	}
 	if packet.ID != PacketZCShortcutKeyList {
 		return HotkeyList{}, false, nil
 	}

@@ -46,11 +46,11 @@ type TradeResponse struct {
 
 type TradeItem struct {
 	Amount     uint32
-	ItemID     uint16
+	ItemID     uint32
 	Identified bool
 	Damaged    bool
 	Refine     uint8
-	Cards      [4]uint16
+	Cards      [4]uint32
 }
 
 type TradeAddItemAck struct {
@@ -117,13 +117,13 @@ func ParseTradeItem(packet Packet) (TradeItem, bool, error) {
 	}
 	item := TradeItem{
 		Amount:     binary.LittleEndian.Uint32(packet.Data[2:6]),
-		ItemID:     binary.LittleEndian.Uint16(packet.Data[6:8]),
+		ItemID:     uint32(binary.LittleEndian.Uint16(packet.Data[6:8])),
 		Identified: packet.Data[8] != 0,
 		Damaged:    packet.Data[9] != 0,
 		Refine:     packet.Data[10],
 	}
 	for i := range item.Cards {
-		item.Cards[i] = binary.LittleEndian.Uint16(packet.Data[11+i*2 : 13+i*2])
+		item.Cards[i] = uint32(binary.LittleEndian.Uint16(packet.Data[11+i*2 : 13+i*2]))
 	}
 	return item, true, nil
 }
