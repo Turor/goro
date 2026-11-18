@@ -50,15 +50,15 @@ func (m *WorldMode) SkillIconImage(manager *res.Manager, skill session.Skill) im
 	if img := m.imageCache[key]; img != nil {
 		return img
 	}
-	if _, ok := m.imageMiss[key]; ok {
+	img, _, err := res.LoadTextureWithin(manager, res.SkillIconTextureCandidates(resourceName, int(skill.ID)), scene.FrameRemoteBudget)
+	if errors.Is(err, res.ErrRemotePending) {
 		return nil
 	}
-	img, _, err := res.LoadImageWithin(manager, res.SkillIconTextureCandidates(resourceName, int(skill.ID)), scene.FrameRemoteBudget)
 	if err != nil {
-		if !errors.Is(err, res.ErrRemotePending) {
-			m.imageMiss[key] = struct{}{}
-		}
 		return nil
+	}
+	if res.IsMissingCheckerboard(img) {
+		m.imageMiss[key] = struct{}{}
 	}
 	m.imageCache[key] = img
 	return img

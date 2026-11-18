@@ -470,6 +470,30 @@ func (m *WorldMode) handleNetworkPacket(ctx client.Context, pkt network.Packet, 
 		m.pets().ApplyAction(ctx, petAction)
 		return nil, false
 	}
+	if homunList, ok, err := network.ParseStableHomunculusList(pkt); err != nil {
+		glog.Errorf("parse stable homunculus list 0x%04X: %v", pkt.ID, err)
+	} else if ok {
+		m.companions().ApplyStableHomunculusList(homunList)
+		return nil, false
+	}
+	if petList, ok, err := network.ParseStablePetList(pkt); err != nil {
+		glog.Errorf("parse stable pet list 0x%04X: %v", pkt.ID, err)
+	} else if ok {
+		m.companions().ApplyStablePetList(petList)
+		return nil, false
+	}
+	if owned, ok, err := network.ParseStableOwnedList(pkt); err != nil {
+		glog.Errorf("parse stable owned list 0x%04X: %v", pkt.ID, err)
+	} else if ok {
+		m.companions().ApplyStableOwnedList(owned)
+		return nil, false
+	}
+	if result, ok, err := network.ParseStableResult(pkt); err != nil {
+		glog.Errorf("parse stable result 0x%04X: %v", pkt.ID, err)
+	} else if ok {
+		m.companions().ApplyStableResult(ctx, result)
+		return nil, false
+	}
 	if identifyList, ok, err := network.ParseItemIdentifyList(pkt); err != nil {
 		glog.Errorf("parse item identify list 0x%04X: %v", pkt.ID, err)
 	} else if ok {

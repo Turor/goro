@@ -86,7 +86,7 @@ func TestSoulLinkerRealEffectAssets(t *testing.T) {
 			}
 			paths := append([]string{c.TextureFile}, c.TextureFiles...)
 			for _, p := range paths {
-				if p != "" && m.EffectFileTexture(manager, p) == nil {
+				if p != "" && !TextureLoaded(m.EffectFileTexture(manager, p)) {
 					t.Errorf("effect %d missing %s", id, p)
 				}
 			}

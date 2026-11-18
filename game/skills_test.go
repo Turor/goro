@@ -1193,7 +1193,7 @@ func TestBlacksmithEffectsWithClientAssets(t *testing.T) {
 		ticks []int
 	}{
 		{effects.HasteUp, []int{0, 30}}, {effects.RepairWeapon, []int{20, 55}},
-		{effects.CrashEarth, []int{30}}, {effects.WeaponPerfect, []int{0}},
+		{effects.CrashEarth, []int{0}}, {effects.WeaponPerfect, []int{0}},
 		{effects.MaximizePower, []int{0, 40, 47, 65}}, {effects.Overthrust, []int{0, 0}},
 	} {
 		m := &WorldMode{}
@@ -1226,7 +1226,7 @@ func TestBlacksmithEffectsWithClientAssets(t *testing.T) {
 		}
 		if tc.id == effects.CrashEarth {
 			spec, _ := effects.Lookup(tc.id)
-			if spec.CameraShakeDelay != 35*db.EffectFrameDuration || m.scheduledSounds[0].paths[0] != "effect\\wizard_fire_pillar_b.wav" {
+			if spec.CameraShakeDelay != 350*time.Millisecond || m.scheduledSounds[0].paths[0] != "effect\\black_hammerfall.wav" {
 				t.Fatal("Hammer Fall must use the native impact sound and quake tick")
 			}
 		}
@@ -1585,7 +1585,7 @@ func TestGunslingerAssetsAndTiming(t *testing.T) {
 				files = append(files, c.TextureFile)
 			}
 			for _, file := range files {
-				if m.effects().EffectFileTexture(ctx.Resources, file) == nil {
+				if !effects.TextureLoaded(m.effects().EffectFileTexture(ctx.Resources, file)) {
 					t.Fatalf("effect %d missing texture %s", tc.id, file)
 				}
 			}
@@ -4521,7 +4521,7 @@ func TestBardPangVoiceAndSongAssets(t *testing.T) {
 		effect := m.effects().Active[0]
 		spec, _ := effects.Lookup(effect.EffectID)
 		for _, file := range spec.Components[0].TextureFiles {
-			if m.effects().EffectFileTexture(ctx.Resources, file) == nil {
+			if !effects.TextureLoaded(m.effects().EffectFileTexture(ctx.Resources, file)) {
 				t.Fatalf("missing texture %s", file)
 			}
 		}
