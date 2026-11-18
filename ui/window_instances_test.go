@@ -35,7 +35,7 @@ func TestItemDescriptionsAndCardArtworkAreIndependent(t *testing.T) {
 	ctx, manager, app := newWindowInstanceTest()
 	ctx.Resources = cardIllustrationTestManager(t)
 	var windows ItemWindows
-	item := session.InventoryItem{ItemID: 2607, Type: db.ItemTypeArmor, Location: db.EquipAccessory1, Equip: true, Identified: true, Refine: 3, Cards: [4]uint16{4001}}
+	item := session.InventoryItem{ItemID: 2607, Type: db.ItemTypeArmor, Location: db.EquipAccessory1, Equip: true, Identified: true, Refine: 3, Cards: [4]uint32{4001}}
 	windows.openItem(ctx, item, 100, 100)
 	item.Refine = 7
 	windows.openItem(ctx, item, 100, 100)

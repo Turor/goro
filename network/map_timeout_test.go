@@ -19,7 +19,7 @@ func attachMapTimeoutTestConnection(client *Client) (net.Conn, net.Conn) {
 	client.conn = local
 	client.sendCh = sendCh
 	client.mu.Unlock()
-	go client.readLoop(local)
+	go client.readLoop(local, client.framer)
 	go client.writeLoop(local, sendCh)
 	return local, remote
 }

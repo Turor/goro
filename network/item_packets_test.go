@@ -398,10 +398,10 @@ func TestParseMakableItemList(t *testing.T) {
 	if !ok || len(list.Items) != 2 {
 		t.Fatalf("makable item list ok=%v value=%+v", ok, list)
 	}
-	if list.Items[0].ItemID != 501 || list.Items[0].Material != [3]uint16{1000, 990, 5} {
+	if list.Items[0].ItemID != 501 || list.Items[0].Material != [3]uint32{1000, 990, 5} {
 		t.Fatalf("first makable item = %+v", list.Items[0])
 	}
-	if list.Items[1].ItemID != 713 || list.Items[1].Material != [3]uint16{} {
+	if list.Items[1].ItemID != 713 || list.Items[1].Material != [3]uint32{} {
 		t.Fatalf("second makable item = %+v", list.Items[1])
 	}
 }
@@ -442,8 +442,8 @@ func TestParseRepairItemListAndAck(t *testing.T) {
 	listData := make([]byte, 4+13*2)
 	binary.LittleEndian.PutUint16(listData[0:2], PacketZCRepairItemList)
 	binary.LittleEndian.PutUint16(listData[2:4], uint16(len(listData)))
-	writeTestEquipmentChoice(listData[4:17], 7, 1201, 5, [4]uint16{4001, 4002, 0, 0})
-	writeTestEquipmentChoice(listData[17:30], 9, 2301, 2, [4]uint16{0, 0, 0, 0})
+	writeTestEquipmentChoice(listData[4:17], 7, 1201, 5, [4]uint32{4001, 4002, 0, 0})
+	writeTestEquipmentChoice(listData[17:30], 9, 2301, 2, [4]uint32{0, 0, 0, 0})
 
 	list, ok, err := ParseRepairItemList(Packet{ID: PacketZCRepairItemList, Data: listData})
 	if err != nil {
@@ -452,7 +452,7 @@ func TestParseRepairItemListAndAck(t *testing.T) {
 	if !ok || len(list.Items) != 2 {
 		t.Fatalf("repair item list ok=%v value=%+v", ok, list)
 	}
-	if list.Items[0] != (RepairItem{Index: 7, ItemID: 1201, Refine: 5, Cards: [4]uint16{4001, 4002, 0, 0}}) {
+	if list.Items[0] != (RepairItem{Index: 7, ItemID: 1201, Refine: 5, Cards: [4]uint32{4001, 4002, 0, 0}}) {
 		t.Fatalf("first repair item = %+v", list.Items[0])
 	}
 	if list.Items[1] != (RepairItem{Index: 9, ItemID: 2301, Refine: 2}) {
@@ -476,7 +476,7 @@ func TestParseWeaponRefineListAndAck(t *testing.T) {
 	listData := make([]byte, 4+13)
 	binary.LittleEndian.PutUint16(listData[0:2], PacketZCWeaponRefineList)
 	binary.LittleEndian.PutUint16(listData[2:4], uint16(len(listData)))
-	writeTestEquipmentChoice(listData[4:17], 11, 1101, 4, [4]uint16{4001, 0, 0, 0})
+	writeTestEquipmentChoice(listData[4:17], 11, 1101, 4, [4]uint32{4001, 0, 0, 0})
 
 	list, ok, err := ParseWeaponRefineList(Packet{ID: PacketZCWeaponRefineList, Data: listData})
 	if err != nil {
@@ -485,7 +485,7 @@ func TestParseWeaponRefineListAndAck(t *testing.T) {
 	if !ok || len(list.Items) != 1 {
 		t.Fatalf("weapon refine list ok=%v value=%+v", ok, list)
 	}
-	if list.Items[0] != (WeaponRefineItem{Index: 11, ItemID: 1101, Refine: 4, Cards: [4]uint16{4001, 0, 0, 0}}) {
+	if list.Items[0] != (WeaponRefineItem{Index: 11, ItemID: 1101, Refine: 4, Cards: [4]uint32{4001, 0, 0, 0}}) {
 		t.Fatalf("weapon refine item = %+v", list.Items[0])
 	}
 
@@ -533,18 +533,18 @@ func TestBuildMakingArrowPacket(t *testing.T) {
 }
 
 func TestBuildMakingItemPacket(t *testing.T) {
-	packet := BuildMakingItemPacket(501, [3]uint16{1000, 990, 5})
+	packet := BuildMakingItemPacket(501, [3]uint32{1000, 990, 5})
 	if len(packet) != 10 || ID(packet) != PacketCZReqMakingItem {
 		t.Fatalf("unexpected making item packet header: % X", packet)
 	}
 	if got := binary.LittleEndian.Uint16(packet[2:4]); got != 501 {
 		t.Fatalf("making item id = %d, want 501", got)
 	}
-	if got := [3]uint16{
-		binary.LittleEndian.Uint16(packet[4:6]),
-		binary.LittleEndian.Uint16(packet[6:8]),
-		binary.LittleEndian.Uint16(packet[8:10]),
-	}; got != [3]uint16{1000, 990, 5} {
+	if got := [3]uint32{
+		uint32(binary.LittleEndian.Uint16(packet[4:6])),
+		uint32(binary.LittleEndian.Uint16(packet[6:8])),
+		uint32(binary.LittleEndian.Uint16(packet[8:10])),
+	}; got != [3]uint32{1000, 990, 5} {
 		t.Fatalf("making item material = %v", got)
 	}
 }
@@ -552,7 +552,7 @@ func TestBuildMakingItemPacket(t *testing.T) {
 func TestBuildCookingPacket(t *testing.T) {
 	for _, tt := range []struct {
 		makeType uint16
-		itemID   uint16
+		itemID   uint32
 		want     []byte
 	}{
 		{1, 12001, []byte{0x5b, 0x02, 1, 0, 0xe1, 0x2e}},
@@ -566,7 +566,7 @@ func TestBuildCookingPacket(t *testing.T) {
 }
 
 func TestBuildRepairItemPacket(t *testing.T) {
-	packet := BuildRepairItemPacket(RepairItem{Index: 7, ItemID: 1201, Refine: 5, Cards: [4]uint16{4001, 4002, 0, 0}})
+	packet := BuildRepairItemPacket(RepairItem{Index: 7, ItemID: 1201, Refine: 5, Cards: [4]uint32{4001, 4002, 0, 0}})
 	if len(packet) != 15 || ID(packet) != PacketCZReqItemRepair {
 		t.Fatalf("unexpected repair packet header: % X", packet)
 	}
@@ -579,12 +579,12 @@ func TestBuildRepairItemPacket(t *testing.T) {
 	if packet[6] != 5 {
 		t.Fatalf("repair refine = %d, want 5", packet[6])
 	}
-	if got := [4]uint16{
-		binary.LittleEndian.Uint16(packet[7:9]),
-		binary.LittleEndian.Uint16(packet[9:11]),
-		binary.LittleEndian.Uint16(packet[11:13]),
-		binary.LittleEndian.Uint16(packet[13:15]),
-	}; got != [4]uint16{4001, 4002, 0, 0} {
+	if got := [4]uint32{
+		uint32(binary.LittleEndian.Uint16(packet[7:9])),
+		uint32(binary.LittleEndian.Uint16(packet[9:11])),
+		uint32(binary.LittleEndian.Uint16(packet[11:13])),
+		uint32(binary.LittleEndian.Uint16(packet[13:15])),
+	}; got != [4]uint32{4001, 4002, 0, 0} {
 		t.Fatalf("repair cards = %v", got)
 	}
 }
@@ -614,14 +614,14 @@ func TestBuildItemIdentifyPacket(t *testing.T) {
 	}
 }
 
-func writeTestEquipmentChoice(dst []byte, index, itemID uint16, refine uint8, cards [4]uint16) {
+func writeTestEquipmentChoice(dst []byte, index uint16, itemID uint32, refine uint8, cards [4]uint32) {
 	binary.LittleEndian.PutUint16(dst[0:2], index)
-	binary.LittleEndian.PutUint16(dst[2:4], itemID)
+	binary.LittleEndian.PutUint16(dst[2:4], uint16(itemID))
 	dst[4] = refine
-	binary.LittleEndian.PutUint16(dst[5:7], cards[0])
-	binary.LittleEndian.PutUint16(dst[7:9], cards[1])
-	binary.LittleEndian.PutUint16(dst[9:11], cards[2])
-	binary.LittleEndian.PutUint16(dst[11:13], cards[3])
+	binary.LittleEndian.PutUint16(dst[5:7], uint16(cards[0]))
+	binary.LittleEndian.PutUint16(dst[7:9], uint16(cards[1]))
+	binary.LittleEndian.PutUint16(dst[9:11], uint16(cards[2]))
+	binary.LittleEndian.PutUint16(dst[11:13], uint16(cards[3]))
 }
 
 func TestParseEquippedArrow(t *testing.T) {

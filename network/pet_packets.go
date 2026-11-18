@@ -51,7 +51,7 @@ type PetProperty struct {
 
 type PetFeedResult struct {
 	Success bool
-	ItemID  uint16
+	ItemID  uint32
 }
 
 type PetStateChange struct {
@@ -115,7 +115,7 @@ func ParsePetFeedResult(packet Packet) (PetFeedResult, bool, error) {
 	}
 	return PetFeedResult{
 		Success: packet.Data[2] != 0,
-		ItemID:  binary.LittleEndian.Uint16(packet.Data[3:5]),
+		ItemID:  uint32(binary.LittleEndian.Uint16(packet.Data[3:5])),
 	}, true, nil
 }
 
