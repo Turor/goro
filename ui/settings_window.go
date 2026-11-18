@@ -223,6 +223,30 @@ func (w *SettingsWindow) displayTree(ctx client.Context) widget.Widget {
 				w.refresh(ctx)
 			}),
 		),
+
+		rotheme.Checkbox(
+			checkbox.Checked(settingsFXAA(ctx)),
+			checkbox.LabelOpt("FXAA"),
+			checkbox.OnToggle(func(enabled bool) {
+				if ctx.Runtime != nil {
+					ctx.Runtime.SetFXAA(enabled)
+				}
+				w.saveSettings(ctx)
+				w.refresh(ctx)
+			}),
+		),
+
+		rotheme.Checkbox(
+			checkbox.Checked(settingsEnhancedLighting(ctx)),
+			checkbox.LabelOpt("Enhanced lighting"),
+			checkbox.OnToggle(func(enabled bool) {
+				if ctx.Runtime != nil {
+					ctx.Runtime.SetEnhancedLighting(enabled)
+				}
+				w.saveSettings(ctx)
+				w.refresh(ctx)
+			}),
+		),
 	).Padding(float32(settingsPad)).Gap(float32(settingsGap))
 }
 
@@ -413,6 +437,8 @@ func (w *SettingsWindow) saveSettings(ctx client.Context) {
 		MSAA:             settingsMSAA(ctx),
 		Bloom:            settingsBloom(ctx),
 		SSAO:             settingsSSAO(ctx),
+		FXAA:             settingsFXAA(ctx),
+		EnhancedLighting: settingsEnhancedLighting(ctx),
 		BGMVolume:        settingsVolumeBGM(ctx),
 		SFXVolume:        settingsVolumeSFX(ctx),
 		NoShift:          settingsNoShift(ctx),
@@ -553,4 +579,18 @@ func settingsSSAO(ctx client.Context) bool {
 		return ctx.Runtime.SSAO()
 	}
 	return ctx.Config.Render.SSAO
+}
+
+func settingsFXAA(ctx client.Context) bool {
+	if ctx.Runtime != nil {
+		return ctx.Runtime.FXAA()
+	}
+	return ctx.Config.Render.FXAA
+}
+
+func settingsEnhancedLighting(ctx client.Context) bool {
+	if ctx.Runtime != nil {
+		return ctx.Runtime.EnhancedLighting()
+	}
+	return ctx.Config.Render.EnhancedLighting
 }

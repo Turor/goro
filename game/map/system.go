@@ -30,6 +30,8 @@ type System struct {
 	rswEffectSource  *res.RSW
 	rswEffects       []rswEffectEmitter
 	Night            bool
+	waterRetain      *waterRetainCache
+	animatedRetain   map[animatedRetainKey]*animatedRetainMesh
 }
 
 func (m *System) ResetGeometry() {
@@ -41,9 +43,13 @@ func (m *System) ResetGeometry() {
 	m.rsmAnimScratch.reset()
 	m.rsmPlacementGrid = nil
 	m.gndMeshCache = nil
+	m.waterRetain = nil
+	m.animatedRetain = nil
 }
 
 func (m *System) InvalidateLighting() {
 	m.gndMeshCache = nil
 	m.rsmMeshCache = make(map[int][]retainedWorldMesh)
+	m.waterRetain = nil
+	m.animatedRetain = nil
 }

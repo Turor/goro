@@ -1325,6 +1325,11 @@ func (m *WorldMode) Draw(ctx client.Context, screen *render.Frame) {
 	maps.ClearWorldScene(screen, ctx.World.MapName)
 	var actorOverlays []scene.ActorDrawEntry
 	screen.SetCamera3D(projection.RenderCameraWithFog(fog))
+	enhanced := ctx.Config.Render.EnhancedLighting
+	if ctx.Runtime != nil {
+		enhanced = ctx.Runtime.EnhancedLighting()
+	}
+	m.mapScene.SubmitMapLighting(screen, ctx.World.GND, ctx.World.RSW, projection, enhanced)
 	vertexFog := scene.SceneFog{}
 
 	if ctx.World.GND != nil {

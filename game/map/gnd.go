@@ -30,36 +30,46 @@ func LoadGND(manager *res.Manager, mapName string) (*res.GND, string, error) {
 }
 
 func (m *System) DrawGNDWater(screen *render.Frame, manager *res.Manager, gnd *res.GND, rsw *res.RSW, projection scene.Projection, now time.Time, fog scene.SceneFog) {
-	water, ok := mapWater(gnd, rsw)
-	if !ok {
+	if m == nil || screen == nil {
 		return
 	}
 	width := screen.Bounds().Dx()
 	height := screen.Bounds().Dy()
-	startX, endX, startY, endY, ok := gndDrawBoundsWithMargin(gnd, projection, width, height, 4)
+	chunks := m.BuildWaterChunks(gnd, rsw, projection, now, width, height)
+	if len(chunks) == 0 || m.waterRetain == nil || len(m.waterRetain.vertices) == 0 {
+		return
+	}
+	chunk := chunks[0]
+	water, ok := mapWater(gnd, rsw)
 	if !ok {
 		return
 	}
-	waterFrame := waterFrameForTime(water, now)
-	waterTint := waterTint(water, rsw)
-	waterOffset := waterOffsetForTime(water, now)
-	var texture *render.Image
-	textureLoaded := false
-	for y := startY; y <= endY; y++ {
-		for x := startX; x <= endX; x++ {
-			cell, ok := gnd.Cell(x, y)
-			if !ok || cell.Top < 0 {
-				continue
-			}
-			if waterDraw, ok := newGNDWaterDraw(x, y, cell, water, waterTint, waterOffset); ok {
-				if !textureLoaded {
-					texture = m.waterTexture(manager, int(water.Type), waterFrame)
-					textureLoaded = true
-				}
-				m.drawWaterSurface(screen, texture, waterDraw, projection, fog)
-			}
+	texture := m.WhitePixel
+	if manager != nil && m.Textures != nil {
+		if loaded := m.waterTexture(manager, int(water.Type), chunk.Anim.Frame); loaded != nil {
+			texture = loaded
 		}
 	}
+	if texture == nil {
+		if m.WhitePixel == nil {
+			m.WhitePixel = render.NewImage(1, 1)
+			m.WhitePixel.Fill(color.White)
+		}
+		texture = m.WhitePixel
+	}
+	cache := m.waterRetain
+	if cache.mesh == nil {
+		options := render.DrawTrianglesOptions{
+			Filter:     render.FilterLinear,
+			Address:    render.AddressRepeat,
+			DepthTest:  true,
+			DepthWrite: false,
+		}
+		cache.mesh = render.NewWorldMeshWithLightmap(chunk.Vertices, chunk.Indices, texture, nil, &options)
+	}
+	cache.mesh.SetTexture(texture)
+	cache.mesh.SetUVOffset([2]float32{float32(chunk.Anim.UVOffset / 360), 0})
+	screen.DrawWorldMesh(cache.mesh)
 }
 
 func gndDrawBounds(gnd *res.GND, projection scene.Projection, screenWidth, screenHeight int) (int, int, int, int, bool) {

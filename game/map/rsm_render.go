@@ -107,11 +107,23 @@ func (m *System) visibleRSMPlacements(rsw *res.RSW, gnd *res.GND, projection sce
 				if math.Abs(dx) > queryRadius || math.Abs(dy) > queryRadius {
 					continue
 				}
+				if !rsmPlacementInsideFrustum(projection, placement) {
+					continue
+				}
 				visible = append(visible, placement)
 			}
 		}
 	}
 	return visible
+}
+
+func rsmPlacementInsideFrustum(projection scene.Projection, placement ModelPlacement) bool {
+	for _, value := range projection.ViewProjection {
+		if value != 0 {
+			return projection.VisibleForTriangle(placement.BaseX, placement.BaseY, 0)
+		}
+	}
+	return true
 }
 
 func (m *System) rsmPlacementGridFor(rsw *res.RSW, gnd *res.GND) *rsmPlacementGrid {
@@ -289,21 +301,60 @@ func (s *animatedRSMScratch) reset() {
 }
 
 func (m *System) DrawAnimatedRSMPlacement(screen *render.Frame, manager *res.Manager, rsw *res.RSW, rsm *res.RSM, visible ModelPlacement, frame int) {
-	context, ok := m.rsmPlacementContext(rsm, rsw, visible)
-	if !ok {
+	if m == nil || screen == nil {
 		return
 	}
-	nodeMatrices := m.animatedRSMNodeMatrices(rsm, frame)
-	batchOrder := m.rsmAnimScratch.batches[:0]
-	for _, nodeIndex := range context.nodeIndices {
-		node := &rsm.Nodes[nodeIndex]
-		m.drawAnimatedRSMNodeTriangles(screen, manager, rsm, node, nodeMatrices[node.Name], context, visible, &batchOrder)
+	if m.WhitePixel == nil {
+		m.WhitePixel = render.NewImage(1, 1)
+		m.WhitePixel.Fill(color.White)
 	}
-	for i := range batchOrder {
-		batchOrder[i].Flush()
-		batchOrder[i].Clear()
+	nodes := m.BuildAnimatedNodes(rsm, rsw, visible, frame)
+	for _, node := range nodes {
+		cached := m.animatedRetain[animatedRetainKey{rsm: rsm, name: node.Name}]
+		if cached == nil || len(cached.vertices) == 0 {
+			continue
+		}
+		texture := m.WhitePixel
+		options := render.DrawTrianglesOptions{
+			Filter:     render.FilterLinear,
+			Address:    render.AddressRepeat,
+			DepthTest:  true,
+			DepthWrite: true,
+		}
+		if src := rsmNodeByName(rsm, node.Name); src != nil && len(src.Faces) > 0 && len(src.Vertices) > int(src.Faces[0].VertexIndices[0]) && len(src.Vertices) > int(src.Faces[0].VertexIndices[1]) && len(src.Vertices) > int(src.Faces[0].VertexIndices[2]) {
+			face := src.Faces[0]
+			a := vectorFromRSM(src.Vertices[face.VertexIndices[0]])
+			b := vectorFromRSM(src.Vertices[face.VertexIndices[1]])
+			c := vectorFromRSM(src.Vertices[face.VertexIndices[2]])
+			options = rsmDrawOptionsForVertices(render.FilterLinear, render.AddressRepeat, a, b, c, visible.Index)
+			if manager != nil {
+				name, _ := rsmFaceTexture(rsm, src, face)
+				if loaded := m.groundTexture(manager, name); loaded != nil {
+					texture = loaded
+				}
+			}
+		}
+		if cached.mesh == nil {
+			cached.mesh = render.NewWorldMeshWithLightmap(cached.vertices, cached.indices, texture, nil, &options)
+		} else if texture != m.WhitePixel {
+			cached.mesh.SetTexture(texture)
+		}
+		cached.mesh.SetModel(mat4ToFloat32(node.Transform))
+		screen.DrawWorldMesh(cached.mesh)
 	}
-	m.rsmAnimScratch.batches = batchOrder[:0]
+	m.rsmAnimScratch.reset()
+}
+
+func rsmNodeByName(rsm *res.RSM, name string) *res.RSMNode {
+	if rsm == nil {
+		return nil
+	}
+	for i := range rsm.Nodes {
+		if rsm.Nodes[i].Name == name {
+			return &rsm.Nodes[i]
+		}
+	}
+	return nil
 }
 
 func animatedRSMBatchFor(screen *render.Frame, batches *[]scene.ModelDrawBatch, texture *render.Image, options render.DrawTrianglesOptions) *scene.ModelDrawBatch {

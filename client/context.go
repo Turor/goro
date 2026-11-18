@@ -70,6 +70,10 @@ type RuntimeSettings interface {
 	SetBloom(bool)
 	SSAO() bool
 	SetSSAO(bool)
+	FXAA() bool
+	SetFXAA(bool)
+	EnhancedLighting() bool
+	SetEnhancedLighting(bool)
 }
 
 func (c Context) ScriptPath() string {
