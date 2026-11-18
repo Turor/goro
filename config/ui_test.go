@@ -31,6 +31,7 @@ func TestUISettingsRoundTrip(t *testing.T) {
 		GuildPosition:            WindowPosition{X: 60, Y: 70, Set: true},
 		CartPosition:             WindowPosition{X: 70, Y: 80, Set: true},
 		WorldMapPosition:         WindowPosition{X: 80, Y: 90, Set: true},
+		WarpraPosition:           WindowPosition{X: 85, Y: 95, Set: true},
 		EmotesPosition:           WindowPosition{X: 90, Y: 100, Set: true},
 		ChatShortcutsPosition:    WindowPosition{X: 100, Y: 110, Set: true},
 		SettingsPosition:         WindowPosition{X: 110, Y: 120, Set: true},
