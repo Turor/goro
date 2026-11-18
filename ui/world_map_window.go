@@ -108,7 +108,7 @@ func (w *WorldMapWindow) widgetTree(ctx Context) widget.Widget {
 			w.board.showNames = w.showNames
 			w.redraw(ctx)
 		}),
-		Size(float32(w.width), float32(w.height)), Content(w.board))
+		Size(float32(w.width), float32(w.baseHeight())), Content(w.board))
 }
 
 // Capture only data the atlas uses, never live session/world pointers in Draw.

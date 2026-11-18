@@ -44,9 +44,13 @@ type windowFrame struct {
 	onClose    func()
 	background *widget.Color
 	radiusSet  bool
-	opacity    float32
-	layoutGen  uint64
-	title      *primitives.TextWidget
+	titleBar   bool
+	// heightDelta is how much the title and footer tokens changed the
+	// window's height from the size it asked for.
+	heightDelta int
+	opacity     float32
+	layoutGen   uint64
+	title       *primitives.TextWidget
 	// titleStyle is what the theme last gave the title; a title restyled by
 	// its window since then keeps its own color or size across reloads.
 	titleColor widget.Color
@@ -93,8 +97,10 @@ func (f *windowFrame) Layout(ctx widget.Context, constraints geometry.Constraint
 	return f.BoxWidget.Layout(ctx, constraints)
 }
 
-// Title and footer heights stay compile-time: about 90 window sizes are
-// constant sums of them, so changing them needs those sizes to move first.
+// ROWindowTitleHeight and ROWindowFooterHeight are the base heights the
+// window sizes are written against. The live heights are the layout tokens
+// windowTitleHeight and windowFooterHeight; Win grows or shrinks a window by
+// the difference, so the content area keeps its size.
 const (
 	ROWindowTitleHeight   = 28
 	ROWindowFooterHeight  = 42
@@ -111,6 +117,8 @@ var (
 	windowTitleButtonPadR         = 7
 	windowTitlePadL       float32 = 12
 	windowBorderWidth     float32 = 1
+	windowTitleHeight             = ROWindowTitleHeight
+	windowFooterHeight            = ROWindowFooterHeight
 )
 
 func Win(options ...WindowOption) widget.Widget {
@@ -144,7 +152,7 @@ func Win(options ...WindowOption) widget.Widget {
 			CrossAlign(primitives.CrossAxisCenter).
 			PaddingLeft(windowTitlePadL).
 			PaddingRight(float32(windowTitleButtonPadR)).
-			Height(ROWindowTitleHeight)
+			Height(float32(windowTitleHeight))
 		children = append(children, roTitleBar(titleContent))
 	}
 	if cfg.content != nil {
@@ -158,7 +166,7 @@ func Win(options ...WindowOption) widget.Widget {
 		).
 			CrossAlign(primitives.CrossAxisStretch).
 			PaddingXY(float32(ROWindowFooterPadding), 0).
-			Height(ROWindowFooterHeight - 1)
+			Height(float32(windowFooterHeight - 1))
 		footer := primitives.Box(
 			primitives.HBox(
 				primitives.Expanded(
@@ -180,23 +188,32 @@ func Win(options ...WindowOption) widget.Widget {
 	if cfg.background != nil {
 		background = *cfg.background
 	}
+	heightDelta := 0
+	if cfg.titleBar {
+		heightDelta += windowTitleHeight - ROWindowTitleHeight
+	}
+	if cfg.footer != nil {
+		heightDelta += windowFooterHeight - ROWindowFooterHeight
+	}
 	box := primitives.Box(children...).
 		CrossAlign(primitives.CrossAxisStretch).
 		Width(cfg.width).
-		Height(cfg.height).
+		Height(cfg.height+float32(heightDelta)).
 		Background(background).
 		BorderStyle(windowBorderWidth, rotheme.Default.Colors.WindowBorder).
 		Rounded(cfg.radius)
 	return &windowFrame{
-		BoxWidget:  box,
-		onClose:    cfg.onClose,
-		background: cfg.background,
-		radiusSet:  cfg.radiusSet,
-		opacity:    1,
-		layoutGen:  rotheme.Generation(),
-		title:      titleText,
-		titleColor: rotheme.Default.Colors.TitleText,
-		titleSize:  rotheme.Default.Typography.TextSize,
+		BoxWidget:   box,
+		onClose:     cfg.onClose,
+		background:  cfg.background,
+		radiusSet:   cfg.radiusSet,
+		titleBar:    cfg.titleBar,
+		heightDelta: heightDelta,
+		opacity:     1,
+		layoutGen:   rotheme.Generation(),
+		title:       titleText,
+		titleColor:  rotheme.Default.Colors.TitleText,
+		titleSize:   rotheme.Default.Typography.TextSize,
 	}
 }
 
@@ -319,7 +336,7 @@ func windowTitleButtons(buttons []windowTitleButton, closeButton bool, onClose f
 
 func windowCloseButton(enabled bool, onClose func()) widget.Widget {
 	if !enabled {
-		return primitives.Box().Width(windowTitleButtonSize).Height(ROWindowTitleHeight)
+		return primitives.Box().Width(windowTitleButtonSize).Height(float32(windowTitleHeight))
 	}
 	return windowTitleIconButton(rotheme.IconButtonClose, onClose)
 }
@@ -331,7 +348,7 @@ func windowTitleIconButton(kind rotheme.IconButtonKind, onClick func()) widget.W
 		primitives.Expanded(primitives.Box()),
 	).
 		Width(windowTitleButtonSize).
-		Height(ROWindowTitleHeight)
+		Height(float32(windowTitleHeight))
 }
 
 type Window struct {
@@ -350,6 +367,7 @@ type Window struct {
 	dragDY       int
 	dragBottom   int
 	titleButtons int
+	heightDelta  int
 	content      widget.Widget
 	placed       widget.Widget
 	published    widget.Widget
@@ -422,6 +440,7 @@ func (w *Window) IsOpen() bool {
 func (w *Window) SetContent(content widget.Widget) {
 	w.cancelDragLayer(w.ctx)
 	w.content = content
+	w.adoptFrameHeight(content)
 	if overlay := w.positionedOverlay(); overlay != nil {
 		damage := overlay.setChild(content, windowWidgetContext(w.ctx))
 		w.setOpacity(1)
@@ -431,6 +450,26 @@ func (w *Window) SetContent(content widget.Widget) {
 	}
 	w.placed = nil
 	w.setOpacity(1)
+}
+
+// adoptFrameHeight follows the title and footer height tokens: the window
+// takes the frame's grown or shrunk height and its title bar drag height.
+func (w *Window) adoptFrameHeight(content widget.Widget) {
+	frame, ok := content.(*windowFrame)
+	if !ok {
+		return
+	}
+	if frame.titleBar && w.titleHeight > 0 {
+		w.titleHeight = windowTitleHeight
+	}
+	if frame.heightDelta == w.heightDelta {
+		return
+	}
+	w.height += frame.heightDelta - w.heightDelta
+	w.heightDelta = frame.heightDelta
+	if overlay := w.positionedOverlay(); overlay != nil {
+		overlay.setFrame(w.x, w.y, w.width, w.height)
+	}
 }
 
 func (w *Window) RebindContent(ctx client.Context, content widget.Widget) {
@@ -497,7 +536,15 @@ func (w *Window) Unpublish(ctx client.Context) {
 	w.published = nil
 }
 
+// baseHeight is the height the window asked for, before the title and
+// footer token delta; build window trees from it so the delta is not doubled.
+func (w *Window) baseHeight() int {
+	return w.height - w.heightDelta
+}
+
+// SetSize takes the base size; the title and footer token delta is added.
 func (w *Window) SetSize(width, height int) {
+	height += w.heightDelta
 	if w.width == width && w.height == height {
 		return
 	}
