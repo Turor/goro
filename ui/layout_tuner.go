@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/gogpu/ui/core/textfield"
 	"github.com/gogpu/ui/primitives"
@@ -137,7 +138,13 @@ func (t *LayoutTuner) widgetTree(ctx Context) widget.Widget {
 	t.page = minInt(t.page, pages-1)
 	start := t.page * layoutTunerRows
 	shown := all[start:minInt(len(all), start+layoutTunerRows)]
-	header := fmt.Sprintf("page %d/%d  [%s]", t.page+1, pages, shown[0].Section)
+	sections := []string{}
+	for _, info := range shown {
+		if len(sections) == 0 || sections[len(sections)-1] != info.Section {
+			sections = append(sections, info.Section)
+		}
+	}
+	header := fmt.Sprintf("page %d/%d  [%s]", t.page+1, pages, strings.Join(sections, "] ["))
 	if t.status != "" {
 		header += "  " + t.status
 	}
