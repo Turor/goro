@@ -142,7 +142,7 @@ func Win(options ...WindowOption) widget.Widget {
 		children = append(children, roTitleBar(titleContent))
 	}
 	if cfg.content != nil {
-		children = append(children, primitives.Expanded(cfg.content))
+		children = append(children, primitives.Expanded(newGrowingContent(cfg.content)))
 	}
 	if cfg.footer != nil {
 		footerBody := primitives.Box(
