@@ -33,7 +33,15 @@ const (
 	StatusSpl           uint16 = 222
 	StatusCon           uint16 = 223
 	StatusCrt           uint16 = 224
+	StatusPAtk          uint16 = 225
+	StatusSMatk         uint16 = 226
+	StatusRes           uint16 = 227
+	StatusMRes          uint16 = 228
+	StatusHPlus         uint16 = 229
+	StatusCRate         uint16 = 230
 	StatusTraitPoint    uint16 = 231
+	StatusAP            uint16 = 232
+	StatusMaxAP         uint16 = 233
 	StatusUPow          uint16 = 247
 	StatusUSta          uint16 = 248
 	StatusUWis          uint16 = 249

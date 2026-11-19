@@ -339,6 +339,8 @@ type Vitals struct {
 	MaxHP int
 	SP    int
 	MaxSP int
+	AP    int
+	MaxAP int
 }
 
 type Progress struct {
@@ -442,6 +444,12 @@ type Stats struct {
 	Critical      int
 	ASPD          int
 	ASPDBonus     int
+	PAtk          int
+	SMatk         int
+	Res           int
+	MRes          int
+	HPlus         int
+	CRate         int
 }
 
 type Skills struct {
