@@ -51,6 +51,10 @@ type Screen struct {
 	charCreateWindow    *gameui.CharacterCreateWindow
 	charDeleteConfirm   gameui.ConfirmModal
 	charDeletePrompt    gameui.TextPromptWindow
+	pincode             gameui.PincodeWindow
+	pincodeSeed         uint32
+	pincodeAccount      uint32
+	pincodeRequired     bool
 	deleteCharID        uint32
 	loginPingActive     bool
 	nextLoginPing       time.Time
@@ -185,6 +189,7 @@ func (m *Screen) Update(ctx client.Context) (bool, error) {
 		if m.updateQuitConfirm(ctx) {
 			// The confirmation modal is modal: no keyboard or mouse input should
 			// leak into the login form, character list, or creation controls.
+		} else if m.updatePincode(ctx) {
 		} else if m.updateDisconnectDialog(ctx) {
 		} else if m.updateCharacterDelete(ctx) {
 		} else if m.updatePhaseEscape(ctx, now) {
@@ -266,6 +271,9 @@ func (m *Screen) Update(ctx client.Context) (bool, error) {
 					return false, err
 				}
 			}
+		}
+		if m.handlePincodePacket(ctx, pkt) {
+			continue
 		}
 		if network.IsCharList(pkt.ID) {
 			list, err := network.ParseCharList(pkt)
@@ -631,7 +639,7 @@ func (m *Screen) moveToNextCharacterSlot() {
 }
 
 func (m *Screen) submitSelectedCharacter(ctx client.Context) {
-	if m.charSelectPending {
+	if m.charSelectPending || m.pinBlocksCharacterSelect() {
 		return
 	}
 	character, ok := characterBySlot(ctx.Session.Characters, m.selectedSlot)

@@ -141,6 +141,10 @@ type worldUI struct {
 	instanceWindow  gameui.InstanceWindow
 	worldMap        gameui.WorldMapWindow
 	warpra          gameui.WarpraWindow
+	bank            gameui.BankWindow
+	refineUI        gameui.RefineUIWindow
+	enchantUI       gameui.EnchantUIWindow
+	rodex           gameui.RodexWindow
 	emoteWindow     gameui.EmoteWindow
 	chatShortcuts   gameui.ChatShortcutsWindow
 	skillTextPrompt gameui.TextPromptWindow
@@ -174,6 +178,10 @@ func (u *worldUI) nonConsoleKeyboardInputBlockedExcept(ctx client.Context, excep
 		u.worldMap.Confirm.IsOpen() ||
 		u.worldMap.Picker.IsOpen() ||
 		u.warpra.Confirm.IsOpen() ||
+		u.bank.IsOpen() ||
+		u.refineUI.IsOpen() ||
+		u.enchantUI.IsOpen() ||
+		u.rodex.IsOpen() ||
 		!u.npcInputAvailable() ||
 		open(&u.settingsWindow.Window) ||
 		u.chatShortcuts.IsOpen() ||
@@ -825,6 +833,18 @@ func (m *WorldMode) Update(ctx client.Context) (Mode, error) {
 	if m.ui.weaponRefine.Update(ctx) {
 		return nil, nil
 	}
+	if m.updateBank(ctx) {
+		return nil, nil
+	}
+	if m.ui.refineUI.Update(ctx) {
+		return nil, nil
+	}
+	if m.ui.enchantUI.Update(ctx) {
+		return nil, nil
+	}
+	if m.ui.rodex.Update(ctx) {
+		return nil, nil
+	}
 	if m.ui.warpra.Update(ctx) {
 		return nil, nil
 	}
@@ -1115,6 +1135,12 @@ func (m *WorldMode) basicMenuCallbacks(ctx client.Context) gameui.BasicMenuCallb
 		OnComm:   func() { m.ui.social.ChatRoomCreate.Open(ctx) },
 		OnFriend: func() { m.ui.social.FriendsWindow.Toggle(ctx) },
 		OnWarpra: func() { m.ui.warpra.Toggle(ctx) },
+		OnBank:   func() { m.openBank(ctx) },
+		OnMail: func() {
+			if m.useRodex(ctx) {
+				m.ui.rodex.Toggle(ctx)
+			}
+		},
 	}
 }
 
@@ -1251,6 +1277,10 @@ func (m *WorldMode) nextWorldMode() *WorldMode {
 	next.ui.instanceWindow = m.ui.instanceWindow
 	next.ui.worldMap = m.ui.worldMap
 	next.ui.warpra = m.ui.warpra
+	next.ui.bank = m.ui.bank
+	next.ui.refineUI = m.ui.refineUI
+	next.ui.enchantUI = m.ui.enchantUI
+	next.ui.rodex = m.ui.rodex
 	next.ui.emoteWindow = m.ui.emoteWindow
 	next.ui.chatShortcuts = m.ui.chatShortcuts
 	next.ui.social.FriendsWindow = m.ui.social.FriendsWindow
