@@ -57,6 +57,9 @@ func (w *CharacterWindow) Update(ctx Context) bool {
 			invalidateWindowRect(ctx, overlay.markFrameDirty())
 		}
 	}
+	if w.height != w.windowHeight() {
+		w.SetSize(characterWindowWidth, w.windowHeight())
+	}
 	consumed := w.Window.Update(ctx)
 	w.Publish(ctx)
 	return consumed
@@ -84,14 +87,14 @@ func (w *CharacterWindow) bindLayoutReload() {
 }
 
 func (w *CharacterWindow) windowHeight() int {
-	if w.compact {
-		return characterWindowCompactHeight
-	}
-	h := characterWindowHeight
+	extra := 0
 	if characterWindowShowsAP(w.ctx.Session) {
-		h += int(rotheme.ProgressBarHeight + characterVitalsGap)
+		extra = int(rotheme.ProgressBarHeight + characterVitalsGap)
 	}
-	return h
+	if w.compact {
+		return characterWindowCompactHeight + extra
+	}
+	return characterWindowHeight + extra
 }
 
 func (w *CharacterWindow) ToggleCompact() {
@@ -160,11 +163,18 @@ func (w *CharacterWindow) bodyTree(ctx Context) *primitives.BoxWidget {
 		// summary, without the bars, weight, or zeny.
 		jobName := strings.TrimSpace(db.JobDisplayName(int(character.Job)))
 		baseEXP := math.Floor(ratioInt64(progress.BaseExp, progress.NextBaseExp)*1000) / 10
-		return primitives.Box(
+		compactRows := []widget.Widget{
 			rotheme.Text(fmt.Sprintf("Lv. %d / %s / Lv. %d / Exp. %.1f%%", progress.BaseLevel, jobName, progress.JobLevel, baseEXP)).
 				MaxLines(1).Ellipsis(),
-			primitives.HBox(characterCompactVitalCells(vitals)...).Gap(characterBodyGap),
-		).PaddingXY(characterBodyPadX, characterBodyPadY).Gap(characterVitalsGap).CrossAlign(primitives.CrossAxisStretch)
+			primitives.HBox(
+				characterTextCell(fmt.Sprintf("HP %d / %d", vitals.HP, vitals.MaxHP), characterStatCellW, rotheme.Default.Colors.MutedText),
+				characterTextCell(fmt.Sprintf("SP %d / %d", vitals.SP, vitals.MaxSP), characterStatCellW, rotheme.Default.Colors.MutedText),
+			).Gap(characterBodyGap),
+		}
+		if text := characterAPText(vitals); text != "" {
+			compactRows = append(compactRows, rotheme.Text(text).MaxLines(1))
+		}
+		return primitives.Box(compactRows...).PaddingXY(characterBodyPadX, characterBodyPadY).Gap(characterVitalsGap).CrossAlign(primitives.CrossAxisStretch)
 	}
 	weightColor := rotheme.Default.Colors.Text
 	if inventory.MaxWeight > 0 && inventory.Weight*100 >= inventory.MaxWeight*50 {
@@ -248,7 +258,9 @@ func characterWindowData(s *session.Session) (session.Character, session.Vitals,
 	}
 	vitals := s.Vitals
 	if vitals.HP == 0 && vitals.MaxHP == 0 && vitals.SP == 0 && vitals.MaxSP == 0 {
+		ap, maxAP := vitals.AP, vitals.MaxAP
 		vitals = sessionVitalsFromCharacter(character)
+		vitals.AP, vitals.MaxAP = ap, maxAP
 	}
 	progress := s.Progress
 	if progress.BaseLevel == 0 {
@@ -433,10 +445,8 @@ func formatHUDNumber(value int64) string {
 }
 
 func characterWindowShowsAP(s *session.Session) bool {
-	if s == nil {
-		return false
-	}
-	return s.Vitals.MaxAP > 0
+	_, vitals, _, _ := characterWindowData(s)
+	return vitals.MaxAP > 0
 }
 
 func characterAPText(vitals session.Vitals) string {
@@ -444,17 +454,6 @@ func characterAPText(vitals session.Vitals) string {
 		return ""
 	}
 	return fmt.Sprintf("AP %d / %d", vitals.AP, vitals.MaxAP)
-}
-
-func characterCompactVitalCells(vitals session.Vitals) []widget.Widget {
-	cells := []widget.Widget{
-		characterTextCell(fmt.Sprintf("HP %d / %d", vitals.HP, vitals.MaxHP), characterStatCellW, rotheme.Default.Colors.MutedText),
-		characterTextCell(fmt.Sprintf("SP %d / %d", vitals.SP, vitals.MaxSP), characterStatCellW, rotheme.Default.Colors.MutedText),
-	}
-	if text := characterAPText(vitals); text != "" {
-		cells = append(cells, characterTextCell(text, characterStatCellW, rotheme.Default.Colors.MutedText))
-	}
-	return cells
 }
 
 func characterVitalRows(vitals session.Vitals, width float32) []widget.Widget {

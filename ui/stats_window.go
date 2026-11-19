@@ -246,24 +246,6 @@ func statsDerivedWidget(stats session.Stats) widget.Widget {
 			{Text: "ASPD", Width: statsDerivedLabelWidth, Align: widget.TextAlignLeft, Head: true},
 			{Text: fmt.Sprintf("%d", displayASPD(stats.ASPD+stats.ASPDBonus)), Width: statsDerivedValueWidth, Align: widget.TextAlignRight},
 		},
-		{
-			{Text: "P.ATK", Width: statsDerivedLabelWidth, Align: widget.TextAlignLeft, Head: true},
-			{Text: fmt.Sprintf("%d", stats.PAtk), Width: statsDerivedValueWidth, Align: widget.TextAlignRight},
-			{Text: "RES", Width: statsDerivedLabelWidth, Align: widget.TextAlignLeft, Head: true},
-			{Text: fmt.Sprintf("%d", stats.Res), Width: statsDerivedValueWidth, Align: widget.TextAlignRight},
-		},
-		{
-			{Text: "S.MATK", Width: statsDerivedLabelWidth, Align: widget.TextAlignLeft, Head: true},
-			{Text: fmt.Sprintf("%d", stats.SMatk), Width: statsDerivedValueWidth, Align: widget.TextAlignRight},
-			{Text: "MRES", Width: statsDerivedLabelWidth, Align: widget.TextAlignLeft, Head: true},
-			{Text: fmt.Sprintf("%d", stats.MRes), Width: statsDerivedValueWidth, Align: widget.TextAlignRight},
-		},
-		{
-			{Text: "H.PLUS", Width: statsDerivedLabelWidth, Align: widget.TextAlignLeft, Head: true},
-			{Text: fmt.Sprintf("%d", stats.HPlus), Width: statsDerivedValueWidth, Align: widget.TextAlignRight},
-			{Text: "C.RATE", Width: statsDerivedLabelWidth, Align: widget.TextAlignLeft, Head: true},
-			{Text: fmt.Sprintf("%d", stats.CRate), Width: statsDerivedValueWidth, Align: widget.TextAlignRight},
-		},
 	}
 	return primitives.Box(
 		rotheme.Table(
@@ -333,12 +315,12 @@ func statsDetailsWidget(s *session.Session, stats session.Stats) widget.Widget {
 				{Text: fmt.Sprintf("%d", stats.TraitPoints), Width: statsDerivedPairWidth, Align: widget.TextAlignRight},
 			},
 			{
-				{Text: "POW/STA/WIS", Width: statsDerivedPairWidth, Align: widget.TextAlignLeft, Head: true},
-				{Text: fmt.Sprintf("%d/%d/%d", stats.Pow, stats.Sta, stats.Wis), Width: statsDerivedPairWidth, Align: widget.TextAlignRight},
+				{Text: "P.ATK/S.MATK/RES", Width: statsDerivedPairWidth, Align: widget.TextAlignLeft, Head: true},
+				{Text: fmt.Sprintf("%d/%d/%d", stats.PAtk, stats.SMatk, stats.Res), Width: statsDerivedPairWidth, Align: widget.TextAlignRight},
 			},
 			{
-				{Text: "SPL/CON/CRT", Width: statsDerivedPairWidth, Align: widget.TextAlignLeft, Head: true},
-				{Text: fmt.Sprintf("%d/%d/%d", stats.Spl, stats.Con, stats.Crt), Width: statsDerivedPairWidth, Align: widget.TextAlignRight},
+				{Text: "MRES/H.PLUS/C.RATE", Width: statsDerivedPairWidth, Align: widget.TextAlignLeft, Head: true},
+				{Text: fmt.Sprintf("%d/%d/%d", stats.MRes, stats.HPlus, stats.CRate), Width: statsDerivedPairWidth, Align: widget.TextAlignRight},
 			},
 			{
 				{Text: "EXP/Drop", Width: statsDerivedPairWidth, Align: widget.TextAlignLeft, Head: true},
