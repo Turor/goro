@@ -258,7 +258,7 @@ func TestParseHotkeyListV3(t *testing.T) {
 	data[5+7*26] = 0
 	put32(data, 5+7*26+1, 1000123)
 	list, ok, err := ParseHotkeyList(Packet{ID: 0x0B20, Data: data})
-	if err != nil || !ok || len(list.Slots) != HotkeyListSlots2008 {
+	if err != nil || !ok || len(list.Slots) != hotkeySlotsV3 {
 		t.Fatalf("ok=%t err=%v slots=%d", ok, err, len(list.Slots))
 	}
 	if s := list.Slots[0]; s.Type != 1 || s.ID != 28 || s.Level != 5 {
@@ -267,9 +267,10 @@ func TestParseHotkeyListV3(t *testing.T) {
 	if s := list.Slots[26]; s.ID != 1000123 {
 		t.Fatalf("slot26 = %+v", s)
 	}
-	put16(data, 3, 1) // second tab is not the skill bar
-	if _, ok, _ := ParseHotkeyList(Packet{ID: 0x0B20, Data: data}); ok {
-		t.Fatal("tab 1 applied to the skill bar")
+	put16(data, 3, 1) // extra tab is stored, not applied to the skill bar
+	extra, ok, err := ParseHotkeyList(Packet{ID: 0x0B20, Data: data})
+	if err != nil || !ok || extra.Tab != 1 {
+		t.Fatalf("tab1 ok=%t err=%v tab=%d", ok, err, extra.Tab)
 	}
 }
 

@@ -33,10 +33,10 @@ func TestAccessorySlotsSurviveEquipReloadAndUnequip(t *testing.T) {
 		t.Helper()
 		mode.handleNetworkPacket(ctx, packet, time.Now())
 	}
-	check := func(index, worn uint16) {
+	check := func(index uint16, worn uint32) {
 		t.Helper()
 		item, ok := session.FindInventoryItem(ctx.Session, index)
-		if !ok || !item.Equip || item.Location != db.EquipAccessory1|db.EquipAccessory2 || item.WearLocation != worn || item.Equipped != (worn != 0) {
+		if !ok || !item.Equip || item.Location != db.EquipAccessory1|db.EquipAccessory2 || item.WearLocation != uint32(worn) || item.Equipped != (worn != 0) {
 			t.Fatalf("index %d: %+v, want both slots allowed and wear 0x%04X", index, item, worn)
 		}
 	}

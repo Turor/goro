@@ -337,6 +337,53 @@ func (m *WorldMode) handleNetworkPacket(ctx client.Context, pkt network.Packet, 
 		m.ui.minimap.ApplyCompass(compass.ID, compass.Type, compass.X, compass.Y, compass.Color, time.Now())
 		return nil, false
 	}
+	if mvp, ok, err := network.ParseMvpMinimap(pkt); err != nil {
+		glog.Errorf("parse mvp minimap 0x%04X: %v", pkt.ID, err)
+	} else if ok {
+		marks := make([]gameui.MinimapMvpMark, 0, len(mvp.Marks))
+		for _, mark := range mvp.Marks {
+			marks = append(marks, gameui.MinimapMvpMark{GID: mark.GID, X: mark.X, Y: mark.Y})
+		}
+		m.ui.minimap.ApplyMvpMinimap(mvp.Flags&1 != 0, marks)
+		return nil, false
+	}
+	if quest, ok, err := network.ParseQuestNotifyEffect(pkt); err != nil {
+		glog.Errorf("parse quest notify 0x%04X: %v", pkt.ID, err)
+	} else if ok {
+		m.ui.minimap.ApplyCompass(uint8(quest.NpcID), 1, int(quest.X), int(quest.Y), uint32(quest.Color), time.Now())
+		return nil, false
+	}
+	if del, ok, err := network.ParseSkillInfoDelete(pkt); err != nil {
+		glog.Errorf("parse skill delete 0x%04X: %v", pkt.ID, err)
+	} else if ok {
+		removeSessionSkill(ctx.Session, del.SkillID)
+		return nil, false
+	}
+	if prop, ok, err := network.ParseMapPropertyR2(pkt); err != nil {
+		glog.Errorf("parse map property r2 0x%04X: %v", pkt.ID, err)
+	} else if ok {
+		applyMapPropertyNotify(ctx, network.MapPropertyNotify{Property: prop.Type})
+		return nil, false
+	}
+	if slots, ok, err := network.ParseSwapEquipInfo(pkt); err != nil {
+		glog.Errorf("parse swap equip 0x%04X: %v", pkt.ID, err)
+	} else if ok {
+		applySwapEquipInfo(ctx, slots)
+		return nil, false
+	}
+	if feat, ok, err := network.ParseTuroranFeatures(pkt); err != nil {
+		glog.Errorf("parse features 0x%04X: %v", pkt.ID, err)
+	} else if ok {
+		if ctx.Session != nil {
+			ctx.Session.TuroranFeatures = feat.Flags
+		}
+		return nil, false
+	}
+	if _, ok, err := network.ParseNotifyTime(pkt); err != nil {
+		glog.Errorf("parse notify time 0x%04X: %v", pkt.ID, err)
+	} else if ok {
+		return nil, false
+	}
 	if update, ok, err := network.ParseMapCellUpdate(pkt); err != nil {
 		glog.Errorf("parse map cell update 0x%04X: %v", pkt.ID, err)
 	} else if ok {
@@ -637,6 +684,16 @@ func (m *WorldMode) handleNetworkPacket(ctx client.Context, pkt network.Packet, 
 		glog.Errorf("parse storage password result 0x%04X: %v", pkt.ID, err)
 	} else if ok {
 		m.npc().HandleStoragePasswordResult(ctx, result)
+		return nil, false
+	}
+	if guildItems, ok, err := network.ParseGuildStorageItemList(pkt); err != nil {
+		glog.Errorf("parse guild storage 0x%04X: %v", pkt.ID, err)
+	} else if ok {
+		applyStorageItemList(ctx, guildItems)
+		if ctx.Session != nil {
+			ctx.Session.Storage.Open = true
+		}
+		m.ui.storageWindow.OpenWindow(ctx)
 		return nil, false
 	}
 	if storageItems, ok, err := network.ParseStorageItemList(pkt); err != nil {

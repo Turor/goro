@@ -36,7 +36,7 @@ func init() {
 	s.Float("primary_button_gap", &statsPrimaryButtonGap, 0, 28, "gap before the stat plus button")
 	s.Float("derived_label_width", &statsDerivedLabelWidth, 20, 160, "derived stat label width")
 	s.Float("derived_value_width", &statsDerivedValueWidth, 24, 200, "derived stat value width")
-	s.Int("primary_rows", &statsPrimaryRows, 1, 12, "primary stat rows used to size the window")
+	s.Int("primary_rows", &statsPrimaryRows, 1, 16, "primary stat rows used to size the window")
 	s.Int("position_gap", &statsPositionGap, 0, 48, "gap between the character window and the status window")
 	rotheme.OnLayoutApplied(recomputeStatsWindowMetrics)
 	recomputeStatsWindowMetrics()

@@ -51,6 +51,8 @@ const (
 	CompanionActionHomunculusDelete
 	CompanionActionMercenarySkill
 	CompanionActionMercenaryDelete
+	CompanionActionPetAutoFeed
+	CompanionActionHomunAutoFeed
 )
 
 type CompanionWindowAction struct {
@@ -306,6 +308,9 @@ func (w *CompanionWindow) tabFooter() []widget.Widget {
 				rotheme.Button("To egg", func() {
 					w.emit(CompanionWindowAction{Kind: CompanionActionPetToEgg, PetID: w.petList.ActivePetID})
 				}).Width(float32(companionButtonW)),
+				rotheme.Button("Auto", func() {
+					w.emit(CompanionWindowAction{Kind: CompanionActionPetAutoFeed})
+				}).Width(float32(companionButtonW)),
 			)
 		}
 	case CompanionTabHomunculus:
@@ -319,6 +324,9 @@ func (w *CompanionWindow) tabFooter() []widget.Widget {
 				}).Width(float32(companionButtonW)),
 				rotheme.Button("Store", func() {
 					w.emit(CompanionWindowAction{Kind: CompanionActionHomunculusStore})
+				}).Width(float32(companionButtonW)),
+				rotheme.Button("Auto", func() {
+					w.emit(CompanionWindowAction{Kind: CompanionActionHomunAutoFeed})
 				}).Width(float32(companionButtonW)),
 			)
 		}

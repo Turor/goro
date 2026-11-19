@@ -811,7 +811,7 @@ func TestEquipmentListsKeepAllowedAndOccupiedSlots(t *testing.T) {
 			if err != nil || !ok || len(items) != 1 {
 				t.Fatalf("packet 0x%04X: items=%+v ok=%v err=%v", tc.id, items, ok, err)
 			}
-			if item := items[0]; item.Location != 0x0088 || item.WearLocation != worn || item.Equipped != (worn != 0) {
+			if item := items[0]; item.Location != 0x0088 || item.WearLocation != uint32(worn) || item.Equipped != (worn != 0) {
 				t.Errorf("packet 0x%04X wear 0x%04X: %+v", tc.id, worn, item)
 			}
 		}

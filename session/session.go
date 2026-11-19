@@ -3,6 +3,9 @@ package session
 import "time"
 
 type Session struct {
+	PetAutoFeed          bool
+	HomunAutoFeed        bool
+	TuroranFeatures      uint32
 	AccountID            uint32
 	CharID               uint32
 	AuthCode             uint32
@@ -369,21 +372,22 @@ type Cart struct {
 }
 
 type InventoryItem struct {
-	Index        uint16
-	ItemID       uint32
-	Type         uint8
-	Location     uint16 // Allowed equipment slots.
-	WearLocation uint16 // Occupied equipment slots, or zero when unequipped.
-	Identified   bool
-	Amount       int
-	Equip        bool
-	Equipped     bool
-	Damaged      bool
-	Refine       uint8
-	Grade        uint8
-	Cards        [4]uint32
-	Options      [5]ItemOption
-	ForgeOptions [3]ItemOption
+	Index          uint16
+	ItemID         uint32
+	Type           uint8
+	Location       uint32 // Allowed equipment slots.
+	WearLocation   uint32 // Occupied equipment slots, or zero when unequipped.
+	Identified     bool
+	Amount         int
+	Equip          bool
+	Equipped       bool
+	Damaged        bool
+	Refine         uint8
+	Grade          uint8
+	Cards          [4]uint32
+	Options        [5]ItemOption
+	ForgeOptions   [3]ItemOption
+	SwitchLocation uint32
 }
 
 // ItemOption is one renewal random option or forge option.
@@ -415,6 +419,11 @@ type Stats struct {
 	IntCost int
 	DexCost int
 	LukCost int
+
+	TraitPoints                                                int
+	Pow, Sta, Wis, Spl, Con, Crt                               int
+	PowBonus, StaBonus, WisBonus, SplBonus, ConBonus, CrtBonus int
+	PowCost, StaCost, WisCost, SplCost, ConCost, CrtCost       int
 
 	Attack        int
 	AttackBonus   int
@@ -491,6 +500,7 @@ type Hotkeys struct {
 	Loaded  bool
 	Version int
 	Slots   []HotkeySlot
+	Extra   map[uint16][]HotkeySlot
 }
 
 type Movement struct {

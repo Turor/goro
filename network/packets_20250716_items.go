@@ -101,7 +101,7 @@ func parseNormalItems2025(packet Packet) ([]InventoryItem, bool, error) {
 			ItemID:     binary.LittleEndian.Uint32(e[2:6]),
 			Type:       e[6],
 			Amount:     binary.LittleEndian.Uint16(e[7:9]),
-			Location:   uint16(binary.LittleEndian.Uint32(e[9:13])),
+			Location:   binary.LittleEndian.Uint32(e[9:13]),
 			Cards:      readItemCards32(e, 13),
 			Identified: e[33]&1 != 0,
 		})
@@ -124,8 +124,8 @@ func parseEquipItems2025(packet Packet) ([]InventoryItem, bool, error) {
 			Index:        binary.LittleEndian.Uint16(e[0:2]),
 			ItemID:       binary.LittleEndian.Uint32(e[2:6]),
 			Type:         e[6],
-			Location:     uint16(binary.LittleEndian.Uint32(e[7:11])),
-			WearLocation: uint16(wearState),
+			Location:     binary.LittleEndian.Uint32(e[7:11]),
+			WearLocation: wearState,
 			Amount:       1,
 			Equip:        true,
 			Equipped:     wearState != 0,
@@ -152,7 +152,7 @@ func parseItemPickupAck2025(packet Packet) (ItemPickupAck, bool, error) {
 		Identified:   packet.Data[10] != 0,
 		Damaged:      packet.Data[11] != 0,
 		Cards:        readItemCards32(packet.Data, 12),
-		Location:     uint16(binary.LittleEndian.Uint32(packet.Data[28:32])),
+		Location:     binary.LittleEndian.Uint32(packet.Data[28:32]),
 		Type:         packet.Data[32],
 		Result:       packet.Data[33],
 		Refine:       packet.Data[83],
@@ -229,7 +229,7 @@ func parseEquipAck2025(packet Packet) (InventoryEquipAck, bool, error) {
 		}
 		return InventoryEquipAck{
 			Index:    binary.LittleEndian.Uint16(packet.Data[2:4]),
-			Location: uint16(binary.LittleEndian.Uint32(packet.Data[4:8])),
+			Location: binary.LittleEndian.Uint32(packet.Data[4:8]),
 			Success:  packet.Data[10] == 0,
 		}, true, nil
 	case PacketZCReqTakeoffEquipAck2:
@@ -238,7 +238,7 @@ func parseEquipAck2025(packet Packet) (InventoryEquipAck, bool, error) {
 		}
 		return InventoryEquipAck{
 			Index:    binary.LittleEndian.Uint16(packet.Data[2:4]),
-			Location: uint16(binary.LittleEndian.Uint32(packet.Data[4:8])),
+			Location: binary.LittleEndian.Uint32(packet.Data[4:8]),
 			Success:  packet.Data[8] == 0,
 			Unequip:  true,
 		}, true, nil
@@ -297,17 +297,15 @@ func parseSkillCastNotify2025(packet Packet) (SkillCastNotify, bool, error) {
 	}, true, nil
 }
 
-// parseHotkeyListV3 decodes ZC_SHORTCUT_KEY_LIST_V3 (0x0B20). Only tab 0,
-// the skill bar, is mapped; the first HotkeyListSlots2008 slots are kept.
+// parseHotkeyListV3 decodes ZC_SHORTCUT_KEY_LIST_V3 (0x0B20). Tab 0 is the skill
+// bar (38 slots). Extra tabs parse into HotkeyList.Tab for session.Hotkeys.Extra.
 func parseHotkeyListV3(packet Packet) (HotkeyList, bool, error) {
 	const headerSize = 5
 	if len(packet.Data) < headerSize+hotkeySlotsV3*hotkeySlotSize {
 		return HotkeyList{}, false, fmt.Errorf("ZC_SHORTCUT_KEY_LIST_V3 too short: %d", len(packet.Data))
 	}
-	if tab := binary.LittleEndian.Uint16(packet.Data[3:5]); tab != 0 {
-		return HotkeyList{}, false, nil
-	}
-	slots := make([]HotkeySlot, HotkeyListSlots2008)
+	tab := binary.LittleEndian.Uint16(packet.Data[3:5])
+	slots := make([]HotkeySlot, hotkeySlotsV3)
 	for i := range slots {
 		offset := headerSize + i*hotkeySlotSize
 		slots[i] = HotkeySlot{
@@ -316,18 +314,18 @@ func parseHotkeyListV3(packet Packet) (HotkeyList, bool, error) {
 			Level: binary.LittleEndian.Uint16(packet.Data[offset+5 : offset+7]),
 		}
 	}
-	return HotkeyList{Slots: slots}, true, nil
+	return HotkeyList{Tab: tab, Slots: slots}, true, nil
 }
 
 // BuildWearEquipPacketForClientDate sends CZ_REQ_WEAR_EQUIP. 20250716 uses
 // 0x0998 with a 32-bit location; 0x00A9 is the 2008 layout.
-func BuildWearEquipPacketForClientDate(index, location uint16, clientDate int) []byte {
+func BuildWearEquipPacketForClientDate(index uint16, location uint32, clientDate int) []byte {
 	if !IsClientDate20250716(clientDate) {
-		return BuildWearEquipPacket(index, location)
+		return BuildWearEquipPacket(index, uint16(location))
 	}
 	packet := make([]byte, 8)
 	binary.LittleEndian.PutUint16(packet[0:2], PacketCZReqWearEquip2)
 	binary.LittleEndian.PutUint16(packet[2:4], index)
-	binary.LittleEndian.PutUint32(packet[4:8], uint32(location))
+	binary.LittleEndian.PutUint32(packet[4:8], location)
 	return packet
 }

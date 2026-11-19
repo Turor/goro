@@ -29,7 +29,7 @@ var (
 
 func recomputeEquipmentWindowMetrics() {
 	equipmentCenterColH = equipmentPreviewImageH + equipmentRowH
-	equipmentWindowContentH = equipmentCenterColH + equipmentWindowPad*2
+	equipmentWindowContentH = equipmentCenterColH + equipmentRowH*2 + equipmentWindowPad*2
 	equipmentWindowHeight = ROWindowTitleHeight + equipmentWindowContentH + ROWindowFooterHeight
 }
 

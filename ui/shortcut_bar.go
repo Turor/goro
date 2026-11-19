@@ -22,7 +22,7 @@ import (
 
 const (
 	// shortcutTotalSlots is the 2008 hotkey list length; it sizes the slot array.
-	shortcutTotalSlots = network.HotkeyListSlots2008
+	shortcutTotalSlots = network.HotkeyListSlots2025
 )
 
 // shortcutMaxRows is the 2008 hotkey list divided by the column token.
@@ -32,7 +32,7 @@ func hotbarMaxRows(cols int) int {
 	if cols < 1 {
 		cols = 1
 	}
-	rows := network.HotkeyListSlots2008 / cols
+	rows := shortcutTotalSlots / cols
 	if rows < 1 {
 		return 1
 	}
@@ -81,6 +81,7 @@ type ShortcutBar struct {
 	slots         [shortcutTotalSlots]shortcutSlotState
 	visibleRows   int
 	activeRow     int
+	hotkeyTab     uint16
 	hotkeyVersion int
 	window        Window
 	contentDirty  bool
@@ -388,7 +389,14 @@ func (b *ShortcutBar) slotAt(ctx Context, mx, my int) (int, bool) {
 		return 0, false
 	}
 	for i := 0; i < b.visibleRowCount()*shortcutCols; i++ {
-		slot := (b.activeRow*shortcutCols + i) % shortcutTotalSlots
+		mod := shortcutMaxRows * shortcutCols
+		if mod < 1 {
+			mod = shortcutTotalSlots
+		}
+		slot := (b.activeRow*shortcutCols + i) % mod
+		if slot >= shortcutTotalSlots {
+			continue
+		}
 		x, y := b.slotBounds(ctx, slot)
 		if pointInRect(mx, my, x, y, shortcutSlot, shortcutSlot) {
 			return slot, true
@@ -472,6 +480,11 @@ func (b *ShortcutBar) rowControls(visibleRows int) widget.Widget {
 		}),
 		rotheme.IconButtonDisabled(rotheme.IconButtonMinus, visibleRows <= shortcutMinRows, func() {
 			b.setVisibleRows(b.ctx, b.visibleRowCount()-1)
+		}),
+		rotheme.Button(fmt.Sprintf("T%d", b.hotkeyTab), func() {
+			b.hotkeyTab = (b.hotkeyTab + 1) % 4
+			b.hotkeyVersion = -1
+			b.redraw()
 		}),
 	).
 		Width(rotheme.IconButtonSize).
@@ -741,9 +754,17 @@ func (b *ShortcutBar) SyncFromSession(ctx Context) {
 	if !ctx.Session.Hotkeys.Loaded || b.hotkeyVersion == ctx.Session.Hotkeys.Version {
 		return
 	}
+	src := ctx.Session.Hotkeys.Slots
+	if b.hotkeyTab != 0 && ctx.Session.Hotkeys.Extra != nil {
+		if extra, ok := ctx.Session.Hotkeys.Extra[b.hotkeyTab]; ok {
+			src = extra
+		} else {
+			src = nil
+		}
+	}
 	for i := range b.slots {
-		if i < len(ctx.Session.Hotkeys.Slots) {
-			b.slots[i] = shortcutSlotFromHotkey(ctx.Session.Hotkeys.Slots[i])
+		if i < len(src) {
+			b.slots[i] = shortcutSlotFromHotkey(src[i])
 			continue
 		}
 		b.slots[i] = shortcutSlotState{}
@@ -783,9 +804,9 @@ func (b *ShortcutBar) sendSlotChange(ctx Context, slot int) {
 		return
 	}
 	hotkey := b.slots[slot].hotkey()
-	if ctx.Network != nil && slot < network.HotkeyListSlots2008 {
-		if err := ctx.Network.SendHotkey(uint16(slot), hotkey); err != nil {
-			glog.Warnf("shortcut hotkey save failed slot=%d: %v", slot+1, err)
+	if ctx.Network != nil && slot < shortcutTotalSlots {
+		if err := ctx.Network.SendHotkeyTab(b.hotkeyTab, uint16(slot), hotkey); err != nil {
+			glog.Warnf("shortcut hotkey save failed slot=%d tab=%d: %v", slot+1, b.hotkeyTab, err)
 		}
 	}
 	if ctx.Session != nil {

@@ -96,6 +96,18 @@ func setSessionStat(s *session.Session, statusID uint16, value int) {
 	case network.StatusLuk:
 		s.Stats.Luk = value
 		s.Selected.Luk = uint8(value)
+	case network.StatusPow:
+		s.Stats.Pow = value
+	case network.StatusSta:
+		s.Stats.Sta = value
+	case network.StatusWis:
+		s.Stats.Wis = value
+	case network.StatusSpl:
+		s.Stats.Spl = value
+	case network.StatusCon:
+		s.Stats.Con = value
+	case network.StatusCrt:
+		s.Stats.Crt = value
 	}
 }
 
@@ -116,6 +128,18 @@ func setSessionStatCost(s *session.Session, statusID uint16, value int) {
 		s.Stats.DexCost = value
 	case network.StatusULuk:
 		s.Stats.LukCost = value
+	case network.StatusUPow:
+		s.Stats.PowCost = value
+	case network.StatusUSta:
+		s.Stats.StaCost = value
+	case network.StatusUWis:
+		s.Stats.WisCost = value
+	case network.StatusUSpl:
+		s.Stats.SplCost = value
+	case network.StatusUCon:
+		s.Stats.ConCost = value
+	case network.StatusUCrt:
+		s.Stats.CrtCost = value
 	}
 }
 
@@ -138,6 +162,23 @@ func applySkillInfoUpdate(ctx client.Context, update network.SkillInfoUpdate) {
 	upsertSessionSkill(ctx.Session, scene.SessionSkillFromNetworkWithResources(ctx.Resources, update.Skill))
 	refreshLocalPlayerMoveSpeed(ctx)
 	glog.Debugf("skill update id=%d level=%d sp=%d range=%d upgradable=%t", update.Skill.ID, update.Skill.Level, update.Skill.SPCost, update.Skill.Range, update.Skill.Upgradable)
+}
+
+func removeSessionSkill(s *session.Session, id uint16) {
+	if s == nil || id == 0 {
+		return
+	}
+	list := &s.Skills.List
+	if id >= db.SkillGdApproval && id < db.SkillGdLast {
+		list = &s.Guild.Skills
+	}
+	for i := range *list {
+		if (*list)[i].ID != id {
+			continue
+		}
+		*list = append((*list)[:i], (*list)[i+1:]...)
+		return
+	}
 }
 
 func upsertSessionSkill(s *session.Session, skill session.Skill) {

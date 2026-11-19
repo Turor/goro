@@ -33,7 +33,7 @@ func TestEquippedItemForSlotUsesEquippedWearLocation(t *testing.T) {
 }
 
 func TestAccessoryWindowAndEquipSelectionUseOccupiedSlots(t *testing.T) {
-	for _, worn := range []uint16{db.EquipAccessory1, db.EquipAccessory2} {
+	for _, worn := range []uint32{db.EquipAccessory1, db.EquipAccessory2} {
 		free := (db.EquipAccessory1 | db.EquipAccessory2) &^ worn
 		ring := session.InventoryItem{Index: 11, ItemID: 2601, Type: db.ItemTypeArmor,
 			Location: db.EquipAccessory1 | db.EquipAccessory2, WearLocation: worn, Equip: true, Equipped: true}
@@ -61,7 +61,7 @@ func TestEquipmentWindowKeepsGenuineMultipleSlotEquipment(t *testing.T) {
 	item := session.InventoryItem{Index: 11, ItemID: 1151, Location: db.EquipWeapon | db.EquipShield,
 		WearLocation: db.EquipWeapon | db.EquipShield, Equip: true, Equipped: true}
 	s := &session.Session{Inventory: session.Inventory{Items: []session.InventoryItem{item}}}
-	for _, slot := range []uint16{db.EquipWeapon, db.EquipShield} {
+	for _, slot := range []uint32{db.EquipWeapon, db.EquipShield} {
 		if got, ok := equippedItemForSlot(s, slot); !ok || got.Index != item.Index {
 			t.Fatalf("two-handed item missing from slot 0x%04X", slot)
 		}
@@ -109,7 +109,7 @@ func TestEquipmentWindowOpensCentered(t *testing.T) {
 }
 
 func TestEquipmentWindowHeightHasNoCartContentRow(t *testing.T) {
-	want := ROWindowTitleHeight + equipmentWindowPad*2 + equipmentPreviewImageH + equipmentRowH + ROWindowFooterHeight
+	want := ROWindowTitleHeight + equipmentWindowPad*2 + equipmentPreviewImageH + equipmentRowH*3 + ROWindowFooterHeight
 	if equipmentWindowHeight != want {
 		t.Fatalf("equipment window height = %d, want content-fitting height %d", equipmentWindowHeight, want)
 	}

@@ -44,14 +44,16 @@ func applyParameterChange(ctx client.Context, change network.ParameterChange) {
 		ctx.Session.Selected.MaxSP = value
 	case network.StatusPoint:
 		ctx.Session.Stats.Points = value
+	case network.StatusTraitPoint:
+		ctx.Session.Stats.TraitPoints = value
 	case network.StatusBaseLevel:
 		ctx.Session.Progress.BaseLevel = value
 		ctx.Session.Selected.Level = clampInt16(value)
 	case network.StatusSkillPoint:
 		ctx.Session.Skills.Points = value
-	case network.StatusStr, network.StatusAgi, network.StatusVit, network.StatusInt, network.StatusDex, network.StatusLuk:
+	case network.StatusStr, network.StatusAgi, network.StatusVit, network.StatusInt, network.StatusDex, network.StatusLuk, network.StatusPow, network.StatusSta, network.StatusWis, network.StatusSpl, network.StatusCon, network.StatusCrt:
 		setSessionStat(ctx.Session, change.VarID, value)
-	case network.StatusUStr, network.StatusUAgi, network.StatusUVit, network.StatusUInt, network.StatusUDex, network.StatusULuk:
+	case network.StatusUStr, network.StatusUAgi, network.StatusUVit, network.StatusUInt, network.StatusUDex, network.StatusULuk, network.StatusUPow, network.StatusUSta, network.StatusUWis, network.StatusUSpl, network.StatusUCon, network.StatusUCrt:
 		setSessionStatCost(ctx.Session, change.VarID, value)
 	case network.StatusZeny:
 		ctx.Session.Inventory.Zeny = change.Value

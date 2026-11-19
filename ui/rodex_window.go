@@ -24,6 +24,7 @@ type RodexWindow struct {
 	title    string
 	text     string
 	sendZeny string
+	attach   string
 	message  string
 	sender   string
 }
@@ -156,10 +157,12 @@ func (w *RodexWindow) composeForm() widget.Widget {
 	title := rotheme.TextField(w.title, textfield.TypeText, func(v string) { w.title = v }, func(string) {}, textfield.MaxLength(64))
 	body := rotheme.TextField(w.text, textfield.TypeText, func(v string) { w.text = v }, func(string) {})
 	zeny := rotheme.TextField(w.sendZeny, textfield.TypeText, func(v string) { w.sendZeny = filterDigits(v, 10) }, func(string) {}, textfield.MaxLength(10))
+	attach := rotheme.TextField(w.attach, textfield.TypeText, func(v string) { w.attach = filterDigits(v, 5) }, func(string) {}, textfield.MaxLength(5))
 	return primitives.Box(
 		primitives.HBox(primitives.Box(rotheme.Label("To")).Width(float32(rodexLabelW)), primitives.Expanded(to)).Height(float32(rodexRowH)),
 		primitives.HBox(primitives.Box(rotheme.Label("Title")).Width(float32(rodexLabelW)), primitives.Expanded(title)).Height(float32(rodexRowH)),
 		primitives.HBox(primitives.Box(rotheme.Label("Zeny")).Width(float32(rodexLabelW)), primitives.Expanded(zeny)).Height(float32(rodexRowH)),
+		primitives.HBox(primitives.Box(rotheme.Label("Item #")).Width(float32(rodexLabelW)), primitives.Expanded(attach)).Height(float32(rodexRowH)),
 		primitives.Expanded(body),
 	).Padding(float32(rodexPad)).Gap(float32(rodexGap))
 }
@@ -170,6 +173,17 @@ func (w *RodexWindow) footer(ctx Context) []widget.Widget {
 			rotheme.Button("Cancel", func() {
 				w.compose = false
 				w.SetContent(w.widgetTree(ctx))
+			}),
+			rotheme.Button("Check", func() {
+				if ctx.Network != nil {
+					_ = ctx.Network.SendCheckName(w.to)
+				}
+			}),
+			rotheme.Button("Attach", func() {
+				n, _ := strconv.ParseUint(w.attach, 10, 16)
+				if ctx.Network != nil && n > 0 {
+					_ = ctx.Network.SendRodexAddItem(uint16(n), 1)
+				}
 			}),
 			rotheme.Button("Send", func() {
 				n, _ := strconv.ParseInt(w.sendZeny, 10, 64)

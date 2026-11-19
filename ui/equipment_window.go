@@ -40,7 +40,7 @@ type equipmentItemIconKey struct {
 
 type equipmentSlotDef struct {
 	label    string
-	location uint16
+	location uint32
 	side     equipmentSlotSide
 }
 
@@ -64,6 +64,14 @@ var (
 	equipmentSlotAccessory  = equipmentSlotDef{label: "Accessory", location: db.EquipAccessory1, side: equipmentSlotLeft}
 	equipmentSlotAccessory2 = equipmentSlotDef{label: "Accessory", location: db.EquipAccessory2, side: equipmentSlotRight}
 	equipmentSlotAmmo       = equipmentSlotDef{label: "Ammo", location: db.EquipAmmo, side: equipmentSlotCenter}
+	equipmentSlotCHeadTop   = equipmentSlotDef{label: "C. Head", location: db.EquipCostumeHeadTop, side: equipmentSlotLeft}
+	equipmentSlotCHeadMid   = equipmentSlotDef{label: "C. Mid", location: db.EquipCostumeHeadMid, side: equipmentSlotRight}
+	equipmentSlotCHeadLow   = equipmentSlotDef{label: "C. Low", location: db.EquipCostumeHeadBottom, side: equipmentSlotLeft}
+	equipmentSlotCRobe      = equipmentSlotDef{label: "C. Robe", location: db.EquipCostumeRobe, side: equipmentSlotRight}
+	equipmentSlotShadowWep  = equipmentSlotDef{label: "S. Wep", location: db.EquipShadowWeapon, side: equipmentSlotLeft}
+	equipmentSlotShadowArm  = equipmentSlotDef{label: "S. Arm", location: db.EquipShadowArmor, side: equipmentSlotRight}
+	equipmentSlotShadowShd  = equipmentSlotDef{label: "S. Shd", location: db.EquipShadowShield, side: equipmentSlotLeft}
+	equipmentSlotShadowSho  = equipmentSlotDef{label: "S. Shoes", location: db.EquipShadowShoes, side: equipmentSlotRight}
 )
 
 func (w *EquipmentWindow) Toggle(ctx Context) {
@@ -185,6 +193,18 @@ func (w *EquipmentWindow) widgetTree(ctx Context, itemInfo *ItemWindows, cart *C
 						Gap(0),
 				).
 					Gap(0),
+				primitives.HBox(
+					w.slotWidget(ctx, itemInfo, equipmentSlotCHeadTop, equipmentLeftColW),
+					w.slotWidget(ctx, itemInfo, equipmentSlotCHeadMid, equipmentRightColW),
+					w.slotWidget(ctx, itemInfo, equipmentSlotCHeadLow, equipmentLeftColW),
+					w.slotWidget(ctx, itemInfo, equipmentSlotCRobe, equipmentRightColW),
+				).Height(float32(equipmentRowH)).Gap(0),
+				primitives.HBox(
+					w.slotWidget(ctx, itemInfo, equipmentSlotShadowWep, equipmentLeftColW),
+					w.slotWidget(ctx, itemInfo, equipmentSlotShadowArm, equipmentRightColW),
+					w.slotWidget(ctx, itemInfo, equipmentSlotShadowShd, equipmentLeftColW),
+					w.slotWidget(ctx, itemInfo, equipmentSlotShadowSho, equipmentRightColW),
+				).Height(float32(equipmentRowH)).Gap(0),
 			).
 				Padding(float32(equipmentWindowPad)),
 		),
@@ -607,7 +627,7 @@ func equipmentSlotShowsAmount(slot equipmentSlotDef, item session.InventoryItem)
 	return slot.location == db.EquipAmmo && item.Amount > 0
 }
 
-func equippedItemForSlot(s *session.Session, location uint16) (session.InventoryItem, bool) {
+func equippedItemForSlot(s *session.Session, location uint32) (session.InventoryItem, bool) {
 	if s == nil || location == 0 {
 		return session.InventoryItem{}, false
 	}

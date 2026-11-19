@@ -159,7 +159,7 @@ func (w *StatsWindow) statsBodyWidget(ctx Context) widget.Widget {
 
 	return primitives.HBox(
 		primary,
-		statsRightColumnWidget(ctx.Session, stats),
+		w.statsRightColumnWidget(ctx, stats),
 	).
 		Gap(statsSectionGap).
 		CrossAlign(primitives.CrossAxisStart)
@@ -256,23 +256,71 @@ func statsDerivedWidget(stats session.Stats) widget.Widget {
 	)
 }
 
-func statsRightColumnWidget(s *session.Session, stats session.Stats) widget.Widget {
+func (w *StatsWindow) statsRightColumnWidget(ctx Context, stats session.Stats) widget.Widget {
 	return primitives.Box(
 		statsDerivedWidget(stats),
-		statsDetailsWidget(s, stats.Points),
+		statsDetailsWidget(ctx.Session, stats),
+		w.traitRowsWidget(ctx),
 	).Gap(rotheme.TableGap)
 }
 
-func statsDetailsWidget(s *session.Session, points int) widget.Widget {
+func (w *StatsWindow) traitRowsWidget(ctx Context) widget.Widget {
+	rows := traitRows(ctx.Session)
+	children := make([]widget.Widget, 0, len(rows))
+	for _, row := range rows {
+		row := row
+		children = append(children,
+			primitives.HBox(
+				statsLabelCell(row.label, statsDerivedLabelWidth).
+					Height(float32(statsRowH)).
+					Background(rotheme.Default.Colors.ButtonHover),
+				statsTextCell(formatStatValue(row.value, row.bonus), statsDerivedValueWidth, rotheme.Default.Colors.Text),
+				rotheme.IconButtonDisabled(rotheme.IconButtonPlus, !canIncreaseStat(ctx.Session, row), func() {
+					w.requestStatIncrease(ctx, row)
+				}),
+			).
+				Height(float32(statsRowH)).
+				CrossAlign(primitives.CrossAxisCenter).
+				Background(rotheme.Default.Colors.WindowFooter),
+		)
+	}
+	return primitives.Box(children...).Gap(rotheme.TableGap)
+}
+
+func traitRows(s *session.Session) []statRow {
+	stats := sessionStats(s)
+	return []statRow{
+		{label: "POW", statusID: network.StatusPow, value: stats.Pow, bonus: stats.PowBonus, cost: stats.PowCost},
+		{label: "STA", statusID: network.StatusSta, value: stats.Sta, bonus: stats.StaBonus, cost: stats.StaCost},
+		{label: "WIS", statusID: network.StatusWis, value: stats.Wis, bonus: stats.WisBonus, cost: stats.WisCost},
+		{label: "SPL", statusID: network.StatusSpl, value: stats.Spl, bonus: stats.SplBonus, cost: stats.SplCost},
+		{label: "CON", statusID: network.StatusCon, value: stats.Con, bonus: stats.ConBonus, cost: stats.ConCost},
+		{label: "CRT", statusID: network.StatusCrt, value: stats.Crt, bonus: stats.CrtBonus, cost: stats.CrtCost},
+	}
+}
+
+func statsDetailsWidget(s *session.Session, stats session.Stats) widget.Widget {
 	return rotheme.Table(
 		[]rotheme.TableRow{
 			{
 				{Text: "Status Point", Width: statsDerivedPairWidth, Align: widget.TextAlignLeft, Head: true},
-				{Text: fmt.Sprintf("%d", points), Width: statsDerivedPairWidth, Align: widget.TextAlignRight},
+				{Text: fmt.Sprintf("%d", stats.Points), Width: statsDerivedPairWidth, Align: widget.TextAlignRight},
 			},
 			{
 				{Text: "Guild", Width: statsDerivedPairWidth, Align: widget.TextAlignLeft, Head: true},
 				{Text: statsGuildName(s), Width: statsDerivedPairWidth, Align: widget.TextAlignRight},
+			},
+			{
+				{Text: "Trait Point", Width: statsDerivedPairWidth, Align: widget.TextAlignLeft, Head: true},
+				{Text: fmt.Sprintf("%d", stats.TraitPoints), Width: statsDerivedPairWidth, Align: widget.TextAlignRight},
+			},
+			{
+				{Text: "POW/STA/WIS", Width: statsDerivedPairWidth, Align: widget.TextAlignLeft, Head: true},
+				{Text: fmt.Sprintf("%d/%d/%d", stats.Pow, stats.Sta, stats.Wis), Width: statsDerivedPairWidth, Align: widget.TextAlignRight},
+			},
+			{
+				{Text: "SPL/CON/CRT", Width: statsDerivedPairWidth, Align: widget.TextAlignLeft, Head: true},
+				{Text: fmt.Sprintf("%d/%d/%d", stats.Spl, stats.Con, stats.Crt), Width: statsDerivedPairWidth, Align: widget.TextAlignRight},
 			},
 		},
 		rotheme.TableRowHeightOpt(float32(statsRowH)),
@@ -294,7 +342,7 @@ func statsWindowSnapshot(s *session.Session) string {
 	stats := sessionStats(s)
 	rows := statsRows(s)
 	return fmt.Sprintf(
-		"%d|%d/%d/%d/%d/%d/%d|%d/%d/%d/%d/%d/%d|%d/%d/%d/%d/%d/%d/%d/%d/%d/%d/%d/%d/%d|%s",
+		"%d|%d/%d/%d/%d/%d/%d|%d/%d/%d/%d/%d/%d|%d/%d/%d/%d/%d/%d/%d/%d/%d/%d/%d/%d/%d|%s|%d|%d/%d/%d/%d/%d/%d",
 		stats.Points,
 		rows[0].value, rows[1].value, rows[2].value, rows[3].value, rows[4].value, rows[5].value,
 		rows[0].bonus, rows[1].bonus, rows[2].bonus, rows[3].bonus, rows[4].bonus, rows[5].bonus,
@@ -302,6 +350,7 @@ func statsWindowSnapshot(s *session.Session) string {
 		stats.Hit, stats.Critical, stats.Defense, stats.DefenseBonus,
 		stats.MDefense, stats.MDefenseBonus, stats.Flee, stats.FleeBonus, stats.ASPD+stats.ASPDBonus,
 		statsGuildName(s),
+		stats.TraitPoints, stats.Pow, stats.Sta, stats.Wis, stats.Spl, stats.Con, stats.Crt,
 	)
 }
 
@@ -344,11 +393,24 @@ func sessionStats(s *session.Session) session.Stats {
 	return stats
 }
 
+func isTraitStatus(id uint16) bool {
+	return id >= network.StatusPow && id <= network.StatusCrt
+}
+
 func canIncreaseStat(s *session.Session, row statRow) bool {
-	if s == nil || row.value <= 0 || row.value >= 99 {
+	if s == nil {
 		return false
 	}
-	return sessionStats(s).Points >= statCost(row)
+	cap, pool := 99, sessionStats(s).Points
+	if isTraitStatus(row.statusID) {
+		cap, pool = 130, sessionStats(s).TraitPoints
+	} else if row.value <= 0 {
+		return false
+	}
+	if row.value >= cap {
+		return false
+	}
+	return pool >= statCost(row)
 }
 
 func statCost(row statRow) int {
@@ -391,7 +453,11 @@ func (w *StatsWindow) ApplyStatusChangeAck(ctx Context, ack network.StatusChange
 		return
 	}
 	setSessionStat(ctx.Session, ack.StatusID, ack.Value)
-	if ctx.Session.Stats.Points > 0 {
+	if isTraitStatus(ack.StatusID) {
+		if ctx.Session.Stats.TraitPoints > 0 {
+			ctx.Session.Stats.TraitPoints--
+		}
+	} else if ctx.Session.Stats.Points > 0 {
 		ctx.Session.Stats.Points--
 	}
 	glog.Debugf("status increase ack status=%d success=true value=%d", ack.StatusID, ack.Value)
@@ -424,5 +490,17 @@ func setSessionStat(s *session.Session, statusID uint16, value int) {
 	case network.StatusLuk:
 		s.Stats.Luk = value
 		s.Selected.Luk = uint8(value)
+	case network.StatusPow:
+		s.Stats.Pow = value
+	case network.StatusSta:
+		s.Stats.Sta = value
+	case network.StatusWis:
+		s.Stats.Wis = value
+	case network.StatusSpl:
+		s.Stats.Spl = value
+	case network.StatusCon:
+		s.Stats.Con = value
+	case network.StatusCrt:
+		s.Stats.Crt = value
 	}
 }
