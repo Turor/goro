@@ -24,6 +24,8 @@ type BasicMenuCallbacks struct {
 	OnComm   func()
 	OnFriend func()
 	OnWarpra func()
+	OnBank   func()
+	OnMail   func()
 }
 
 type basicMenuButton struct {
@@ -41,6 +43,8 @@ var basicMenuButtons = []basicMenuButton{
 	{key: "comm", label: "Comm"},
 	{key: "friend", label: "Friend"},
 	{key: "warpra", label: "Warpra"},
+	{key: "bank", label: "Bank"},
+	{key: "mail", label: "Mail"},
 }
 
 func (m *BasicMenu) Update(ctx client.Context, callbacks BasicMenuCallbacks) bool {
@@ -297,6 +301,10 @@ func (m *BasicMenu) invoke(key string) {
 		callback = m.callbacks.OnFriend
 	case "warpra":
 		callback = m.callbacks.OnWarpra
+	case "bank":
+		callback = m.callbacks.OnBank
+	case "mail":
+		callback = m.callbacks.OnMail
 	}
 	if callback != nil {
 		callback()

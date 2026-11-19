@@ -129,6 +129,7 @@ func (m *Screen) showCharacterSelectWindow(ctx client.Context) {
 	if m.charSelectWindow != nil {
 		m.charSelectWindow.Publish(ctx)
 	}
+	m.restorePincode(ctx)
 }
 
 func (m *Screen) updateCharacterDelete(ctx client.Context) bool {
@@ -243,7 +244,7 @@ func (m *Screen) prepareCharacterSelectFromSession(ctx client.Context) {
 
 func (m *Screen) autoSelectCharacter(ctx client.Context) bool {
 	slot := ctx.Config.Login.CharSlot
-	if !ctx.Config.Login.AutoLogin || slot < 0 || m.autoCharAttempted {
+	if !ctx.Config.Login.AutoLogin || slot < 0 || m.autoCharAttempted || m.pinBlocksCharacterSelect() {
 		return false
 	}
 	m.autoCharAttempted = true
