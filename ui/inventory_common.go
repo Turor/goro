@@ -39,10 +39,10 @@ func ItemDisplayName(manager *res.Manager, item session.InventoryItem) string {
 func inventoryItemDisplayName(manager *res.Manager, item session.InventoryItem) string {
 	if manager != nil {
 		if name, ok := manager.ItemDisplayName(int(item.ItemID), item.Identified); ok && strings.TrimSpace(name) != "" {
-			return inventoryItemDisplayNameWithCardsAndSlots(manager, item, name)
+			return decorateIdentifiedItemName(inventoryItemDisplayNameWithCardsAndSlots(manager, item, name), item)
 		}
 	}
-	return fmt.Sprintf("item %d", item.ItemID)
+	return decorateIdentifiedItemName(fmt.Sprintf("item %d", item.ItemID), item)
 }
 
 func inventoryItemDisplayNameWithCardsAndSlots(manager *res.Manager, item session.InventoryItem, name string) string {

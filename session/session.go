@@ -380,7 +380,17 @@ type InventoryItem struct {
 	Equipped     bool
 	Damaged      bool
 	Refine       uint8
+	Grade        uint8
 	Cards        [4]uint32
+	Options      [5]ItemOption
+	ForgeOptions [3]ItemOption
+}
+
+// ItemOption is one renewal random option or forge option.
+type ItemOption struct {
+	Index int16
+	Value int16
+	Param uint8
 }
 
 type Stats struct {

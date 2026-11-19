@@ -131,8 +131,11 @@ func parseEquipItems2025(packet Packet) ([]InventoryItem, bool, error) {
 			Equipped:     wearState != 0,
 			Cards:        readItemCards32(e, 15),
 			Refine:       e[80],
+			Grade:        e[81],
 			Identified:   flag&1 != 0,
 			Damaged:      flag&2 != 0,
+			Options:      readFiveItemOptions(e, 40),
+			ForgeOptions: readThreeItemOptions(e, 65),
 		})
 	}
 	return items, true, nil
@@ -143,17 +146,46 @@ func parseItemPickupAck2025(packet Packet) (ItemPickupAck, bool, error) {
 		return ItemPickupAck{}, false, fmt.Errorf("ZC_ITEM_PICKUP_ACK 0x%04X too short: %d", packet.ID, len(packet.Data))
 	}
 	return ItemPickupAck{
-		Index:      binary.LittleEndian.Uint16(packet.Data[2:4]),
-		Amount:     binary.LittleEndian.Uint16(packet.Data[4:6]),
-		ItemID:     binary.LittleEndian.Uint32(packet.Data[6:10]),
-		Identified: packet.Data[10] != 0,
-		Damaged:    packet.Data[11] != 0,
-		Cards:      readItemCards32(packet.Data, 12),
-		Location:   uint16(binary.LittleEndian.Uint32(packet.Data[28:32])),
-		Type:       packet.Data[32],
-		Result:     packet.Data[33],
-		Refine:     packet.Data[83],
+		Index:        binary.LittleEndian.Uint16(packet.Data[2:4]),
+		Amount:       binary.LittleEndian.Uint16(packet.Data[4:6]),
+		ItemID:       binary.LittleEndian.Uint32(packet.Data[6:10]),
+		Identified:   packet.Data[10] != 0,
+		Damaged:      packet.Data[11] != 0,
+		Cards:        readItemCards32(packet.Data, 12),
+		Location:     uint16(binary.LittleEndian.Uint32(packet.Data[28:32])),
+		Type:         packet.Data[32],
+		Result:       packet.Data[33],
+		Refine:       packet.Data[83],
+		Grade:        packet.Data[84],
+		Options:      readFiveItemOptions(packet.Data, 40),
+		ForgeOptions: readThreeItemOptions(packet.Data, 65),
 	}, true, nil
+}
+
+// readItemOptions reads count packed options (int16 index, int16 value, uint8 param).
+// Empty slots, index 0, are omitted.
+func readFiveItemOptions(data []byte, offset int) (out [5]ItemOption) {
+	readItemOptionsInto(data, offset, out[:])
+	return out
+}
+
+func readThreeItemOptions(data []byte, offset int) (out [3]ItemOption) {
+	readItemOptionsInto(data, offset, out[:])
+	return out
+}
+
+func readItemOptionsInto(data []byte, offset int, out []ItemOption) {
+	for i := range out {
+		at := offset + i*5
+		if at+5 > len(data) {
+			return
+		}
+		out[i] = ItemOption{
+			Index: int16(binary.LittleEndian.Uint16(data[at : at+2])),
+			Value: int16(binary.LittleEndian.Uint16(data[at+2 : at+4])),
+			Param: data[at+4],
+		}
+	}
 }
 
 func parseItemEntry2025(packet Packet) (FloorItemEntry, bool, error) {
