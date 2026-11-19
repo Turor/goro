@@ -42,3 +42,14 @@ func TestParseExpandedBarterList20250716(t *testing.T) {
 		t.Fatalf("purchase packet % X", pkt)
 	}
 }
+
+func TestParseExpandedBarterRejectsTrailingBytes(t *testing.T) {
+	body := make([]byte, 8+expandedBarterItemHead+1)
+	binary.LittleEndian.PutUint16(body[0:2], PacketZCExpandedBarter)
+	binary.LittleEndian.PutUint16(body[2:4], uint16(len(body)))
+	binary.LittleEndian.PutUint32(body[4:8], 1)
+	_, ok, err := ParseExpandedBarterList(Packet{ID: PacketZCExpandedBarter, Data: body})
+	if err == nil || ok {
+		t.Fatalf("trailing body accepted ok=%v err=%v", ok, err)
+	}
+}

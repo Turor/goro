@@ -209,6 +209,9 @@ func ParseExpandedBarterList(p Packet) ([]BarterItem, bool, error) {
 		off += ncur * expandedBarterCurrency
 		items = append(items, item)
 	}
+	if off != len(p.Data) {
+		return nil, false, fmt.Errorf("ZC_NPC_EXPANDED_BARTER_MARKET_ITEMINFO: trailing %d bytes", len(p.Data)-off)
+	}
 	return items, true, nil
 }
 

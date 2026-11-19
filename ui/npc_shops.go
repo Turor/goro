@@ -68,11 +68,13 @@ func (w *MarketWindow) widgetTree(ctx Context) widget.Widget {
 
 type BarterWindow struct {
 	Window
-	items []network.BarterItem
+	items    []network.BarterItem
+	expanded bool
 }
 
 func (w *BarterWindow) OpenList(ctx Context, items []network.BarterItem) {
 	w.items = items
+	w.expanded = len(items) > 0 && items[0].Expanded
 	w.EnsureWindow(marketWindowW, marketWindowH)
 	w.Window.Open(ctx, w.widgetTree(ctx))
 	w.OnLayoutReload(func() {
@@ -123,7 +125,7 @@ func (w *BarterWindow) widgetTree(ctx Context) widget.Widget {
 		CloseButton(true),
 		OnClose(func() {
 			if ctx.Network != nil {
-				if len(w.items) > 0 && w.items[0].Expanded {
+				if w.expanded {
 					_ = ctx.Network.SendExpandedBarterClose()
 				} else {
 					_ = ctx.Network.SendBarterClose()
