@@ -78,6 +78,6 @@ MVP minimap (`0x0EF5`), quest notify (`0x0446`), skill delete (`0x0441`),
 map property R2 (`0x099B`), equip-switch info (`0x0A9B`), notify time
 (`0x007F`), and feature flags (`0x0EF1`) are implemented.
 
-Still framed and skipped: hat effects (`0x0A3B`) and personal information
-(`0x097B`). Builders that do not take a client date (party, guild, trade,
+Hat effects (`0x0A3B`) and personal information (`0x097B`) are implemented.
+Builders that do not take a client date (party, guild, trade,
 vending, legacy mail) are not checked against the 20250716 handler map yet.

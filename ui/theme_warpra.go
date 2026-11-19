@@ -4,8 +4,8 @@ import "github.com/kivutar/goro/ui/rotheme"
 
 // Warpra destination list and the world-map dungeon floor picker.
 var (
-	warpraWindowW  = 420
-	warpraWindowH  = 340
+	warpraWindowW  = 720
+	warpraWindowH  = 540
 	warpraTabH     = 24
 	warpraRowH     = 22
 	warpraListRows = 10

@@ -75,7 +75,7 @@ func (w *RefineUIWindow) refreshItems(ctx Context) {
 
 func (w *RefineUIWindow) widgetTree(ctx Context) widget.Widget {
 	return Win(
-		Title("Refine"),
+		Title(msgOr(ctx, 3241, "Refine")),
 		CloseButton(true),
 		OnClose(func() {
 			if ctx.Network != nil {

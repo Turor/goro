@@ -322,10 +322,41 @@ func statsDetailsWidget(s *session.Session, stats session.Stats) widget.Widget {
 				{Text: "SPL/CON/CRT", Width: statsDerivedPairWidth, Align: widget.TextAlignLeft, Head: true},
 				{Text: fmt.Sprintf("%d/%d/%d", stats.Spl, stats.Con, stats.Crt), Width: statsDerivedPairWidth, Align: widget.TextAlignRight},
 			},
+			{
+				{Text: "EXP/Drop", Width: statsDerivedPairWidth, Align: widget.TextAlignLeft, Head: true},
+				{Text: personalExpDropText(s), Width: statsDerivedPairWidth, Align: widget.TextAlignRight},
+			},
 		},
 		rotheme.TableRowHeightOpt(float32(statsRowH)),
 		rotheme.TableColors(rotheme.Default.Colors.ButtonHover, rotheme.Default.Colors.WindowFooter),
 	)
+}
+
+func personalExpDropText(s *session.Session) string {
+	if s == nil {
+		return "0%/0%"
+	}
+	return personalRateText(s.PersonalExp) + "/" + personalRateText(s.PersonalDrop)
+}
+
+// 0x097B totals are percent*1000 (100% is 100000).
+func personalRateText(v int32) string {
+	neg := v < 0
+	if neg {
+		v = -v
+	}
+	whole := v / 1000
+	frac := v % 1000
+	sign := ""
+	if neg {
+		sign = "-"
+	}
+	if frac == 0 {
+		return fmt.Sprintf("%s%d%%", sign, whole)
+	}
+	digits := fmt.Sprintf("%03d", frac)
+	digits = strings.TrimRight(digits, "0")
+	return fmt.Sprintf("%s%d.%s%%", sign, whole, digits)
 }
 
 func statsGuildName(s *session.Session) string {
@@ -342,7 +373,7 @@ func statsWindowSnapshot(s *session.Session) string {
 	stats := sessionStats(s)
 	rows := statsRows(s)
 	return fmt.Sprintf(
-		"%d|%d/%d/%d/%d/%d/%d|%d/%d/%d/%d/%d/%d|%d/%d/%d/%d/%d/%d/%d/%d/%d/%d/%d/%d/%d|%s|%d|%d/%d/%d/%d/%d/%d",
+		"%d|%d/%d/%d/%d/%d/%d|%d/%d/%d/%d/%d/%d|%d/%d/%d/%d/%d/%d/%d/%d/%d/%d/%d/%d/%d|%s|%d|%d/%d/%d/%d/%d/%d|%d/%d",
 		stats.Points,
 		rows[0].value, rows[1].value, rows[2].value, rows[3].value, rows[4].value, rows[5].value,
 		rows[0].bonus, rows[1].bonus, rows[2].bonus, rows[3].bonus, rows[4].bonus, rows[5].bonus,
@@ -351,6 +382,7 @@ func statsWindowSnapshot(s *session.Session) string {
 		stats.MDefense, stats.MDefenseBonus, stats.Flee, stats.FleeBonus, stats.ASPD+stats.ASPDBonus,
 		statsGuildName(s),
 		stats.TraitPoints, stats.Pow, stats.Sta, stats.Wis, stats.Spl, stats.Con, stats.Crt,
+		personalExp(s), personalDrop(s),
 	)
 }
 
@@ -503,4 +535,18 @@ func setSessionStat(s *session.Session, statusID uint16, value int) {
 	case network.StatusCrt:
 		s.Stats.Crt = value
 	}
+}
+
+func personalExp(s *session.Session) int32 {
+	if s == nil {
+		return 0
+	}
+	return s.PersonalExp
+}
+
+func personalDrop(s *session.Session) int32 {
+	if s == nil {
+		return 0
+	}
+	return s.PersonalDrop
 }
