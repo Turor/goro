@@ -257,7 +257,7 @@ var worldMapAtlases = []WorldMapAtlas{
 			{ID: "splendide", Name: "Forest Village Splendide", EpFrom: 13.2, EpTo: 99.0, Top: 544, Left: 393, Width: 91, Height: 91},
 			{ID: "spl_fild01", Name: "Splendide Field 01", EpFrom: 13.1, EpTo: 99.0, Top: 455, Left: 483, Width: 91, Height: 91},
 			{ID: "spl_fild02", Name: "Splendide Field 02", EpFrom: 13.1, EpTo: 99.0, Top: 544, Left: 483, Width: 91, Height: 91},
-			{ID: "spl_fild02", Name: "Splendide Field 03", EpFrom: 13.2, EpTo: 99.0, Top: 636, Left: 483, Width: 91, Height: 91},
+			{ID: "spl_fild03", Name: "Splendide Field 03", EpFrom: 13.2, EpTo: 99.0, Top: 636, Left: 483, Width: 91, Height: 91},
 			{ID: "mid_camp", Name: "Rune Midgard Allied Forces Post", EpFrom: 13.1, EpTo: 99.0, Top: 544, Left: 573, Width: 91, Height: 91},
 			{ID: "man_fild01", Name: "Manuk Field 01", EpFrom: 13.1, EpTo: 99.0, Top: 544, Left: 662, Width: 91, Height: 91},
 			{ID: "man_fild03", Name: "Manuk Field 03", EpFrom: 13.2, EpTo: 99.0, Top: 636, Left: 662, Width: 91, Height: 91},

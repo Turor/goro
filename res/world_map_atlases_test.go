@@ -19,3 +19,22 @@ func TestWorldMapAtlasesEpisode98(t *testing.T) {
 		}
 	}
 }
+
+func TestWorldMapAtlasTilesDoNotShareARegion(t *testing.T) {
+	atlases := WorldMapAtlasesForEpisode(WorldMapEpisode)
+	entries := atlases[0].Entries()
+	if len(entries) < 2 || entries[0].Region == entries[1].Region {
+		t.Fatal("continent tiles share a warp region")
+	}
+	var field3 string
+	for _, atlas := range atlases {
+		for _, section := range atlas.Maps {
+			if section.Name == "Splendide Field 03" {
+				field3 = section.ID
+			}
+		}
+	}
+	if field3 != "spl_fild03" {
+		t.Fatalf("splendide field 03 id = %q", field3)
+	}
+}

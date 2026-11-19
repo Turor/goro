@@ -72,7 +72,7 @@ func (w *WorldMapWindow) OpenWindow(ctx Context) error {
 	if w.art == nil && ctx.Resources != nil && len(w.atlases) > 0 {
 		if img, _, err := res.LoadImage(ctx.Resources, res.WorldMapImageCandidates(w.atlases[0].ID)); err == nil {
 			w.art = img
-			w.sections = w.atlases[0].Entries(0)
+			w.sections = w.atlases[0].Entries()
 			w.atlasIndex = 0
 		}
 	}
@@ -89,12 +89,13 @@ func (w *WorldMapWindow) OpenWindow(ctx Context) error {
 		}
 	}
 	screenW, screenH := ctx.ScreenSize()
-	size := w.layoutSize(screenW, screenH)
-	w.EnsureWindow(size.X, size.Y+ROWindowTitleHeight)
-	w.SetSize(size.X, size.Y+ROWindowTitleHeight)
+	frameW, frameH := w.frameSize(screenW, screenH)
+	w.EnsureWindow(frameW, frameH)
+	w.SetSize(frameW, frameH)
 	w.setTitleButtonCount(2)
-	if w.scaled == nil || w.scaled.Bounds().Size() != size {
-		w.scaled = scaleWorldMapImage(w.art, size)
+	mapSize := w.mapSize(screenW, screenH)
+	if w.scaled == nil || w.scaled.Bounds().Size() != mapSize {
+		w.scaled = scaleWorldMapImage(w.art, mapSize)
 	}
 	if w.previews == nil {
 		w.previews = make(map[string]image.Image)
@@ -125,13 +126,17 @@ func (w *WorldMapWindow) reloadLayout() {
 		hovered = w.board.hovered
 	}
 	screenW, screenH := w.ctx.ScreenSize()
-	size := w.layoutSize(screenW, screenH)
-	w.SetSize(size.X, size.Y+ROWindowTitleHeight)
-	if w.scaled == nil || w.scaled.Bounds().Size() != size {
-		w.scaled = scaleWorldMapImage(w.art, size)
+	frameW, frameH := w.frameSize(screenW, screenH)
+	w.SetSize(frameW, frameH)
+	mapSize := w.mapSize(screenW, screenH)
+	if w.scaled == nil || w.scaled.Bounds().Size() != mapSize {
+		w.scaled = scaleWorldMapImage(w.art, mapSize)
 	}
 	w.SetContent(w.widgetTree(w.ctx))
 	if w.board != nil {
+		if hovered < 0 || hovered >= len(w.board.entries) {
+			hovered = -1
+		}
 		w.board.hovered = hovered
 	}
 	w.UpdatePresentation(w.ctx)
@@ -202,16 +207,25 @@ func (w *WorldMapWindow) activeEntries(ctx Context) []res.WorldMapEntry {
 	return ctx.Resources.WorldMapEntries()
 }
 
-func (w *WorldMapWindow) layoutSize(screenW, screenH int) image.Point {
+func (w *WorldMapWindow) hasRegionRail() bool {
+	return len(w.atlases) > 1
+}
+
+func (w *WorldMapWindow) mapSize(screenW, screenH int) image.Point {
 	availW := screenW
-	if len(w.atlases) > 1 {
-		availW -= worldMapRailW
+	if w.hasRegionRail() {
+		availW -= worldMapRailW + int(worldMapPreviewEdge)
 	}
-	size := worldMapSize(w.art.Bounds().Size(), availW, screenH)
-	if len(w.atlases) > 1 {
-		size.X += worldMapRailW
+	return worldMapSize(w.art.Bounds().Size(), availW, screenH)
+}
+
+func (w *WorldMapWindow) frameSize(screenW, screenH int) (int, int) {
+	size := w.mapSize(screenW, screenH)
+	width := size.X
+	if w.hasRegionRail() {
+		width += worldMapRailW + int(worldMapPreviewEdge)
 	}
-	return size
+	return width, size.Y + ROWindowTitleHeight
 }
 
 func (w *WorldMapWindow) selectAtlas(ctx Context, index int) {
@@ -225,7 +239,7 @@ func (w *WorldMapWindow) selectAtlas(ctx Context, index int) {
 	w.atlasIndex = index
 	w.art = img
 	w.scaled = nil
-	w.sections = w.atlases[index].Entries(index)
+	w.sections = w.atlases[index].Entries()
 	if w.IsOpen() {
 		w.reloadLayout()
 	}

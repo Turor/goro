@@ -60,13 +60,13 @@ func parseWorldMapEntries(data []byte) []WorldMapEntry {
 	return entries
 }
 
-func (a WorldMapAtlas) Entries(region int) []WorldMapEntry {
+func (a WorldMapAtlas) Entries() []WorldMapEntry {
 	out := make([]WorldMapEntry, len(a.Maps))
 	for i, section := range a.Maps {
 		out[i] = WorldMapEntry{
 			MapName: strings.ToLower(section.ID),
 			Name:    section.Name,
-			Region:  region,
+			Region:  i + 1,
 			Bounds:  image.Rect(section.Left, section.Top, section.Left+section.Width, section.Top+section.Height),
 		}
 	}
