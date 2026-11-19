@@ -292,12 +292,12 @@ func TestShortcutBarF12CyclesActiveRow(t *testing.T) {
 
 func TestShortcutLabelsMatchClassicBattleMode(t *testing.T) {
 	tests := map[int]string{
-		0:                      "F1 / Z",
-		shortcutCols - 1:       "F9 / .",
-		shortcutCols:           "Q",
-		2*shortcutCols - 1:     "O",
-		2 * shortcutCols:       "A",
-		shortcutTotalSlots - 1: "L",
+		0:                  "F1 / Z",
+		shortcutCols - 1:   "F9 / .",
+		shortcutCols:       "Q",
+		2*shortcutCols - 1: "O",
+		2 * shortcutCols:   "A",
+		26:                 "L",
 	}
 	for slot, want := range tests {
 		if got := shortcutLabelForSlot(slot, 0, true); got != want {

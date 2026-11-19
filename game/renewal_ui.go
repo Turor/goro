@@ -152,6 +152,55 @@ func (m *WorldMode) handleRenewalUIPacket(ctx client.Context, pkt network.Packet
 		m.ui.console.AddMessage("%s", msg)
 		return true
 	}
+	if open, ok, err := network.ParseReformOpen(pkt); err != nil {
+		glog.Errorf("parse reform open 0x%04X: %v", pkt.ID, err)
+		return true
+	} else if ok {
+		m.ui.reform.Open(ctx, open.ItemID)
+		return true
+	}
+	if ack, ok, err := network.ParseReformAck(pkt); err != nil {
+		glog.Errorf("parse reform ack 0x%04X: %v", pkt.ID, err)
+		return true
+	} else if ok {
+		m.ui.reform.SetAck(ctx, ack)
+		return true
+	}
+	if open, ok, err := network.ParseLaphineOpen(pkt); err != nil {
+		glog.Errorf("parse laphine open 0x%04X: %v", pkt.ID, err)
+		return true
+	} else if ok {
+		m.ui.laphine.Open(ctx, open)
+		return true
+	}
+	if result, ok, err := network.ParseLaphineAck(pkt); err != nil {
+		glog.Errorf("parse laphine ack 0x%04X: %v", pkt.ID, err)
+		return true
+	} else if ok {
+		m.ui.laphine.SetResult(ctx, result)
+		return true
+	}
+	if list, ok, err := network.ParseEdenList(pkt); err != nil {
+		glog.Errorf("parse eden list 0x%04X: %v", pkt.ID, err)
+		return true
+	} else if ok {
+		m.ui.eden.SetList(ctx, list)
+		return true
+	}
+	if shop, ok, err := network.ParseEdenShop(pkt); err != nil {
+		glog.Errorf("parse eden shop 0x%04X: %v", pkt.ID, err)
+		return true
+	} else if ok {
+		m.ui.eden.SetShop(ctx, shop)
+		return true
+	}
+	if res, ok, err := network.ParseEdenResult(pkt); err != nil {
+		glog.Errorf("parse eden result 0x%04X: %v", pkt.ID, err)
+		return true
+	} else if ok {
+		m.ui.eden.SetResult(ctx, res)
+		return true
+	}
 	return false
 }
 
@@ -165,6 +214,8 @@ func (m *WorldMode) applyUIOpen(ctx client.Context, ui network.UIOpen) {
 		m.ui.attendance.Open(ctx, ui.Data)
 	case network.UITypeGrade:
 		m.ui.gradeUI.Open(ctx)
+	case network.UITypeStyling:
+		m.ui.styling.Open(ctx)
 	default:
 		glog.Debugf("unhandled UI type %d data=%d", ui.Type, ui.Data)
 	}

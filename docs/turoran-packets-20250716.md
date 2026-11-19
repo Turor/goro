@@ -69,13 +69,13 @@ golden fixtures of the Hercules struct layout.
 
 ## Not yet in this profile
 
-PIN, Bank, Refine UI, Enchant UI, RoDEX inbox/compose/attach, attendance,
-achievements, grade enchant, search store, equip switch, pet/homun autofeed,
-costume/shadow equipment slots, 4th-job trait display, extra hotkey tabs,
-and guild storage (inventory type 3) are implemented.
+PIN, Bank, Refine UI, Enchant UI, RoDEX, attendance, achievements, grade
+enchant, search store, equip switch, autofeed, costume/shadow slots, 4th-job
+traits, extra hotkey tabs, guild storage, roulette, NPC market, barter, clan,
+item reform, Laphine, styling shop, and Eden group are implemented.
 
 Still framed and skipped: remaining Turoran custom features (`0x0EF1`,
-`0x0EF5`, Eden), item reform, Laphine, styling shop, Eden, and remaining map packets (`0x0A9B`, `0x097B`,
+`0x0EF5`) and remaining map packets (`0x0A9B`, `0x097B`,
 `0x0446`, `0x0A3B`, `0x099B`, `0x0441`, `0x007F`). Builders that do not
 take a client date (party, guild, trade, vending, legacy mail) are not
 checked against the 20250716 handler map yet.

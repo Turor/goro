@@ -154,6 +154,10 @@ type worldUI struct {
 	market          gameui.MarketWindow
 	barter          gameui.BarterWindow
 	clan            gameui.ClanWindow
+	reform          gameui.ReformWindow
+	laphine         gameui.LaphineWindow
+	styling         gameui.StylingWindow
+	eden            gameui.EdenWindow
 	emoteWindow     gameui.EmoteWindow
 	chatShortcuts   gameui.ChatShortcutsWindow
 	skillTextPrompt gameui.TextPromptWindow
@@ -200,6 +204,10 @@ func (u *worldUI) nonConsoleKeyboardInputBlockedExcept(ctx client.Context, excep
 		u.market.IsOpen() ||
 		u.barter.IsOpen() ||
 		u.clan.IsOpen() ||
+		u.reform.IsOpen() ||
+		u.laphine.IsOpen() ||
+		u.styling.IsOpen() ||
+		u.eden.IsOpen() ||
 		!u.npcInputAvailable() ||
 		open(&u.settingsWindow.Window) ||
 		u.chatShortcuts.IsOpen() ||
@@ -890,6 +898,18 @@ func (m *WorldMode) Update(ctx client.Context) (Mode, error) {
 	if m.ui.clan.Update(ctx) {
 		return nil, nil
 	}
+	if m.ui.reform.Update(ctx) {
+		return nil, nil
+	}
+	if m.ui.laphine.Update(ctx) {
+		return nil, nil
+	}
+	if m.ui.styling.Update(ctx) {
+		return nil, nil
+	}
+	if m.ui.eden.Update(ctx) {
+		return nil, nil
+	}
 	if m.ui.warpra.Update(ctx) {
 		return nil, nil
 	}
@@ -1343,6 +1363,10 @@ func (m *WorldMode) nextWorldMode() *WorldMode {
 	next.ui.market = m.ui.market
 	next.ui.barter = m.ui.barter
 	next.ui.clan = m.ui.clan
+	next.ui.reform = m.ui.reform
+	next.ui.laphine = m.ui.laphine
+	next.ui.styling = m.ui.styling
+	next.ui.eden = m.ui.eden
 	next.ui.emoteWindow = m.ui.emoteWindow
 	next.ui.chatShortcuts = m.ui.chatShortcuts
 	next.ui.social.FriendsWindow = m.ui.social.FriendsWindow

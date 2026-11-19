@@ -14,6 +14,7 @@ const (
 	HotkeyTypeSkill uint8 = 1
 
 	HotkeyListSlots2008 = 27
+	HotkeyListSlots2025 = 38
 )
 
 type HotkeySlot struct {
