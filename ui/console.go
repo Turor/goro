@@ -293,7 +293,7 @@ func (c *ChatConsole) clickedOutside(ctx client.Context) bool {
 }
 
 func (c *ChatConsole) ensureWindow(ctx client.Context) {
-	if c.window.dragging {
+	if c.window.dragging || c.window.resizing {
 		return
 	}
 	c.ctx = ctx

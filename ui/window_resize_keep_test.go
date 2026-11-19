@@ -51,3 +51,39 @@ func TestGripPressWithoutMovementDoesNotSaveSize(t *testing.T) {
 		t.Fatalf("unchanged grip press saved size %+v", saved)
 	}
 }
+
+func TestUserSizeDoesNotLookLikeALayoutMismatch(t *testing.T) {
+	ctx := Context{Input: input.NewState(), UIManager: NewManager(), ScreenW: 1280, ScreenH: 720}
+	window := NewWindow(300, 200)
+	window.Open(ctx, Win(Title("Box"), Size(300, 200), Content(primitives.Box())))
+	window.resizeTo(ctx, 340, 230)
+	if !window.holdsUserSize() {
+		t.Fatal("resized window does not hold its size")
+	}
+	window.SetSize(300, 200)
+	if window.width != 340 || window.height != 230 {
+		t.Fatalf("layout SetSize changed user size to %dx%d", window.width, window.height)
+	}
+}
+
+func TestSetContentDuringResizeInstallsTree(t *testing.T) {
+	ctx := Context{Input: input.NewState(), UIManager: NewManager(), ScreenW: 1280, ScreenH: 720}
+	window := NewWindow(300, 200)
+	window.Open(ctx, Win(Title("Box"), Size(300, 200), Content(primitives.Box())))
+	window.Publish(ctx)
+	pressX, pressY := window.x+window.width-2, window.y+window.height-2
+	ctx.Input.SetMousePosition(pressX, pressY)
+	ctx.Input.SetMouseButton(input.MouseButtonLeft, true)
+	window.Update(ctx)
+	if !window.Resizing() {
+		t.Fatal("grip press did not start a resize")
+	}
+	next := Win(Title("Updated"), Size(300, 200), Content(primitives.Box()))
+	window.SetContent(next)
+	if window.content != next {
+		t.Fatal("SetContent did not install the new tree")
+	}
+	if window.width != 300 || window.height != 200 {
+		t.Fatalf("resize start changed size to %dx%d", window.width, window.height)
+	}
+}

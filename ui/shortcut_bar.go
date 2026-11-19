@@ -163,7 +163,7 @@ func (b *ShortcutBar) Publish(ctx Context, actions GameActions, assets AssetProv
 	}
 	w, h := shortcutBarWidth(), shortcutBarHeightForRows(b.visibleRowCount())
 	b.ensureWindow()
-	if !b.window.dragging {
+	if !b.window.dragging && !b.window.resizing {
 		x, y := b.bounds(ctx)
 		b.window.SetAutoPosition(x, y)
 		b.window.SetSize(w, h)

@@ -440,9 +440,6 @@ func (w *Window) IsOpen() bool {
 }
 
 func (w *Window) SetContent(content widget.Widget) {
-	if w.resizing {
-		return
-	}
 	w.cancelDragLayer(w.ctx)
 	w.content = content
 	w.applyUserFrame()

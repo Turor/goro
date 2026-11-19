@@ -140,7 +140,7 @@ func (m *Minimap) Update(ctx Context) bool {
 	markerOnly := markerChanged && !fullRedraw
 	drawPendingMarker := m.pendingMarker && !markerChanged
 	needsRedraw := fullRedraw || drawPendingMarker
-	if m.window.width != w || m.window.baseHeight() != h {
+	if !m.window.holdsUserSize() && (m.window.width != w || m.window.baseHeight() != h) {
 		m.window.SetSize(w, h)
 		if m.window.IsOpen() {
 			m.widget.image = m.scaledImage(minimapContentMapSize(w, h))

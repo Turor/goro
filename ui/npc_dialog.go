@@ -396,7 +396,7 @@ func (d *NPCDialog) ensureWindows(ctx Context) {
 		d.dialogWindow = NewWindow(w, h)
 		d.dialogWindow.SetAutoPosition(x, y)
 	} else {
-		if d.dialogWindow.width != w || d.dialogWindow.baseHeight() != h {
+		if !d.dialogWindow.holdsUserSize() && (d.dialogWindow.width != w || d.dialogWindow.baseHeight() != h) {
 			d.dirty = true
 		}
 		d.dialogWindow.SetSize(w, h)
@@ -409,7 +409,7 @@ func (d *NPCDialog) ensureWindows(ctx Context) {
 		d.menuWindow = NewWindow(menuW, menuH)
 		d.menuWindow.SetAutoPosition(menuX, menuY)
 	} else {
-		if d.menuWindow.width != menuW || d.menuWindow.baseHeight() != menuH {
+		if !d.menuWindow.holdsUserSize() && (d.menuWindow.width != menuW || d.menuWindow.baseHeight() != menuH) {
 			d.dirty = true
 		}
 		d.menuWindow.SetSize(menuW, menuH)
@@ -424,7 +424,7 @@ func (d *NPCDialog) ensureWindows(ctx Context) {
 		d.inputWindow.SetAutoPosition(inputX, inputY)
 	} else {
 		d.inputWindow.titleHeight = 0
-		if d.inputWindow.width != inputW || d.inputWindow.baseHeight() != inputH {
+		if !d.inputWindow.holdsUserSize() && (d.inputWindow.width != inputW || d.inputWindow.baseHeight() != inputH) {
 			d.dirty = true
 		}
 		d.inputWindow.SetSize(inputW, inputH)

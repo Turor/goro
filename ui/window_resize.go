@@ -10,6 +10,10 @@ import (
 
 func (w *Window) Resizing() bool { return w.resizing }
 
+func (w *Window) holdsUserSize() bool {
+	return w != nil && (w.userSized || w.resizing)
+}
+
 func (w *Window) rememberSize(width, height int) {
 	if width < 1 || height < 1 {
 		return
