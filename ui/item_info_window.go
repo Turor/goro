@@ -424,12 +424,13 @@ func itemInfoShowsCardSlots(ctx Context, item session.InventoryItem) bool {
 }
 
 func itemInfoDescriptionLines(ctx Context, item session.InventoryItem) []itemInfoTextLine {
+	optionLines := itemRandomOptionLines(ctx.Resources, item)
 	if ctx.Resources == nil {
-		return nil
+		return optionLines
 	}
 	lines, ok := ctx.Resources.ItemDescription(int(item.ItemID), item.Identified)
 	if !ok {
-		return nil
+		return optionLines
 	}
 	out := make([]itemInfoTextLine, 0, len(lines))
 	for _, line := range lines {
@@ -440,7 +441,10 @@ func itemInfoDescriptionLines(ctx Context, item session.InventoryItem) []itemInf
 		}
 		out = append(out, parseItemInfoTextLine(line))
 	}
-	return out
+	if len(optionLines) == 0 {
+		return out
+	}
+	return append(optionLines, out...)
 }
 
 type itemInfoTextLine struct {
