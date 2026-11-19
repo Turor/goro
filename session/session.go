@@ -6,6 +6,9 @@ type Session struct {
 	PetAutoFeed          bool
 	HomunAutoFeed        bool
 	TuroranFeatures      uint32
+	PersonalExp          int32
+	PersonalDeath        int32
+	PersonalDrop         int32
 	AccountID            uint32
 	CharID               uint32
 	AuthCode             uint32

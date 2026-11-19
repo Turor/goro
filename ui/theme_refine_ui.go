@@ -3,8 +3,8 @@ package ui
 import "github.com/kivutar/goro/ui/rotheme"
 
 var (
-	refineUIWindowW = 360
-	refineUIWindowH = 320
+	refineUIWindowW = 262
+	refineUIWindowH = 348
 	refineUIRowH    = 24
 	refineUIRows    = 6
 	refineUIPad     = 10

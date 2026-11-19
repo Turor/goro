@@ -3,8 +3,8 @@ package ui
 import "github.com/kivutar/goro/ui/rotheme"
 
 var (
-	enchantUIWindowW = 360
-	enchantUIWindowH = 280
+	enchantUIWindowW = 690
+	enchantUIWindowH = 470
 	enchantUIRowH    = 24
 	enchantUIRows    = 5
 	enchantUIPad     = 10

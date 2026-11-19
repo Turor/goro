@@ -7,8 +7,8 @@ import (
 )
 
 var (
-	companionWindowW         = 560
-	companionWindowH         = 380
+	companionWindowW         = 640
+	companionWindowH         = 500
 	companionWindowTabW      = 92
 	companionWindowTabH      = 23
 	companionWindowPad       = 10
