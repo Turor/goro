@@ -222,7 +222,7 @@ func (m *System) rsmMeshesForPlacement(manager *res.Manager, rsm *res.RSM, rsw *
 			if texture != nil {
 				bounds := texture.Bounds()
 				w, h := float32(bounds.Dx()), float32(bounds.Dy())
-				builder := builderFor(texture, rsmDrawOptionsForTriangle(render.FilterLinear, render.AddressClampToEdge, worldTri, visible.Index))
+				builder := builderFor(texture, rsmDrawOptionsForTriangle(render.FilterLinear, render.AddressRepeat, worldTri, visible.Index))
 				if builder != nil {
 					builder.addTriangle(
 						scene.TexturedSurfaceVertex3D(worldTri.verts[0], worldTri.uvs[0], worldTri.color, w, h),
@@ -396,7 +396,7 @@ func (m *System) drawAnimatedRSMNodeTriangles(screen *render.Frame, manager *res
 		if texture != nil {
 			bounds := texture.Bounds()
 			w, h := float32(bounds.Dx()), float32(bounds.Dy())
-			options := rsmDrawOptionsForVertices(render.FilterLinear, render.AddressClampToEdge, a, b, c, visible.Index)
+			options := rsmDrawOptionsForVertices(render.FilterLinear, render.AddressRepeat, a, b, c, visible.Index)
 			batch := animatedRSMBatchFor(screen, batchOrder, texture, options)
 			if batch != nil {
 				batch.AddTriangle(
