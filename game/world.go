@@ -145,6 +145,9 @@ type worldUI struct {
 	refineUI        gameui.RefineUIWindow
 	enchantUI       gameui.EnchantUIWindow
 	rodex           gameui.RodexWindow
+	attendance      gameui.AttendanceWindow
+	achievements    gameui.AchievementWindow
+	gradeUI         gameui.GradeEnchantWindow
 	emoteWindow     gameui.EmoteWindow
 	chatShortcuts   gameui.ChatShortcutsWindow
 	skillTextPrompt gameui.TextPromptWindow
@@ -182,6 +185,9 @@ func (u *worldUI) nonConsoleKeyboardInputBlockedExcept(ctx client.Context, excep
 		u.refineUI.IsOpen() ||
 		u.enchantUI.IsOpen() ||
 		u.rodex.IsOpen() ||
+		u.attendance.IsOpen() ||
+		u.achievements.IsOpen() ||
+		u.gradeUI.IsOpen() ||
 		!u.npcInputAvailable() ||
 		open(&u.settingsWindow.Window) ||
 		u.chatShortcuts.IsOpen() ||
@@ -845,6 +851,15 @@ func (m *WorldMode) Update(ctx client.Context) (Mode, error) {
 	if m.ui.rodex.Update(ctx) {
 		return nil, nil
 	}
+	if m.ui.attendance.Update(ctx) {
+		return nil, nil
+	}
+	if m.ui.achievements.Update(ctx) {
+		return nil, nil
+	}
+	if m.ui.gradeUI.Update(ctx) {
+		return nil, nil
+	}
 	if m.ui.warpra.Update(ctx) {
 		return nil, nil
 	}
@@ -1141,6 +1156,12 @@ func (m *WorldMode) basicMenuCallbacks(ctx client.Context) gameui.BasicMenuCallb
 				m.ui.rodex.Toggle(ctx)
 			}
 		},
+		OnAttendance: func() {
+			if ctx.Network != nil {
+				_ = ctx.Network.SendOpenUI(network.CZUITypeAttendance)
+			}
+		},
+		OnAchievement: func() { m.ui.achievements.Open(ctx) },
 	}
 }
 
@@ -1281,6 +1302,9 @@ func (m *WorldMode) nextWorldMode() *WorldMode {
 	next.ui.refineUI = m.ui.refineUI
 	next.ui.enchantUI = m.ui.enchantUI
 	next.ui.rodex = m.ui.rodex
+	next.ui.attendance = m.ui.attendance
+	next.ui.achievements = m.ui.achievements
+	next.ui.gradeUI = m.ui.gradeUI
 	next.ui.emoteWindow = m.ui.emoteWindow
 	next.ui.chatShortcuts = m.ui.chatShortcuts
 	next.ui.social.FriendsWindow = m.ui.social.FriendsWindow
