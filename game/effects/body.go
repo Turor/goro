@@ -504,6 +504,7 @@ func (m *System) DrawActor(ctx client.Context, screen *render.Frame, projection 
 func (m *System) DrawActorSpriteBillboard(screen *render.Frame, projection scene.Projection, billboard *scene.Billboard, worldX, worldY, worldZ, scale, alpha, shadow float64, tintColor color.RGBA, blend render.Blend) {
 	options := scene.SpriteBillboardTriangleDrawOptions()
 	options.DepthWrite = true
+	options.CastShadow = true
 	options.Filter = render.FilterSprite
 	options.Blend = blend
 	scene.DrawSpriteBillboardTintAlpha3DWithOptions(screen, projection, billboard, m.spriteTexture(billboard.Image), worldX, worldY, scene.ActorSpriteWorldZ(worldZ), scale, alpha, shadow, tintColor, options)

@@ -11,7 +11,8 @@ const (
 	MaxLightsPerTile = 8
 	// ShadowBias is added to the shadow-map depth before the occlusion test.
 	ShadowBias float32 = 0.002
-	// ShadowDarken scales the sun term on receivers the shadow map occludes.
+	// ShadowDarken is the previous occluded-sun scale. Enhanced shading now
+	// drops the sun term in shadow and keeps the ambient term.
 	ShadowDarken float32 = 0.45
 )
 
@@ -23,10 +24,13 @@ type PointLight struct {
 	Intensity float32
 }
 
-// SunLight is the map sun.
+// SunLight is the map sun. Direction is the downward ray, not the direction
+// toward the sun. Ambient is packed into the lighting uniform and used only
+// when enhanced shading replaces the baked lightmap.
 type SunLight struct {
 	Direction [3]float32
 	Color     [3]float32
+	Ambient   [3]float32
 }
 
 // SelectPointLights keeps at most cap of the strongest lights.
@@ -177,28 +181,30 @@ func ShadowOccludes(receiverLightDepth, mapDepth, bias float32) bool {
 	return receiverLightDepth > mapDepth+bias
 }
 
-// Shade applies the lightmap and, when enhanced is on, the sun N·L term, the
-// point lights, and shadow darkening. Enhanced off is the lightmap term only.
+// Shade returns the lightmap term when enhanced is off. Enhanced on ignores
+// the lightmap and returns base * saturate(ambient + sun·N·visibility + points).
+// sun.Direction is the downward ray, so N·L faces the opposite way. Occlusion
+// drops the sun term and leaves ambient. Ground vertices are still premultiplied
+// by the map ground scale, so this multiply can darken them; it cannot exceed base.
 func Shade(base [3]float32, lightmap [4]float32, normal [3]float32, sun SunLight, points []PointLight, worldPos [3]float32, occluded, enhanced bool) [3]float32 {
-	lit := lightmapTerm(base, lightmap)
 	if !enhanced {
-		return lit
+		return lightmapTerm(base, lightmap)
 	}
 	n := normalize3(normal)
 	sunDir := normalize3(sun.Direction)
-	ndotl := dot3(n, sunDir)
+	ndotl := dot3(n, scale3(sunDir, -1))
 	if ndotl < 0 {
 		ndotl = 0
 	}
-	sunScale := ndotl
+	visibility := float32(1)
 	if occluded {
-		sunScale *= ShadowDarken
+		visibility = 0
 	}
-	lit = add3(lit, scale3(sun.Color, sunScale))
+	sum := add3(sun.Ambient, scale3(sun.Color, ndotl*visibility))
 	for _, light := range points {
-		lit = add3(lit, pointContribution(light, worldPos))
+		sum = add3(sum, pointContribution(light, worldPos, n))
 	}
-	return lit
+	return mul3(base, saturate3(sum))
 }
 
 func lightmapTerm(base [3]float32, lightmap [4]float32) [3]float32 {
@@ -209,20 +215,22 @@ func lightmapTerm(base [3]float32, lightmap [4]float32) [3]float32 {
 	}
 }
 
-func pointContribution(light PointLight, worldPos [3]float32) [3]float32 {
+func pointContribution(light PointLight, worldPos, normal [3]float32) [3]float32 {
 	if light.Range <= 0 || light.Intensity <= 0 {
 		return [3]float32{}
 	}
-	dx := worldPos[0] - light.Position[0]
-	dy := worldPos[1] - light.Position[1]
-	dz := worldPos[2] - light.Position[2]
-	dist := float32(math.Sqrt(float64(dx*dx + dy*dy + dz*dz)))
+	toLight := sub3(light.Position, worldPos)
+	dist := float32(math.Sqrt(float64(dot3(toLight, toLight))))
 	if dist >= light.Range {
 		return [3]float32{}
 	}
 	atten := 1 - dist/light.Range
 	atten *= atten
-	return scale3(light.Color, light.Intensity*atten)
+	ndotl := dot3(normalize3(normal), normalize3(toLight))
+	if ndotl < 0 {
+		ndotl = 0
+	}
+	return scale3(light.Color, light.Intensity*atten*ndotl)
 }
 
 func clamp01(v float32) float32 {
@@ -245,6 +253,38 @@ func scale3(v [3]float32, s float32) [3]float32 {
 
 func add3(a, b [3]float32) [3]float32 {
 	return [3]float32{a[0] + b[0], a[1] + b[1], a[2] + b[2]}
+}
+
+func mul3(a, b [3]float32) [3]float32 {
+	return [3]float32{a[0] * b[0], a[1] * b[1], a[2] * b[2]}
+}
+
+func saturate3(v [3]float32) [3]float32 {
+	return [3]float32{clamp01(v[0]), clamp01(v[1]), clamp01(v[2])}
+}
+
+// LightFacingAxes is the shadow-sprite basis. axisScale is the world length of
+// the camera right axis (world units per pixel). sunRay is the stored downward
+// ray. A zero ray or scale returns zero axes so the shader can keep the camera
+// basis. Both returned axes are perpendicular to a non-zero ray.
+func LightFacingAxes(axisScale float32, sunRay [3]float32) (right, up [3]float32) {
+	if axisScale == 0 || math.IsNaN(float64(axisScale)) || math.IsInf(float64(axisScale), 0) {
+		return [3]float32{}, [3]float32{}
+	}
+	ray := normalize3(sunRay)
+	if ray == ([3]float32{}) {
+		return [3]float32{}, [3]float32{}
+	}
+	worldUp := [3]float32{0, 1, 0}
+	if math.Abs(float64(dot3(ray, worldUp))) > 0.95 {
+		worldUp = [3]float32{0, 0, 1}
+	}
+	side := normalize3(cross3(worldUp, ray))
+	if side == ([3]float32{}) {
+		return [3]float32{}, [3]float32{}
+	}
+	lift := normalize3(cross3(ray, side))
+	return scale3(side, axisScale), scale3(lift, axisScale)
 }
 
 func normalize3(v [3]float32) [3]float32 {

@@ -17,6 +17,7 @@ func (m *System) SubmitMapLighting(screen *render.Frame, gnd *res.GND, rsw *res.
 	sun := render.SunLight{
 		Direction: [3]float32{float32(dir.X), float32(dir.Y), float32(dir.Z)},
 		Color:     [3]float32{float32(lighting.Diffuse.X), float32(lighting.Diffuse.Y), float32(lighting.Diffuse.Z)},
+		Ambient:   [3]float32{float32(lighting.ambient.X), float32(lighting.ambient.Y), float32(lighting.ambient.Z)},
 	}
 	var raw []render.PointLight
 	if rsw != nil && gnd != nil {

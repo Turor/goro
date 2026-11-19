@@ -122,6 +122,11 @@ type gpuRenderer struct {
 	shadowLayout            *wgpu.PipelineLayout
 	shadowGroup             *wgpu.BindGroup
 	shadowPipeline          *wgpu.RenderPipeline
+	shadowSpriteBGL         *wgpu.BindGroupLayout
+	shadowSpriteLayout      *wgpu.PipelineLayout
+	shadowSpritePipeline    *wgpu.RenderPipeline
+	shadowSpriteSlot        dynamicGPUBuffer
+	shadowSpriteGroups      []*wgpu.BindGroup
 	billboardLayout         *wgpu.PipelineLayout
 	arrayBGL                *wgpu.BindGroupLayout
 	arrayLayout             *wgpu.PipelineLayout
