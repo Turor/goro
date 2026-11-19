@@ -53,8 +53,9 @@ type windowFrame struct {
 	title       *primitives.TextWidget
 	// titleStyle is what the theme last gave the title; a title restyled by
 	// its window since then keeps its own color or size across reloads.
-	titleColor widget.Color
-	titleSize  float32
+	titleColor   widget.Color
+	titleSize    float32
+	fillUserSize bool
 }
 
 func (f *windowFrame) applyBackground() {
@@ -94,7 +95,32 @@ func (f *windowFrame) refreshLayoutTokens() {
 
 func (f *windowFrame) Layout(ctx widget.Context, constraints geometry.Constraints) geometry.Size {
 	f.refreshLayoutTokens()
+	if f.fillUserSize {
+		if content := windowFrameContent(f.BoxWidget); content != nil {
+			width := f.Style().ExplicitWidth
+			height := f.Style().ExplicitHeight
+			if f.titleBar {
+				height -= float32(windowTitleHeight)
+			}
+			if height < 0 {
+				height = 0
+			}
+			growWindowPanes(content, width, height)
+		}
+	}
 	return f.BoxWidget.Layout(ctx, constraints)
+}
+
+func windowFrameContent(frame *primitives.BoxWidget) widget.Widget {
+	if frame == nil {
+		return nil
+	}
+	for _, child := range frame.Children() {
+		if expanded, ok := child.(*primitives.ExpandedWidget); ok {
+			return expanded.Child()
+		}
+	}
+	return nil
 }
 
 // ROWindowTitleHeight and ROWindowFooterHeight are the base heights the
@@ -142,7 +168,7 @@ func Win(options ...WindowOption) widget.Widget {
 		children = append(children, roTitleBar(titleContent))
 	}
 	if cfg.content != nil {
-		children = append(children, primitives.Expanded(newGrowingContent(cfg.content)))
+		children = append(children, primitives.Expanded(cfg.content))
 	}
 	if cfg.footer != nil {
 		footerBody := primitives.Box(

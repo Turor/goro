@@ -81,6 +81,7 @@ func (w *Window) applyUserFrame() {
 	w.width, w.height = w.userWidth, w.userHeight
 	frame.Width(float32(w.userWidth))
 	frame.Height(float32(w.userHeight))
+	frame.fillUserSize = true
 	w.heightDelta = frame.heightDelta
 }
 
