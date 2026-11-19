@@ -42,6 +42,10 @@ func applyParameterChange(ctx client.Context, change network.ParameterChange) {
 	case network.StatusMaxSP:
 		ctx.Session.Vitals.MaxSP = value
 		ctx.Session.Selected.MaxSP = value
+	case network.StatusAP:
+		ctx.Session.Vitals.AP = value
+	case network.StatusMaxAP:
+		ctx.Session.Vitals.MaxAP = value
 	case network.StatusPoint:
 		ctx.Session.Stats.Points = value
 	case network.StatusTraitPoint:
@@ -95,6 +99,18 @@ func applyParameterChange(ctx client.Context, change network.ParameterChange) {
 		ctx.Session.Stats.ASPD = int(int32(change.Value))
 	case network.StatusASPDBonus:
 		ctx.Session.Stats.ASPDBonus = int(int32(change.Value))
+	case network.StatusPAtk:
+		ctx.Session.Stats.PAtk = int(int32(change.Value))
+	case network.StatusSMatk:
+		ctx.Session.Stats.SMatk = int(int32(change.Value))
+	case network.StatusRes:
+		ctx.Session.Stats.Res = int(int32(change.Value))
+	case network.StatusMRes:
+		ctx.Session.Stats.MRes = int(int32(change.Value))
+	case network.StatusHPlus:
+		ctx.Session.Stats.HPlus = int(int32(change.Value))
+	case network.StatusCRate:
+		ctx.Session.Stats.CRate = int(int32(change.Value))
 	case network.StatusJobLevel:
 		ctx.Session.Progress.JobLevel = value
 		ctx.Session.Selected.JobLevel = clampInt16(value)

@@ -31,6 +31,7 @@ type CharacterWindow struct {
 }
 
 func (w *CharacterWindow) Update(ctx Context) bool {
+	w.ctx = ctx
 	w.EnsureWindow(characterWindowWidth, w.windowHeight())
 	w.CloseOnEsc = false
 	if ctx.Session == nil {
@@ -86,7 +87,11 @@ func (w *CharacterWindow) windowHeight() int {
 	if w.compact {
 		return characterWindowCompactHeight
 	}
-	return characterWindowHeight
+	h := characterWindowHeight
+	if characterWindowShowsAP(w.ctx.Session) {
+		h += int(rotheme.ProgressBarHeight + characterVitalsGap)
+	}
+	return h
 }
 
 func (w *CharacterWindow) ToggleCompact() {
@@ -158,10 +163,7 @@ func (w *CharacterWindow) bodyTree(ctx Context) *primitives.BoxWidget {
 		return primitives.Box(
 			rotheme.Text(fmt.Sprintf("Lv. %d / %s / Lv. %d / Exp. %.1f%%", progress.BaseLevel, jobName, progress.JobLevel, baseEXP)).
 				MaxLines(1).Ellipsis(),
-			primitives.HBox(
-				characterTextCell(fmt.Sprintf("HP %d / %d", vitals.HP, vitals.MaxHP), characterStatCellW, rotheme.Default.Colors.MutedText),
-				characterTextCell(fmt.Sprintf("SP %d / %d", vitals.SP, vitals.MaxSP), characterStatCellW, rotheme.Default.Colors.MutedText),
-			).Gap(characterBodyGap),
+			primitives.HBox(characterCompactVitalCells(vitals)...).Gap(characterBodyGap),
 		).PaddingXY(characterBodyPadX, characterBodyPadY).Gap(characterVitalsGap).CrossAlign(primitives.CrossAxisStretch)
 	}
 	weightColor := rotheme.Default.Colors.Text
@@ -170,10 +172,7 @@ func (w *CharacterWindow) bodyTree(ctx Context) *primitives.BoxWidget {
 	}
 	contentWidth := float32(characterWindowWidth) - characterBodyPadX*2
 	return primitives.Box(
-		primitives.Box(
-			vitalsRow("HP", vitals.HP, vitals.MaxHP, contentWidth),
-			vitalsRow("SP", vitals.SP, vitals.MaxSP, contentWidth),
-		).Gap(characterVitalsGap),
+		primitives.Box(characterVitalRows(vitals, contentWidth)...).Gap(characterVitalsGap),
 		characterEXPPanel(progress, contentWidth),
 		primitives.HBox(
 			characterAlignedTextCell(fmt.Sprintf("Weight : %d / %d", displayWeight(inventory.Weight), displayWeight(inventory.MaxWeight)), characterStatCellW, weightColor, primitives.TextAlignStart),
@@ -268,7 +267,7 @@ func characterWindowData(s *session.Session) (session.Character, session.Vitals,
 func characterWindowSnapshot(s *session.Session) string {
 	character, vitals, progress, inventory := characterWindowData(s)
 	return fmt.Sprintf(
-		"name=%s;job=%d;%s;hp=%d/%d;sp=%d/%d;bl=%d;jl=%d;bexp=%d/%d;jexp=%d/%d;zeny=%d;weight=%d/%d",
+		"name=%s;job=%d;%s;hp=%d/%d;sp=%d/%d;ap=%d/%d;bl=%d;jl=%d;bexp=%d/%d;jexp=%d/%d;zeny=%d;weight=%d/%d",
 		character.Name,
 		character.Job,
 		db.JobDisplayName(int(character.Job)),
@@ -276,6 +275,8 @@ func characterWindowSnapshot(s *session.Session) string {
 		vitals.MaxHP,
 		vitals.SP,
 		vitals.MaxSP,
+		vitals.AP,
+		vitals.MaxAP,
 		progress.BaseLevel,
 		progress.JobLevel,
 		progress.BaseExp,
@@ -429,4 +430,40 @@ func formatHUDNumber(value int64) string {
 		b.WriteString(text[i : i+3]) // theme:ok thousands grouping
 	}
 	return sign + b.String()
+}
+
+func characterWindowShowsAP(s *session.Session) bool {
+	if s == nil {
+		return false
+	}
+	return s.Vitals.MaxAP > 0
+}
+
+func characterAPText(vitals session.Vitals) string {
+	if vitals.MaxAP <= 0 {
+		return ""
+	}
+	return fmt.Sprintf("AP %d / %d", vitals.AP, vitals.MaxAP)
+}
+
+func characterCompactVitalCells(vitals session.Vitals) []widget.Widget {
+	cells := []widget.Widget{
+		characterTextCell(fmt.Sprintf("HP %d / %d", vitals.HP, vitals.MaxHP), characterStatCellW, rotheme.Default.Colors.MutedText),
+		characterTextCell(fmt.Sprintf("SP %d / %d", vitals.SP, vitals.MaxSP), characterStatCellW, rotheme.Default.Colors.MutedText),
+	}
+	if text := characterAPText(vitals); text != "" {
+		cells = append(cells, characterTextCell(text, characterStatCellW, rotheme.Default.Colors.MutedText))
+	}
+	return cells
+}
+
+func characterVitalRows(vitals session.Vitals, width float32) []widget.Widget {
+	rows := []widget.Widget{
+		vitalsRow("HP", vitals.HP, vitals.MaxHP, width),
+		vitalsRow("SP", vitals.SP, vitals.MaxSP, width),
+	}
+	if vitals.MaxAP > 0 {
+		rows = append(rows, vitalsRow("AP", vitals.AP, vitals.MaxAP, width))
+	}
+	return rows
 }

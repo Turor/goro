@@ -246,6 +246,24 @@ func statsDerivedWidget(stats session.Stats) widget.Widget {
 			{Text: "ASPD", Width: statsDerivedLabelWidth, Align: widget.TextAlignLeft, Head: true},
 			{Text: fmt.Sprintf("%d", displayASPD(stats.ASPD+stats.ASPDBonus)), Width: statsDerivedValueWidth, Align: widget.TextAlignRight},
 		},
+		{
+			{Text: "P.ATK", Width: statsDerivedLabelWidth, Align: widget.TextAlignLeft, Head: true},
+			{Text: fmt.Sprintf("%d", stats.PAtk), Width: statsDerivedValueWidth, Align: widget.TextAlignRight},
+			{Text: "RES", Width: statsDerivedLabelWidth, Align: widget.TextAlignLeft, Head: true},
+			{Text: fmt.Sprintf("%d", stats.Res), Width: statsDerivedValueWidth, Align: widget.TextAlignRight},
+		},
+		{
+			{Text: "S.MATK", Width: statsDerivedLabelWidth, Align: widget.TextAlignLeft, Head: true},
+			{Text: fmt.Sprintf("%d", stats.SMatk), Width: statsDerivedValueWidth, Align: widget.TextAlignRight},
+			{Text: "MRES", Width: statsDerivedLabelWidth, Align: widget.TextAlignLeft, Head: true},
+			{Text: fmt.Sprintf("%d", stats.MRes), Width: statsDerivedValueWidth, Align: widget.TextAlignRight},
+		},
+		{
+			{Text: "H.PLUS", Width: statsDerivedLabelWidth, Align: widget.TextAlignLeft, Head: true},
+			{Text: fmt.Sprintf("%d", stats.HPlus), Width: statsDerivedValueWidth, Align: widget.TextAlignRight},
+			{Text: "C.RATE", Width: statsDerivedLabelWidth, Align: widget.TextAlignLeft, Head: true},
+			{Text: fmt.Sprintf("%d", stats.CRate), Width: statsDerivedValueWidth, Align: widget.TextAlignRight},
+		},
 	}
 	return primitives.Box(
 		rotheme.Table(
@@ -373,13 +391,14 @@ func statsWindowSnapshot(s *session.Session) string {
 	stats := sessionStats(s)
 	rows := statsRows(s)
 	return fmt.Sprintf(
-		"%d|%d/%d/%d/%d/%d/%d|%d/%d/%d/%d/%d/%d|%d/%d/%d/%d/%d/%d/%d/%d/%d/%d/%d/%d/%d|%s|%d|%d/%d/%d/%d/%d/%d|%d/%d",
+		"%d|%d/%d/%d/%d/%d/%d|%d/%d/%d/%d/%d/%d|%d/%d/%d/%d/%d/%d/%d/%d/%d/%d/%d/%d/%d|%d/%d/%d/%d/%d/%d|%s|%d|%d/%d/%d/%d/%d/%d|%d/%d",
 		stats.Points,
 		rows[0].value, rows[1].value, rows[2].value, rows[3].value, rows[4].value, rows[5].value,
 		rows[0].bonus, rows[1].bonus, rows[2].bonus, rows[3].bonus, rows[4].bonus, rows[5].bonus,
 		stats.Attack, stats.AttackBonus, stats.MatkMin, stats.MatkMax,
 		stats.Hit, stats.Critical, stats.Defense, stats.DefenseBonus,
 		stats.MDefense, stats.MDefenseBonus, stats.Flee, stats.FleeBonus, stats.ASPD+stats.ASPDBonus,
+		stats.PAtk, stats.SMatk, stats.Res, stats.MRes, stats.HPlus, stats.CRate,
 		statsGuildName(s),
 		stats.TraitPoints, stats.Pow, stats.Sta, stats.Wis, stats.Spl, stats.Con, stats.Crt,
 		personalExp(s), personalDrop(s),
