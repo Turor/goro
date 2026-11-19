@@ -57,6 +57,12 @@ func (m *WorldMode) handleRenewalUIPacket(ctx client.Context, pkt network.Packet
 	if m.handleRodexPacket(ctx, pkt) {
 		return true
 	}
+	if m.handleAttendanceAchievePackets(ctx, pkt) {
+		return true
+	}
+	if m.handleGradePacket(ctx, pkt) {
+		return true
+	}
 	return false
 }
 
@@ -66,6 +72,10 @@ func (m *WorldMode) applyUIOpen(ctx client.Context, ui network.UIOpen) {
 		m.openBank(ctx)
 	case network.UITypeEnchant:
 		m.ui.enchantUI.Open(ctx, ui.Data)
+	case network.UITypeAttendance:
+		m.ui.attendance.Open(ctx, ui.Data)
+	case network.UITypeGrade:
+		m.ui.gradeUI.Open(ctx)
 	default:
 		glog.Debugf("unhandled UI type %d data=%d", ui.Type, ui.Data)
 	}
@@ -213,4 +223,91 @@ func bankZeny(ctx client.Context) int32 {
 		return 1<<31 - 1
 	}
 	return int32(ctx.Session.Inventory.Zeny)
+}
+
+func (m *WorldMode) handleAttendanceAchievePackets(ctx client.Context, pkt network.Packet) bool {
+	if act, ok, err := network.ParseUIAction(pkt); err != nil {
+		glog.Errorf("parse UI action 0x%04X: %v", pkt.ID, err)
+		return true
+	} else if ok {
+		m.ui.attendance.SetProgress(ctx, int(act.Data))
+		return true
+	}
+	if list, ok, err := network.ParseAchievementList(pkt); err != nil {
+		glog.Errorf("parse achievement list 0x%04X: %v", pkt.ID, err)
+		return true
+	} else if ok {
+		m.ui.achievements.SetList(ctx, list)
+		return true
+	}
+	if upd, ok, err := network.ParseAchievementUpdate(pkt); err != nil {
+		glog.Errorf("parse achievement update 0x%04X: %v", pkt.ID, err)
+		return true
+	} else if ok {
+		cur := m.ui.achievements.List
+		cur.Points = upd.Points
+		cur.Rank = upd.Rank
+		cur.RankPoints = upd.RankPoints
+		cur.NextPoints = upd.NextPoints
+		if len(upd.Items) == 1 {
+			found := false
+			for i, a := range cur.Items {
+				if a.ID == upd.Items[0].ID {
+					cur.Items[i] = upd.Items[0]
+					found = true
+					break
+				}
+			}
+			if !found {
+				cur.Items = append(cur.Items, upd.Items[0])
+			}
+		}
+		m.ui.achievements.SetList(ctx, cur)
+		return true
+	}
+	if id, failed, ok, err := network.ParseAchievementRewardAck(pkt); err != nil {
+		glog.Errorf("parse achievement reward 0x%04X: %v", pkt.ID, err)
+		return true
+	} else if ok {
+		if failed {
+			m.ui.achievements.SetMessage(ctx, "Reward failed.")
+		} else {
+			m.ui.achievements.SetMessage(ctx, "Reward claimed.")
+		}
+		_ = id
+		return true
+	}
+	return false
+}
+
+func (m *WorldMode) handleGradePacket(ctx client.Context, pkt network.Packet) bool {
+	if list, ok, err := network.ParseGradeMaterialList(pkt); err != nil {
+		glog.Errorf("parse grade materials 0x%04X: %v", pkt.ID, err)
+		return true
+	} else if ok {
+		if !m.ui.gradeUI.IsOpen() {
+			m.ui.gradeUI.Open(ctx)
+		}
+		m.ui.gradeUI.SetMaterials(ctx, list)
+		return true
+	}
+	if ack, ok, err := network.ParseGradeAck(pkt); err != nil {
+		glog.Errorf("parse grade ack 0x%04X: %v", pkt.ID, err)
+		return true
+	} else if ok {
+		m.ui.gradeUI.SetAck(ctx, ack)
+		return true
+	}
+	if bc, ok, err := network.ParseGradeBroadcast(pkt); err != nil {
+		glog.Errorf("parse grade broadcast 0x%04X: %v", pkt.ID, err)
+		return true
+	} else if ok {
+		status := "failed"
+		if bc.Status != 0 {
+			status = "succeeded"
+		}
+		m.ui.console.AddSystemMessage("%s graded item %d to %d (%s).", bc.Name, bc.ItemID, bc.Grade, status)
+		return true
+	}
+	return false
 }
