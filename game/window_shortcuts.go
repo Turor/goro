@@ -61,7 +61,7 @@ func (m *WorldMode) toggleWindowFromInput(ctx client.Context) bool {
 		case gpucontext.KeyS:
 			m.ui.skillWindow.Toggle(ctx)
 		case gpucontext.KeyA:
-			m.ui.statsWindow.Toggle(ctx)
+			m.ui.equipmentWindow.Toggle(ctx)
 		case gpucontext.KeyZ:
 			m.ui.social.FriendsWindow.ToggleParty(ctx)
 		case gpucontext.KeyH:

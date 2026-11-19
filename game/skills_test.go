@@ -4167,8 +4167,8 @@ func TestLevelUpNotificationActionsOpenStatusAndSkillWindows(t *testing.T) {
 	if !mode.handleLevelUpNotificationAction(ctx, gameui.LevelUpNotificationBase|gameui.LevelUpNotificationJob) {
 		t.Fatal("level-up notification action was not handled")
 	}
-	if !mode.ui.statsWindow.IsOpen() {
-		t.Fatal("base notification did not open the status window")
+	if !mode.ui.equipmentWindow.IsOpen() {
+		t.Fatal("base notification did not open the gear window")
 	}
 	if !mode.ui.skillWindow.IsOpen() {
 		t.Fatal("job notification did not open the skill window")

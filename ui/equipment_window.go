@@ -75,14 +75,14 @@ var (
 )
 
 func (w *EquipmentWindow) Toggle(ctx Context) {
-	w.EnsureWindow(equipmentWindowWidth, equipmentWindowHeight)
+	w.EnsureWindow(gearWindowSize())
 	if w.IsOpen() {
 		w.hideTooltip()
 		w.Window.Close()
 		w.Publish(ctx)
 		return
 	}
-	w.snapshot = equipmentSnapshot(ctx.Session)
+	w.snapshot = gearSnapshot(ctx.Session)
 	w.hasCart = inventoryBagHasCart(ctx)
 	w.hasPeco = equipmentHasPeco(ctx)
 	w.preview = nil
@@ -92,12 +92,12 @@ func (w *EquipmentWindow) Toggle(ctx Context) {
 }
 
 func (w *EquipmentWindow) Update(ctx Context, itemInfo *ItemWindows, cart *CartWindow, assets AssetProvider) bool {
-	w.EnsureWindow(equipmentWindowWidth, equipmentWindowHeight)
+	w.EnsureWindow(gearWindowSize())
 	if !w.IsOpen() {
 		w.hideTooltip()
 		return false
 	}
-	snapshot := equipmentSnapshot(ctx.Session)
+	snapshot := gearSnapshot(ctx.Session)
 	needsPreview := w.preview == nil && assets != nil
 	hasCart := inventoryBagHasCart(ctx)
 	hasPeco := equipmentHasPeco(ctx)
@@ -124,11 +124,11 @@ func (w *EquipmentWindow) Update(ctx Context, itemInfo *ItemWindows, cart *CartW
 }
 
 func (w *EquipmentWindow) Rebind(ctx Context, itemInfo *ItemWindows, cart *CartWindow, assets AssetProvider) {
-	w.EnsureWindow(equipmentWindowWidth, equipmentWindowHeight)
+	w.EnsureWindow(gearWindowSize())
 	if !w.IsOpen() {
 		return
 	}
-	w.snapshot = equipmentSnapshot(ctx.Session)
+	w.snapshot = gearSnapshot(ctx.Session)
 	w.itemInfo = itemInfo
 	w.cart = cart
 	w.hasCart = inventoryBagHasCart(ctx)
@@ -136,7 +136,7 @@ func (w *EquipmentWindow) Rebind(ctx Context, itemInfo *ItemWindows, cart *CartW
 	if assets != nil {
 		w.preview = assets.EquipmentPreviewImage(ctx, equipmentCenterColW, equipmentPreviewImageH)
 	}
-	w.SetSize(equipmentWindowWidth, equipmentWindowHeight)
+	w.SetSize(gearWindowSize())
 	w.SetContent(w.widgetTree(ctx, itemInfo, cart))
 	w.bindLayoutReload()
 	w.Publish(ctx)
@@ -147,66 +147,73 @@ func (w *EquipmentWindow) bindLayoutReload() {
 		if !w.IsOpen() {
 			return
 		}
-		w.SetSize(equipmentWindowWidth, equipmentWindowHeight)
+		w.SetSize(gearWindowSize())
 		w.SetContent(w.widgetTree(w.ctx, w.itemInfo, w.cart))
 	})
 }
 
 func (w *EquipmentWindow) widgetTree(ctx Context, itemInfo *ItemWindows, cart *CartWindow) widget.Widget {
+	gearW, gearH := gearWindowSize()
 	return Win(
-		Title("Equipment"),
+		Title("Gear"),
 		CloseButton(true),
 		OnClose(func() {
 			w.Window.Close()
 			w.Publish(ctx)
 		}),
-		Size(float32(equipmentWindowWidth), float32(equipmentWindowHeight)),
+		Size(float32(gearW), float32(gearH)),
 		Content(
-			primitives.Box(
-				primitives.HBox(
-					primitives.Box(
-						w.slotWidget(ctx, itemInfo, equipmentSlotHeadTop, equipmentLeftColW),
-						w.slotWidget(ctx, itemInfo, equipmentSlotHeadLow, equipmentLeftColW),
-						w.slotWidget(ctx, itemInfo, equipmentSlotWeapon, equipmentLeftColW),
-						w.slotWidget(ctx, itemInfo, equipmentSlotGarment, equipmentLeftColW),
-						w.slotWidget(ctx, itemInfo, equipmentSlotAccessory, equipmentLeftColW),
-					).
-						Width(float32(equipmentLeftColW)).
-						Gap(0),
+			primitives.HBox(
+				primitives.Box(
+					primitives.HBox(
+						primitives.Box(
+							w.slotWidget(ctx, itemInfo, equipmentSlotHeadTop, equipmentLeftColW),
+							w.slotWidget(ctx, itemInfo, equipmentSlotHeadLow, equipmentLeftColW),
+							w.slotWidget(ctx, itemInfo, equipmentSlotWeapon, equipmentLeftColW),
+							w.slotWidget(ctx, itemInfo, equipmentSlotGarment, equipmentLeftColW),
+							w.slotWidget(ctx, itemInfo, equipmentSlotAccessory, equipmentLeftColW),
+						).
+							Width(float32(equipmentLeftColW)).
+							Gap(0),
 
-					primitives.Box(
-						newStaticImageWidget(w.preview, equipmentCenterColW, equipmentPreviewImageH),
-						w.slotWidget(ctx, itemInfo, equipmentSlotAmmo, equipmentCenterColW),
-					).
-						Width(float32(equipmentCenterColW)).
-						Height(float32(equipmentCenterColH)).
-						Gap(0),
+						primitives.Box(
+							newStaticImageWidget(w.preview, equipmentCenterColW, equipmentPreviewImageH),
+							w.slotWidget(ctx, itemInfo, equipmentSlotAmmo, equipmentCenterColW),
+						).
+							Width(float32(equipmentCenterColW)).
+							Height(float32(equipmentCenterColH)).
+							Gap(0),
 
-					primitives.Box(
-						w.slotWidget(ctx, itemInfo, equipmentSlotHeadMid, equipmentRightColW),
-						w.slotWidget(ctx, itemInfo, equipmentSlotArmor, equipmentRightColW),
-						w.slotWidget(ctx, itemInfo, equipmentSlotShield, equipmentRightColW),
-						w.slotWidget(ctx, itemInfo, equipmentSlotShoes, equipmentRightColW),
-						w.slotWidget(ctx, itemInfo, equipmentSlotAccessory2, equipmentRightColW),
+						primitives.Box(
+							w.slotWidget(ctx, itemInfo, equipmentSlotHeadMid, equipmentRightColW),
+							w.slotWidget(ctx, itemInfo, equipmentSlotArmor, equipmentRightColW),
+							w.slotWidget(ctx, itemInfo, equipmentSlotShield, equipmentRightColW),
+							w.slotWidget(ctx, itemInfo, equipmentSlotShoes, equipmentRightColW),
+							w.slotWidget(ctx, itemInfo, equipmentSlotAccessory2, equipmentRightColW),
+						).
+							Width(float32(equipmentRightColW)).
+							Gap(0),
 					).
-						Width(float32(equipmentRightColW)).
 						Gap(0),
+					primitives.HBox(
+						w.slotWidget(ctx, itemInfo, equipmentSlotCHeadTop, equipmentLeftColW),
+						w.slotWidget(ctx, itemInfo, equipmentSlotCHeadMid, equipmentRightColW),
+						w.slotWidget(ctx, itemInfo, equipmentSlotCHeadLow, equipmentLeftColW),
+						w.slotWidget(ctx, itemInfo, equipmentSlotCRobe, equipmentRightColW),
+					).Height(float32(equipmentRowH)).Gap(0),
+					primitives.HBox(
+						w.slotWidget(ctx, itemInfo, equipmentSlotShadowWep, equipmentLeftColW),
+						w.slotWidget(ctx, itemInfo, equipmentSlotShadowArm, equipmentRightColW),
+						w.slotWidget(ctx, itemInfo, equipmentSlotShadowShd, equipmentLeftColW),
+						w.slotWidget(ctx, itemInfo, equipmentSlotShadowSho, equipmentRightColW),
+					).Height(float32(equipmentRowH)).Gap(0),
 				).
-					Gap(0),
-				primitives.HBox(
-					w.slotWidget(ctx, itemInfo, equipmentSlotCHeadTop, equipmentLeftColW),
-					w.slotWidget(ctx, itemInfo, equipmentSlotCHeadMid, equipmentRightColW),
-					w.slotWidget(ctx, itemInfo, equipmentSlotCHeadLow, equipmentLeftColW),
-					w.slotWidget(ctx, itemInfo, equipmentSlotCRobe, equipmentRightColW),
-				).Height(float32(equipmentRowH)).Gap(0),
-				primitives.HBox(
-					w.slotWidget(ctx, itemInfo, equipmentSlotShadowWep, equipmentLeftColW),
-					w.slotWidget(ctx, itemInfo, equipmentSlotShadowArm, equipmentRightColW),
-					w.slotWidget(ctx, itemInfo, equipmentSlotShadowShd, equipmentLeftColW),
-					w.slotWidget(ctx, itemInfo, equipmentSlotShadowSho, equipmentRightColW),
-				).Height(float32(equipmentRowH)).Gap(0),
+					Width(float32(equipmentWindowWidth)).
+					Padding(float32(equipmentWindowPad)),
+				gearStatsColumn(ctx),
 			).
-				Padding(float32(equipmentWindowPad)),
+				Gap(float32(equipmentWindowPad)).
+				CrossAlign(primitives.CrossAxisStart),
 		),
 		Footer(w.footerWidgets(ctx, itemInfo, cart)...),
 	)
@@ -300,8 +307,9 @@ func (w *EquipmentWindow) DrawTooltip(ctx Context, screen *render.Frame) {
 }
 
 func (w *EquipmentWindow) AcceptInventoryDrop(ctx Context, item session.InventoryItem, mx, my int) bool {
-	w.EnsureWindow(equipmentWindowWidth, equipmentWindowHeight)
-	if !w.IsOpen() || !pointInRect(mx, my, w.x, w.y, equipmentWindowWidth, equipmentWindowHeight) {
+	w.EnsureWindow(gearWindowSize())
+	gearW, gearH := gearWindowSize()
+	if !w.IsOpen() || !pointInRect(mx, my, w.x, w.y, gearW, gearH) {
 		return false
 	}
 	if inventoryItemCanEquip(item) {
