@@ -107,6 +107,7 @@ type Actor struct {
 	Sex              byte
 	HeadDir          uint8
 	IsAdmin          bool
+	HatEffects       []uint16
 	Appearance       bool
 	Moving           bool
 	FromX            int
@@ -285,6 +286,9 @@ func (w *World) UpsertActor(actor Actor) {
 			actor.PvPRank = existing.PvPRank
 			actor.PvPTotal = existing.PvPTotal
 			actor.HasPvPRanking = true
+		}
+		if len(actor.HatEffects) == 0 && len(existing.HatEffects) > 0 {
+			actor.HatEffects = append([]uint16(nil), existing.HatEffects...)
 		}
 		if existing.Sitting && !actor.Moving {
 			actor.Sitting = true
