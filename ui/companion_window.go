@@ -216,7 +216,7 @@ func (w *CompanionWindow) emit(action CompanionWindowAction) {
 
 func (w *CompanionWindow) widgetTree(ctx Context) widget.Widget {
 	return Win(
-		Title("Companions"),
+		Title("Homunculus & Pet Stable"),
 		CloseButton(true),
 		OnClose(func() {
 			w.Close()

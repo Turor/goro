@@ -76,7 +76,7 @@ func (w *BankWindow) PopAction() BankAction {
 
 func (w *BankWindow) widgetTree(ctx Context) widget.Widget {
 	return Win(
-		Title("Bank"),
+		Title(msgOr(ctx, 2771, "Bank")),
 		CloseButton(true),
 		OnClose(func() {
 			w.action = BankAction{Kind: BankActionClose}

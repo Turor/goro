@@ -3,8 +3,8 @@ package ui
 import "github.com/kivutar/goro/ui/rotheme"
 
 var (
-	bankWindowW = 320
-	bankWindowH = 200
+	bankWindowW = 280
+	bankWindowH = 145
 	bankFieldH  = 28
 	bankPad     = 12
 	bankGap     = 8
