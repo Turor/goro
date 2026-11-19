@@ -242,3 +242,13 @@ func (f *Frame) DrawWorldBillboard(cmd WorldBillboardCommand) {
 	}
 	f.worldBillboards = append(f.worldBillboards, cmd)
 }
+
+// WorldBillboards returns a copy of the billboards submitted this frame.
+func (f *Frame) WorldBillboards() []WorldBillboardCommand {
+	if f == nil {
+		return nil
+	}
+	out := make([]WorldBillboardCommand, len(f.worldBillboards))
+	copy(out, f.worldBillboards)
+	return out
+}

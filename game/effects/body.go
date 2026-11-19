@@ -370,8 +370,10 @@ func (m *System) DrawActorSpriteBodyEffects3D(ctx client.Context, screen *render
 		cmd.ColorA *= 150.0 / 255
 	}
 	cmd.Options.DepthWrite = true
+	cmd.Options.CastShadow = true
 	screen.DrawWorldBillboard(cmd)
 	cmd.Options.DepthWrite = false
+	cmd.Options.CastShadow = false
 	if blue > 0 {
 		flash := cmd
 		flash.Options.Blend = render.BlendLighter
