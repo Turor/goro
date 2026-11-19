@@ -287,6 +287,9 @@ func (w *World) UpsertActor(actor Actor) {
 			actor.PvPTotal = existing.PvPTotal
 			actor.HasPvPRanking = true
 		}
+		if len(actor.HatEffects) == 0 && len(existing.HatEffects) > 0 {
+			actor.HatEffects = append([]uint16(nil), existing.HatEffects...)
+		}
 		if existing.Sitting && !actor.Moving {
 			actor.Sitting = true
 		}

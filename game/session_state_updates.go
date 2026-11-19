@@ -226,18 +226,48 @@ func applyHatEffect(ctx client.Context, hat network.HatEffect) {
 	if ctx.World == nil || hat.GID == 0 {
 		return
 	}
-	ids := hat.IDs
-	if !hat.Enabled {
-		ids = nil
-	}
 	if scene.IsLocalActor(ctx, hat.GID) {
-		ctx.World.Player.HatEffects = ids
+		ctx.World.Player.HatEffects = mergeHatEffects(ctx.World.Player.HatEffects, hat)
 		return
 	}
 	actor, ok := ctx.World.Actors[hat.GID]
 	if !ok {
 		return
 	}
-	actor.HatEffects = ids
+	actor.HatEffects = mergeHatEffects(actor.HatEffects, hat)
 	ctx.World.Actors[hat.GID] = actor
+}
+
+// status 0 removes the listed IDs. status 1 adds them. A full list and a
+// single hateffect toggle share this packet; replacing the set drops the others.
+func mergeHatEffects(existing []uint16, hat network.HatEffect) []uint16 {
+	if !hat.Enabled {
+		if len(hat.IDs) == 0 || len(existing) == 0 {
+			return existing
+		}
+		drop := make(map[uint16]struct{}, len(hat.IDs))
+		for _, id := range hat.IDs {
+			drop[id] = struct{}{}
+		}
+		out := make([]uint16, 0, len(existing))
+		for _, id := range existing {
+			if _, ok := drop[id]; !ok {
+				out = append(out, id)
+			}
+		}
+		return out
+	}
+	out := append([]uint16(nil), existing...)
+	have := make(map[uint16]struct{}, len(out))
+	for _, id := range out {
+		have[id] = struct{}{}
+	}
+	for _, id := range hat.IDs {
+		if _, ok := have[id]; ok {
+			continue
+		}
+		out = append(out, id)
+		have[id] = struct{}{}
+	}
+	return out
 }
