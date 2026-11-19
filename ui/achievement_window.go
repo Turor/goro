@@ -99,6 +99,9 @@ func (w *AchievementWindow) content(ctx Context) widget.Widget {
 	}
 	sidebar := primitives.Box(catButtons...).Width(float32(achievementSidebarW)).Gap(float32(achievementGap))
 
+	if w.category == 0 {
+		return w.overview(ctx, header, sidebar)
+	}
 	rows := w.filteredRows(ctx)
 	titles := make([]string, len(rows))
 	for i, a := range rows {
@@ -132,6 +135,33 @@ func (w *AchievementWindow) content(ctx Context) widget.Widget {
 	body := primitives.HBox(
 		sidebar,
 		primitives.Expanded(primitives.Box(header, primitives.Expanded(list), detail).Gap(float32(achievementGap))),
+	).Gap(float32(achievementGap))
+	return primitives.Box(body).Padding(float32(achievementPad))
+}
+
+func (w *AchievementWindow) overview(ctx Context, header, sidebar widget.Widget) widget.Widget {
+	counts := map[int][2]int{}
+	for _, a := range w.List.Items {
+		info := achievementMeta(ctx, a.ID)
+		if info.Major <= 0 {
+			continue
+		}
+		c := counts[info.Major]
+		c[1]++
+		if a.Completed {
+			c[0]++
+		}
+		counts[info.Major] = c
+	}
+	cats := achievementCategories(ctx)
+	lines := []widget.Widget{rotheme.Label(msgOr(ctx, 2656, "General")).MaxLines(1)}
+	for i := 1; i < len(cats); i++ {
+		c := counts[i]
+		lines = append(lines, rotheme.Label(fmt.Sprintf("%s  %d/%d", cats[i], c[0], c[1])).MaxLines(1))
+	}
+	body := primitives.HBox(
+		sidebar,
+		primitives.Expanded(primitives.Box(append([]widget.Widget{header}, lines...)...).Gap(float32(achievementGap))),
 	).Gap(float32(achievementGap))
 	return primitives.Box(body).Padding(float32(achievementPad))
 }
@@ -187,9 +217,6 @@ func (w *AchievementWindow) selected(ctx Context) (network.Achievement, bool) {
 func (w *AchievementWindow) filteredRows(ctx Context) []network.Achievement {
 	items := append([]network.Achievement(nil), w.List.Items...)
 	sort.Slice(items, func(i, j int) bool { return items[i].ID < items[j].ID })
-	if w.category <= 0 {
-		return items
-	}
 	var out []network.Achievement
 	for _, a := range items {
 		info := achievementMeta(ctx, a.ID)
@@ -223,6 +250,8 @@ func achievementCategories(ctx Context) []string {
 		msgOr(ctx, 2661, "Battle"),
 		msgOr(ctx, 2668, "Memorial"),
 		msgOr(ctx, 2671, "Feat"),
+		msgOr(ctx, 2674, "Quest"),
+		msgOr(ctx, 2678, "Event"),
 	}
 }
 

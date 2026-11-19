@@ -27,8 +27,26 @@ func (w *AttendanceWindow) Open(ctx Context, data int64) {
 	w.Publish(ctx)
 }
 
-func (w *AttendanceWindow) SetProgress(ctx Context, data int) {
-	w.Open(ctx, int64(data))
+func (w *AttendanceWindow) SetProgress(ctx Context, count int) {
+	// ZC_UI_ACTION after a claim is the raw post-increment attendance_count.
+	// count*10+claimed is only the open-UI payload.
+	if count < 0 {
+		count = 0
+	}
+	w.EnsureWindow(attendanceWindowW, attendanceWindowH)
+	w.day = count
+	w.claimed = true
+	w.data = int64(count)*10 + 1
+	if !w.IsOpen() {
+		w.Window.Open(ctx, w.widgetTree(ctx))
+		w.OnLayoutReload(func() {
+			w.SetSize(attendanceWindowW, attendanceWindowH)
+			w.SetContent(w.widgetTree(w.ctx))
+		})
+	} else {
+		w.SetContent(w.widgetTree(ctx))
+	}
+	w.Publish(ctx)
 }
 
 func (w *AttendanceWindow) applyData(data int64) {
