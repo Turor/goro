@@ -458,6 +458,8 @@ func (m *WorldMode) rebindPersistentUI(ctx client.Context) {
 	m.ui.instanceWindow.Rebind(ctx, func() { m.destroyInstance(ctx) })
 	m.bindWarpra(ctx)
 	m.ui.worldMap.Rebind(ctx)
+	m.ui.minimap.SetWorldMapOpener(func() { m.openWorldMap(ctx) })
+	m.ui.minimap.Rebind(ctx)
 	m.ui.levelUpNotifications.Rebind(ctx)
 	m.ui.emoteWindow.OnSelect = m.ui.chatShortcuts.SelectEmotion
 	m.ui.emoteWindow.Rebind(ctx, &m.ui.console)
@@ -1046,6 +1048,7 @@ func (m *WorldMode) Update(ctx client.Context) (Mode, error) {
 			return nil, nil
 		}
 	}
+	m.ui.minimap.SetWorldMapOpener(func() { m.openWorldMap(ctx) })
 	minimapDragging := m.ui.minimap.Update(ctx)
 	m.effects().SyncLevel99AuraEffects(ctx, now)
 	pointerBlocked := minimapDragging || m.mapPointerBlocked(ctx)
@@ -1196,7 +1199,7 @@ func (m *WorldMode) basicMenuCallbacks(ctx client.Context) gameui.BasicMenuCallb
 		OnItems:  func() { m.ui.inventoryBag.Toggle(ctx) },
 		OnEquip:  func() { m.ui.equipmentWindow.Toggle(ctx) },
 		OnSkill:  func() { m.ui.skillWindow.Toggle(ctx) },
-		OnMap:    func() { m.ui.minimap.Toggle(ctx) },
+		OnMap:    func() { m.openWorldMap(ctx) },
 		OnComm:   func() { m.ui.social.ChatRoomCreate.Open(ctx) },
 		OnFriend: func() { m.ui.social.FriendsWindow.Toggle(ctx) },
 		OnWarpra: func() { m.ui.warpra.Toggle(ctx) },

@@ -56,3 +56,12 @@ func TestOpenWorldMapBlocksGameplayButKeepsItsToggle(t *testing.T) {
 		t.Fatal("open atlas blocked its own close shortcut")
 	}
 }
+
+func TestOpenWorldMapKeepsMinimapShown(t *testing.T) {
+	m := &WorldMode{}
+	ctx := client.Context{}
+	m.openWorldMap(ctx)
+	if m.ui.minimap.Hidden() {
+		t.Fatal("world map open hid the corner map")
+	}
+}
