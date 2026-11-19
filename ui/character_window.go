@@ -57,7 +57,7 @@ func (w *CharacterWindow) Update(ctx Context) bool {
 			invalidateWindowRect(ctx, overlay.markFrameDirty())
 		}
 	}
-	if w.baseHeight() != w.windowHeight() {
+	if !w.holdsUserSize() && w.baseHeight() != w.windowHeight() {
 		w.SetSize(characterWindowWidth, w.windowHeight())
 		w.SetContent(w.widgetTree(ctx))
 	}

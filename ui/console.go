@@ -239,6 +239,8 @@ func (c *ChatConsole) SavedPosition() config.WindowPosition { return c.window.Sa
 
 func (c *ChatConsole) Dragging() bool { return c.window.dragging }
 
+func (c *ChatConsole) Resizing() bool { return c.window.Resizing() }
+
 func (c *ChatConsole) RestorePosition(ctx client.Context, position config.WindowPosition) {
 	if !position.Set {
 		return
@@ -291,7 +293,7 @@ func (c *ChatConsole) clickedOutside(ctx client.Context) bool {
 }
 
 func (c *ChatConsole) ensureWindow(ctx client.Context) {
-	if c.window.dragging {
+	if c.window.dragging || c.window.resizing {
 		return
 	}
 	c.ctx = ctx

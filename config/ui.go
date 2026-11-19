@@ -62,8 +62,9 @@ type UISettings struct {
 
 // An unset position keeps the window's automatic placement.
 type WindowPosition struct {
-	X, Y int
-	Set  bool
+	X, Y          int
+	Width, Height int
+	Set           bool
 }
 
 func (p *WindowPosition) parse(value string) error {
@@ -71,19 +72,34 @@ func (p *WindowPosition) parse(value string) error {
 		*p = WindowPosition{}
 		return nil
 	}
-	x, y, ok := strings.Cut(value, ",")
-	xValue, xErr := strconv.Atoi(strings.TrimSpace(x))
-	yValue, yErr := strconv.Atoi(strings.TrimSpace(y))
-	if !ok || xErr != nil || yErr != nil {
-		return fmt.Errorf("window position must be x,y or empty for automatic placement")
+	parts := strings.Split(value, ",")
+	if len(parts) != 2 && len(parts) != 4 {
+		return fmt.Errorf("window position must be x,y or x,y,width,height")
 	}
-	*p = WindowPosition{X: xValue, Y: yValue, Set: true}
+	xValue, xErr := strconv.Atoi(strings.TrimSpace(parts[0]))
+	yValue, yErr := strconv.Atoi(strings.TrimSpace(parts[1]))
+	if xErr != nil || yErr != nil {
+		return fmt.Errorf("window position must be x,y or x,y,width,height")
+	}
+	pos := WindowPosition{X: xValue, Y: yValue, Set: true}
+	if len(parts) == 4 {
+		width, wErr := strconv.Atoi(strings.TrimSpace(parts[2]))
+		height, hErr := strconv.Atoi(strings.TrimSpace(parts[3]))
+		if wErr != nil || hErr != nil || width < 1 || height < 1 {
+			return fmt.Errorf("window size must be a positive width,height")
+		}
+		pos.Width, pos.Height = width, height
+	}
+	*p = pos
 	return nil
 }
 
 func (p WindowPosition) iniValue() string {
 	if !p.Set {
 		return ""
+	}
+	if p.Width > 0 && p.Height > 0 {
+		return strconv.Itoa(p.X) + "," + strconv.Itoa(p.Y) + "," + strconv.Itoa(p.Width) + "," + strconv.Itoa(p.Height)
 	}
 	return strconv.Itoa(p.X) + "," + strconv.Itoa(p.Y)
 }

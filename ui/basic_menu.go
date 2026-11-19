@@ -62,7 +62,7 @@ func (m *BasicMenu) Update(ctx client.Context, callbacks BasicMenuCallbacks) boo
 		m.titleHeight = 0
 		m.CloseOnEsc = false
 	}
-	if m.width != width || m.baseHeight() != height {
+	if !m.holdsUserSize() && (m.width != width || m.baseHeight() != height) {
 		m.SetSize(width, height)
 		m.content = nil
 	}

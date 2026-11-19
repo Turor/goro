@@ -24,6 +24,7 @@ type windowPositionBinding struct {
 		SavedPosition() config.WindowPosition
 		RestorePosition(client.Context, config.WindowPosition)
 		Dragging() bool
+		Resizing() bool
 	}
 	position *config.WindowPosition
 }
@@ -215,6 +216,11 @@ func (m *WorldMode) saveUISettings(ctx client.Context, retry bool) {
 	p := &m.ui.preferences
 	if !p.loaded || ctx.Config.Headless || ctx.Config.ConfigPath == "" {
 		return
+	}
+	for _, binding := range m.ui.windowPositions(&p.last) {
+		if binding.window.Resizing() {
+			return
+		}
 	}
 	if !retry {
 		for _, binding := range m.ui.windowPositions(&p.last) {

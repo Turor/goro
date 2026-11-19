@@ -19,6 +19,9 @@ var (
 	windowScreenMargin    = 8
 	windowDirtyPadding    = float32(2)
 	windowTitleButtonSize = 17
+	windowResizeGrip      = 12
+	windowMinWidth        = 160
+	windowMinHeight       = 64
 )
 
 func init() {
@@ -26,6 +29,9 @@ func init() {
 	s.Int("screen_margin", &windowScreenMargin, 0, 64, "gap between a window and the screen edge")
 	s.Float("dirty_padding", &windowDirtyPadding, 0, 16, "extra pixels invalidated around a moved window")
 	s.Int("title_button_size", &windowTitleButtonSize, 8, 64, "title bar button width")
+	s.Int("resize_grip", &windowResizeGrip, 8, 32, "bottom-right resize grip")
+	s.Int("min_width", &windowMinWidth, 80, 640, "smallest resized window width")
+	s.Int("min_height", &windowMinHeight, 40, 480, "smallest resized window height")
 	rotheme.OnLayoutApplied(recomputeWindowScreenMargins)
 }
 

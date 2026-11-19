@@ -140,7 +140,7 @@ func (m *Minimap) Update(ctx Context) bool {
 	markerOnly := markerChanged && !fullRedraw
 	drawPendingMarker := m.pendingMarker && !markerChanged
 	needsRedraw := fullRedraw || drawPendingMarker
-	if m.window.width != w || m.window.baseHeight() != h {
+	if !m.window.holdsUserSize() && (m.window.width != w || m.window.baseHeight() != h) {
 		m.window.SetSize(w, h)
 		if m.window.IsOpen() {
 			m.widget.image = m.scaledImage(minimapContentMapSize(w, h))
@@ -196,6 +196,8 @@ func (m *Minimap) Hidden() bool { return m.hidden }
 func (m *Minimap) SavedPosition() config.WindowPosition { return m.window.SavedPosition() }
 
 func (m *Minimap) Dragging() bool { return m.window.Dragging() }
+
+func (m *Minimap) Resizing() bool { return m.window.Resizing() }
 
 func (m *Minimap) RestorePosition(ctx Context, position config.WindowPosition) {
 	m.window.RestorePosition(ctx, position)

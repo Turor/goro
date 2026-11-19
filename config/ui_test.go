@@ -102,4 +102,13 @@ func TestUIWindowPositionParsing(t *testing.T) {
 	if cfg.UI.ConsolePosition != (WindowPosition{X: -20, Y: 800, Set: true}) || cfg.UI.ShortcutPosition.Set {
 		t.Fatalf("positions = %+v", cfg.UI)
 	}
+	if err := applyINI(&cfg, strings.NewReader("[ui]\nequipment_position = 4, 8, 360, 240")); err != nil {
+		t.Fatal(err)
+	}
+	if cfg.UI.EquipmentPosition != (WindowPosition{X: 4, Y: 8, Width: 360, Height: 240, Set: true}) {
+		t.Fatalf("sized position = %+v", cfg.UI.EquipmentPosition)
+	}
+	if cfg.UI.EquipmentPosition.iniValue() != "4,8,360,240" {
+		t.Fatalf("sized ini = %q", cfg.UI.EquipmentPosition.iniValue())
+	}
 }
