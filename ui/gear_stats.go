@@ -3,23 +3,20 @@ package ui
 import (
 	"fmt"
 
+	"github.com/gogpu/ui/core/scrollview"
 	"github.com/gogpu/ui/primitives"
 	"github.com/gogpu/ui/widget"
 	"github.com/kivutar/goro/session"
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-// gearWindowSize is the player Gear window: the paperdoll on the left and the
-// status column on the right. The viewed-equipment pop-up stays on the
-// paperdoll size.
+// gearWindowSize is the player Gear window: the paperdoll keeps its own size,
+// and the status column sits beside it. The viewed-equipment pop-up stays on
+// the paperdoll size. Height stays the paperdoll height so a dragged window
+// still fits; the status column scrolls.
 func gearWindowSize() (int, int) {
 	width := equipmentWindowWidth + equipmentWindowPad + int(statsPrimaryColumnWidth)
-	rows := 2 + statsPrimaryRows + 1 + 8 + 1 + statsPrimaryRows + 2
-	height := ROWindowTitleHeight + ROWindowFooterHeight + equipmentWindowPad*2 + rows*statsRowH + rows*int(rotheme.TableGap)
-	if height < equipmentWindowHeight {
-		height = equipmentWindowHeight
-	}
-	return width, height
+	return width, equipmentWindowHeight
 }
 
 func (w *EquipmentWindow) OpenIfClosed(ctx Context) {
@@ -39,7 +36,7 @@ func gearSnapshot(s *session.Session) string {
 func gearStatsColumn(ctx Context) widget.Widget {
 	stats := sessionStats(ctx.Session)
 	stub := &StatsWindow{}
-	return primitives.Box(
+	body := primitives.Box(
 		rotheme.Label("Base"),
 		rotheme.Text(fmt.Sprintf("Points %d", stats.Points)).MaxLines(1),
 		stub.statRowsWidget(ctx),
@@ -48,6 +45,14 @@ func gearStatsColumn(ctx Context) widget.Widget {
 		rotheme.Label("Traits"),
 		stub.traitRowsWidget(ctx),
 	).Width(statsPrimaryColumnWidth).Gap(rotheme.TableGap)
+	scroll := scrollview.New(
+		body,
+		scrollview.DirectionOpt(scrollview.Vertical),
+		scrollview.ScrollbarOpt(scrollview.ScrollbarAuto),
+	)
+	return primitives.Box(scroll).
+		Width(statsPrimaryColumnWidth).
+		Height(float32(equipmentWindowContentH))
 }
 
 func gearCombatLines(stats session.Stats) widget.Widget {
