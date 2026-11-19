@@ -90,6 +90,68 @@ type gpuRenderer struct {
 	worldDebugLast         time.Time
 	damageSource           gpucontext.DamageReporter
 
+	fxaaEnabled             bool
+	enhancedEnabled         bool
+	fxaa                    *gpuFXAA
+	textureArrays           bool
+	arrayFrame              bool
+	billboardArrayFrame     bool
+	meshesPacked            bool
+	batchedAsArray          bool
+	framePasses             []Pass
+	worldVertexSlots        [2]dynamicGPUBuffer
+	worldIndexSlots         [2]dynamicGPUBuffer
+	billboardInstanceSlots  [2]dynamicGPUBuffer
+	dynamicUploads          DynamicBufferSet
+	frameSerial             uint64
+	billboardSlot           int
+	triangleSlot            int
+	activeBillboard         *dynamicGPUBuffer
+	billboardStride         uint64
+	modelBGL                *wgpu.BindGroupLayout
+	modelBuf                *wgpu.Buffer
+	modelGroup              *wgpu.BindGroup
+	modelOffset             map[*WorldMesh]uint32
+	lightingBuf             *wgpu.Buffer
+	shadowTex               *wgpu.Texture
+	shadowView              *wgpu.TextureView
+	shadowColorTex          *wgpu.Texture
+	shadowColorView         *wgpu.TextureView
+	shadowUniform           *wgpu.Buffer
+	shadowBGL               *wgpu.BindGroupLayout
+	shadowLayout            *wgpu.PipelineLayout
+	shadowGroup             *wgpu.BindGroup
+	shadowPipeline          *wgpu.RenderPipeline
+	billboardLayout         *wgpu.PipelineLayout
+	arrayBGL                *wgpu.BindGroupLayout
+	arrayLayout             *wgpu.PipelineLayout
+	arrayPipeline           *wgpu.RenderPipeline
+	arrayPipelineKey        worldPipelineKey
+	arrayPipelines          map[worldPipelineKey]*wgpu.RenderPipeline
+	arrayTex                *wgpu.Texture
+	arrayView               *wgpu.TextureView
+	arrayVertex             dynamicGPUBuffer
+	arrayIndex              dynamicGPUBuffer
+	arrayIndirect           dynamicGPUBuffer
+	arrayWidth              int
+	arrayHeight             int
+	arrayLayers             int
+	arrayDraws              []arrayMeshDraw
+	arrayGroup              *wgpu.BindGroup
+	billboardArrayBGL       *wgpu.BindGroupLayout
+	billboardArrayLayout    *wgpu.PipelineLayout
+	billboardArrayPipeline  *wgpu.RenderPipeline
+	billboardArrayDepth     *wgpu.RenderPipeline
+	billboardArrayPipelines map[worldPipelineKey]*wgpu.RenderPipeline
+	billboardArrayTex       *wgpu.Texture
+	billboardArrayView      *wgpu.TextureView
+	billboardArrayW         int
+	billboardArrayH         int
+	billboardArrayLayers    int
+	billboardArrayGroups    []*wgpu.BindGroup
+	billboardArrayGroup     *wgpu.BindGroup
+	posedMeshes             []*WorldMesh
+
 	worldFrameScratch worldFrameScratch
 }
 
@@ -190,6 +252,8 @@ type bindGroupKey struct {
 	lightTexture *gpuImageTexture
 	sampler      *wgpu.Sampler
 	layout       *wgpu.BindGroupLayout
+	shadow       *wgpu.TextureView
+	arrayView    *wgpu.TextureView
 }
 
 func newGPURenderer(ctx *gogpu.Context, app *gogpu.App, cfg config.RenderConfig) (*gpuRenderer, error) {
@@ -213,6 +277,8 @@ func newGPURenderer(ctx *gogpu.Context, app *gogpu.App, cfg config.RenderConfig)
 	r.smoothSprites = cfg.SmoothSprites
 	r.bloomEnabled = cfg.Bloom
 	r.ssaoEnabled = cfg.SSAO
+	r.fxaaEnabled = cfg.FXAA
+	r.enhancedEnabled = cfg.EnhancedLighting
 	r.sampleCount = 1
 	if cfg.MSAA {
 		r.sampleCount = 4
@@ -296,9 +362,14 @@ func (r *gpuRenderer) init(_ *gogpu.Context) error {
 			{Binding: 2, Visibility: wgpu.ShaderStageFragment, Texture: &gputypes.TextureBindingLayout{SampleType: gputypes.TextureSampleTypeFloat, ViewDimension: gputypes.TextureViewDimension2D}},
 			{Binding: 3, Visibility: wgpu.ShaderStageFragment, Texture: &gputypes.TextureBindingLayout{SampleType: gputypes.TextureSampleTypeFloat, ViewDimension: gputypes.TextureViewDimension2D}},
 			{Binding: 4, Visibility: wgpu.ShaderStageFragment, Sampler: &gputypes.SamplerBindingLayout{Type: gputypes.SamplerBindingTypeFiltering}},
+			{Binding: 5, Visibility: wgpu.ShaderStageVertex | wgpu.ShaderStageFragment, Buffer: &gputypes.BufferBindingLayout{Type: gputypes.BufferBindingTypeUniform, MinBindingSize: LightingUniformBytes}},
+			{Binding: 6, Visibility: wgpu.ShaderStageFragment, Texture: &gputypes.TextureBindingLayout{SampleType: gputypes.TextureSampleTypeDepth, ViewDimension: gputypes.TextureViewDimension2D}},
 		},
 	})
 	if err != nil {
+		return err
+	}
+	if err := r.initEnhancedResources(); err != nil {
 		return err
 	}
 	r.layout, err = r.dev.CreatePipelineLayout(&wgpu.PipelineLayoutDescriptor{
@@ -310,6 +381,13 @@ func (r *gpuRenderer) init(_ *gogpu.Context) error {
 	}
 	r.worldLayout, err = r.dev.CreatePipelineLayout(&wgpu.PipelineLayoutDescriptor{
 		Label:            "goro-world-pipeline-layout",
+		BindGroupLayouts: []*wgpu.BindGroupLayout{r.worldBGL, r.modelBGL},
+	})
+	if err != nil {
+		return err
+	}
+	r.billboardLayout, err = r.dev.CreatePipelineLayout(&wgpu.PipelineLayoutDescriptor{
+		Label:            "goro-billboard-pipeline-layout",
 		BindGroupLayouts: []*wgpu.BindGroupLayout{r.worldBGL},
 	})
 	if err != nil {
@@ -382,7 +460,11 @@ func (r *gpuRenderer) init(_ *gogpu.Context) error {
 		return err
 	}
 	r.billboardQuadBuf, err = r.createBillboardQuadBuffer()
-	return err
+	if err != nil {
+		return err
+	}
+	r.initTextureArraySupport()
+	return nil
 }
 
 func (r *gpuRenderer) createPipeline(shader *wgpu.ShaderModule, blend gputypes.BlendState, label string) (*wgpu.RenderPipeline, error) {
@@ -478,7 +560,7 @@ func (r *gpuRenderer) createWorldBillboardPipeline(shader *wgpu.ShaderModule, bl
 func (r *gpuRenderer) worldBillboardPipelineDescriptor(shader *wgpu.ShaderModule, blend gputypes.BlendState, depthTest bool, label string) *wgpu.RenderPipelineDescriptor {
 	return &wgpu.RenderPipelineDescriptor{
 		Label:  label,
-		Layout: r.worldLayout,
+		Layout: r.billboardPipelineLayout(),
 		Vertex: wgpu.VertexState{
 			Module:     shader,
 			EntryPoint: "vs_main",
@@ -568,7 +650,11 @@ func (r *gpuRenderer) Draw(ctx *gogpu.Context, screen *Frame) (bool, error) {
 		}
 	}
 	if screen.camera.Enabled {
-		if err := r.depthTarget.ensure(r.dev, width, height, depthFormat, r.sampleCount, wgpu.TextureUsageRenderAttachment); err != nil {
+		depthUsage := wgpu.TextureUsageRenderAttachment
+		if r.sampleCount == 1 {
+			depthUsage |= wgpu.TextureUsageTextureBinding
+		}
+		if err := r.depthTarget.ensure(r.dev, width, height, depthFormat, r.sampleCount, depthUsage); err != nil {
 			return false, fmt.Errorf("create world depth: %w", err)
 		}
 		if r.sampleCount > 1 {
@@ -613,8 +699,7 @@ func (r *gpuRenderer) Draw(ctx *gogpu.Context, screen *Frame) (bool, error) {
 	} else if r.bloom != nil && !r.bloomEnabled {
 		r.bloom.releaseTargets()
 	}
-	world := r.buildWorldFrame(screen)
-	ssaoActive := r.ssaoEnabled && screen.camera.Enabled
+	ssaoActive := r.ssaoEnabled && screen.camera.Enabled && r.sampleCount == 1
 	if ssaoActive {
 		if r.ssao == nil {
 			var err error
@@ -623,14 +708,23 @@ func (r *gpuRenderer) Draw(ctx *gogpu.Context, screen *Frame) (bool, error) {
 				return false, fmt.Errorf("create SSAO: %w", err)
 			}
 		}
-		if err := r.ssao.ensure(r.dev, width, height); err != nil {
-			return false, fmt.Errorf("prepare SSAO: %w", err)
-		}
 		if err := r.ssao.uploadCamera(r.queue, screen.camera); err != nil {
 			return false, err
 		}
 	} else if r.ssao != nil && !r.ssaoEnabled {
 		r.ssao.releaseTargets()
+	}
+	if r.fxaaEnabled && screen.camera.Enabled {
+		if err := r.ensureFXAA(width, height); err != nil {
+			return false, fmt.Errorf("prepare FXAA: %w", err)
+		}
+	}
+	if !bloomActive && r.fxaaEnabled && screen.camera.Enabled && r.fxaa != nil && r.fxaa.source.view != nil {
+		worldTarget = r.fxaa.source.view
+	}
+	world := r.buildWorldFrame(screen)
+	if err := r.prepareFrameResources(screen, world, width, height); err != nil {
+		return false, err
 	}
 	frame := r.buildFrame(screen)
 	meshBatches := r.depthWriteWorldMeshBatches(screen)
@@ -645,11 +739,12 @@ func (r *gpuRenderer) Draw(ctx *gogpu.Context, screen *Frame) (bool, error) {
 	var worldVertexBuf, worldIndexBuf, vertexBuf, indexBuf *wgpu.Buffer
 	var err error
 	if len(world.floats) > 0 && len(world.indices) > 0 {
-		worldVertexBuf, err = r.dynamicBuffer(&r.worldVertexBuf, "goro-world-vertices", len(world.floats)*4, wgpu.BufferUsageVertex|wgpu.BufferUsageCopyDst, floatBytes(world.floats))
+		slot := r.triangleSlot & 1
+		worldVertexBuf, err = r.dynamicBuffer(&r.worldVertexSlots[slot], "goro-world-vertices", len(world.floats)*4, wgpu.BufferUsageVertex|wgpu.BufferUsageCopyDst, floatBytes(world.floats))
 		if err != nil {
 			return false, err
 		}
-		worldIndexBuf, err = r.dynamicBuffer(&r.worldIndexBuf, "goro-world-indices", len(world.indices)*4, wgpu.BufferUsageIndex|wgpu.BufferUsageCopyDst, u32Bytes(world.indices))
+		worldIndexBuf, err = r.dynamicBuffer(&r.worldIndexSlots[slot], "goro-world-indices", len(world.indices)*4, wgpu.BufferUsageIndex|wgpu.BufferUsageCopyDst, u32Bytes(world.indices))
 		if err != nil {
 			return false, err
 		}
@@ -670,60 +765,26 @@ func (r *gpuRenderer) Draw(ctx *gogpu.Context, screen *Frame) (bool, error) {
 		return false, err
 	}
 	defer enc.DiscardEncoding()
-	if ssaoActive {
-		if err := r.drawSSAO(enc, meshBatches, world, worldVertexBuf, worldIndexBuf); err != nil {
-			return false, fmt.Errorf("draw SSAO: %w", err)
-		}
-	}
 	clear := clearValue(screen.clear)
 	if screen.camera.Enabled {
-		pass, err := enc.BeginRenderPass(r.worldPassDescriptor(worldTarget, clear))
-		if err != nil {
-			return false, err
-		}
-		if err := r.drawWorldOpaque(pass, meshBatches, world, worldVertexBuf, worldIndexBuf, nil); err != nil {
-			_ = pass.End()
-			return false, err
-		}
-		if ssaoActive {
-			pass.SetPipeline(r.ssao.composite)
-			pass.SetBindGroup(0, r.ssao.groups[1], nil)
-			pass.Draw(gputypes.DrawArgs{VertexCount: 3, InstanceCount: 1})
-		}
-		lateGeometry, err := r.drawWorldAlpha(pass, world, screen.worldMeshes, worldVertexBuf, worldIndexBuf, false)
-		if err != nil {
-			_ = pass.End()
-			return false, err
-		}
-		if err := r.prepareWorldBillboards(screen.worldBillboards); err != nil {
-			_ = pass.End()
-			return false, err
-		}
-		if err := r.drawWorldBillboards(pass, billboardColorPass); err != nil {
-			_ = pass.End()
-			return false, err
-		}
-		if lateGeometry {
-			if err := r.drawWorldBillboards(pass, billboardDepthPass); err != nil {
-				_ = pass.End()
-				return false, err
-			}
-			if _, err := r.drawWorldAlpha(pass, world, screen.worldMeshes, worldVertexBuf, worldIndexBuf, true); err != nil {
-				_ = pass.End()
-				return false, err
-			}
-		}
-		if err := r.drawWorldBillboards(pass, billboardOverlayPass); err != nil {
-			_ = pass.End()
-			return false, err
-		}
-		if err := pass.End(); err != nil {
+		if err := r.drawWorldScene(enc, screen, worldTarget, clear, meshBatches, world, worldVertexBuf, worldIndexBuf, ssaoActive); err != nil {
 			return false, err
 		}
 	}
-	if bloomActive {
+	if bloomActive && r.fxaaEnabled && screen.camera.Enabled && r.fxaa != nil {
+		if err := r.bloom.draw(enc, r.fxaa.source.view); err != nil {
+			return false, fmt.Errorf("draw bloom: %w", err)
+		}
+		if err := r.fxaa.draw(enc, output); err != nil {
+			return false, fmt.Errorf("draw FXAA: %w", err)
+		}
+	} else if bloomActive {
 		if err := r.bloom.draw(enc, output); err != nil {
 			return false, fmt.Errorf("draw bloom: %w", err)
+		}
+	} else if r.fxaaEnabled && screen.camera.Enabled && r.fxaa != nil {
+		if err := r.fxaa.draw(enc, output); err != nil {
+			return false, fmt.Errorf("draw FXAA: %w", err)
 		}
 	}
 	// Resolve the world before drawing the UI at native resolution. The UI
@@ -790,6 +851,7 @@ func (r *gpuRenderer) Draw(ctx *gogpu.Context, screen *Frame) (bool, error) {
 	if r.damageSource != nil {
 		r.damageSource.ReportDamage()
 	}
+	r.frameSerial++
 	return true, nil
 }
 
@@ -1048,7 +1110,7 @@ func (r *gpuRenderer) bindGroup(layout *wgpu.BindGroupLayout, uniform *wgpu.Buff
 }
 
 func (r *gpuRenderer) bindWorldGroup(uniform *wgpu.Buffer, uniformSize uint64, tex, lightTex *gpuImageTexture, sampler *wgpu.Sampler) (*wgpu.BindGroup, error) {
-	key := bindGroupKey{texture: tex, lightTexture: lightTex, sampler: sampler, layout: r.worldBGL}
+	key := bindGroupKey{texture: tex, lightTexture: lightTex, sampler: sampler, layout: r.worldBGL, shadow: r.shadowView}
 	if bg := r.bindGroups[key]; bg != nil {
 		return bg, nil
 	}
@@ -1061,6 +1123,8 @@ func (r *gpuRenderer) bindWorldGroup(uniform *wgpu.Buffer, uniformSize uint64, t
 			{Binding: 2, TextureView: tex.view},
 			{Binding: 3, TextureView: lightTex.view},
 			{Binding: 4, Sampler: r.lightmapSampler},
+			{Binding: 5, Buffer: r.lightingBuf, Size: LightingUniformBytes},
+			{Binding: 6, TextureView: r.shadowView},
 		},
 	})
 	if err != nil {
@@ -1099,6 +1163,7 @@ func (r *gpuRenderer) drawWorldMesh(pass *wgpu.RenderPassEncoder, mesh *WorldMes
 	}
 	state.setPipeline(pass, r.worldPipelineFor(mesh.options))
 	state.setBindGroup(pass, bg)
+	r.bindModelGroup(pass, mesh)
 	state.setVertexBuffer(pass, gpuMesh.vertexBuf)
 	state.setIndexBuffer(pass, gpuMesh.indexBuf)
 	pass.DrawIndexed(gputypes.DrawIndexedArgs{
@@ -1113,7 +1178,13 @@ func (r *gpuRenderer) depthWriteWorldMeshBatches(screen *Frame) []worldMeshBatch
 	if screen != nil {
 		commands = screen.worldMeshes
 	}
+	r.posedMeshes = r.posedMeshes[:0]
+	if r.batchedAsArray != r.meshesPacked {
+		r.worldMeshSubmission.revision = 0
+		r.batchedAsArray = r.meshesPacked
+	}
 	if r.worldMeshSubmission.matches(commands) {
+		r.collectPosedWorldMeshes(commands)
 		// A batch growing during the previous draw may have left an empty page.
 		r.pruneWorldMeshBufferPages()
 		return r.worldMeshBatches
@@ -1140,6 +1211,13 @@ func (r *gpuRenderer) depthWriteWorldMeshBatches(screen *Frame) []worldMeshBatch
 		if mesh == nil || !mesh.options.DepthWrite || mesh.texture == nil || mesh.texture.pix == nil || len(mesh.vertices) == 0 || len(mesh.indices) == 0 {
 			continue
 		}
+		if !mesh.modelIsIdentity() || mesh.uvOffset != [2]float32{} {
+			r.posedMeshes = append(r.posedMeshes, mesh)
+			continue
+		}
+		if r.meshesPacked {
+			continue
+		}
 		key := drawBatchKey{texture: mesh.texture, lightTexture: mesh.lightTexture, options: mesh.options}
 		batchIndex, ok := r.worldMeshBatchByKey[key]
 		if !ok {
@@ -1157,6 +1235,20 @@ func (r *gpuRenderer) depthWriteWorldMeshBatches(screen *Frame) []worldMeshBatch
 	}
 	r.pruneWorldMeshBatchCache()
 	return r.worldMeshBatches
+}
+
+func (r *gpuRenderer) collectPosedWorldMeshes(commands []WorldMeshCommand) {
+	r.posedMeshes = r.posedMeshes[:0]
+	for _, meshCommand := range commands {
+		mesh := meshCommand.Mesh
+		if mesh == nil || !mesh.options.DepthWrite || mesh.texture == nil || mesh.texture.pix == nil || len(mesh.vertices) == 0 || len(mesh.indices) == 0 {
+			continue
+		}
+		if mesh.modelIsIdentity() && mesh.uvOffset == [2]float32{} {
+			continue
+		}
+		r.posedMeshes = append(r.posedMeshes, mesh)
+	}
 }
 
 func (r *gpuRenderer) drawWorldMeshBatch(pass *wgpu.RenderPassEncoder, batch worldMeshBatch, state *renderPassState, pipeline *wgpu.RenderPipeline) error {
@@ -1187,6 +1279,7 @@ func (r *gpuRenderer) drawWorldMeshBatch(pass *wgpu.RenderPassEncoder, batch wor
 	}
 	state.setPipeline(pass, pipeline)
 	state.setBindGroup(pass, bg)
+	r.bindModelGroup(pass, nil)
 	gpuBatch, err := r.ensureWorldMeshBatch(batch)
 	if err != nil {
 		return err
@@ -1203,28 +1296,50 @@ func (r *gpuRenderer) drawWorldMeshBatch(pass *wgpu.RenderPassEncoder, batch wor
 }
 
 func (r *gpuRenderer) prepareWorldBillboards(commands []WorldBillboardCommand) error {
+	r.activeBillboard = nil
+	r.billboardArrayFrame = false
+	if r.arrayFrame && r.billboardArrayPipeline != nil {
+		if err := r.prepareArrayBillboards(commands); err != nil {
+			r.releaseBillboardArrayGroups()
+			r.billboardArrayFrame = false
+			r.activeBillboard = nil
+		} else if r.billboardArrayFrame {
+			return nil
+		}
+	}
 	instances, batches := r.buildWorldBillboardBatches(commands)
 	if len(instances) == 0 || len(batches) == 0 {
 		return nil
 	}
+	slot := &r.billboardInstanceSlots[r.billboardSlot&1]
 	_, err := r.dynamicBuffer(
-		&r.billboardInstanceBuf,
+		slot,
 		"goro-world-billboard-instances",
 		len(instances)*4,
 		wgpu.BufferUsageVertex|wgpu.BufferUsageCopyDst,
 		floatBytes(instances),
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	r.activeBillboard = slot
+	r.billboardStride = billboardInstanceStride
+	return nil
 }
 
 // Write silhouettes separately so overlapping equipment and glow layers keep
 // their colour-pass order. Only solid sprites participate, never their shadows.
 func (r *gpuRenderer) drawWorldBillboards(pass *wgpu.RenderPassEncoder, stage billboardPass) error {
-	if r.billboardQuadBuf == nil || r.billboardInstanceBuf.buf == nil {
+	buf := r.activeBillboard
+	if r.billboardQuadBuf == nil || buf == nil || buf.buf == nil {
 		return nil
 	}
+	stride := r.billboardStride
+	if stride == 0 {
+		stride = billboardInstanceStride
+	}
 	pass.SetVertexBuffer(0, r.billboardQuadBuf, 0)
-	for _, batch := range r.worldBillboardBatches {
+	for i, batch := range r.worldBillboardBatches {
 		overlay := !batch.key.options.DepthTest
 		if overlay != (stage == billboardOverlayPass) {
 			continue
@@ -1232,25 +1347,37 @@ func (r *gpuRenderer) drawWorldBillboards(pass *wgpu.RenderPassEncoder, stage bi
 		if stage == billboardDepthPass && !batch.key.options.DepthWrite {
 			continue
 		}
-		tex, err := r.ensureTexture(batch.key.texture)
-		if err != nil {
-			return err
+		if r.billboardArrayFrame {
+			pipeline := r.billboardArrayPipelineFor(batch.key.options.Blend, batch.key.options.DepthTest)
+			if stage == billboardDepthPass {
+				pipeline = r.billboardArrayDepth
+			}
+			if pipeline == nil || i >= len(r.billboardArrayGroups) {
+				continue
+			}
+			pass.SetPipeline(pipeline)
+			pass.SetBindGroup(0, r.billboardArrayGroups[i], nil)
+		} else {
+			tex, err := r.ensureTexture(batch.key.texture)
+			if err != nil {
+				return err
+			}
+			sampler, err := r.sampler(batch.key.options, batch.key.texture)
+			if err != nil {
+				return err
+			}
+			bg, err := r.bindWorldGroup(r.worldUniform, 96, tex, tex, sampler)
+			if err != nil {
+				return err
+			}
+			pipeline := r.worldBillboardPipelineFor(batch.key.options.Blend, batch.key.options.DepthTest)
+			if stage == billboardDepthPass {
+				pipeline = r.billboardDepth
+			}
+			pass.SetPipeline(pipeline)
+			pass.SetBindGroup(0, bg, nil)
 		}
-		sampler, err := r.sampler(batch.key.options, batch.key.texture)
-		if err != nil {
-			return err
-		}
-		bg, err := r.bindWorldGroup(r.worldUniform, 96, tex, tex, sampler)
-		if err != nil {
-			return err
-		}
-		pipeline := r.worldBillboardPipelineFor(batch.key.options.Blend, batch.key.options.DepthTest)
-		if stage == billboardDepthPass {
-			pipeline = r.billboardDepth
-		}
-		pass.SetPipeline(pipeline)
-		pass.SetBindGroup(0, bg, nil)
-		pass.SetVertexBuffer(1, r.billboardInstanceBuf.buf, uint64(batch.firstInstance)*billboardInstanceStride)
+		pass.SetVertexBuffer(1, buf.buf, uint64(batch.firstInstance)*stride)
 		pass.Draw(gputypes.DrawArgs{
 			VertexCount:   6,
 			InstanceCount: batch.instanceCount,
@@ -1458,6 +1585,7 @@ func (r *gpuRenderer) release() {
 			bg.Release()
 		}
 	}
+	r.releaseEnhanced()
 	for _, tex := range r.textures {
 		if tex != nil {
 			tex.release()

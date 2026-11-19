@@ -199,6 +199,8 @@ type runtimeSettingsProvider interface {
 	RuntimeSmoothSprites() bool
 	RuntimeBloom() bool
 	RuntimeSSAO() bool
+	RuntimeFXAA() bool
+	RuntimeEnhancedLighting() bool
 }
 
 type screenshotRequester interface {
@@ -332,6 +334,7 @@ func Run(game Game, cfg config.WindowConfig, renderCfg config.RenderConfig) erro
 	if err != nil {
 		return err
 	}
+	present := BuildPresentRequest(renderCfg)
 	appConfig = appConfig.
 		WithGraphicsAPI(api).
 		WithTitle(cfg.Title).
@@ -339,9 +342,9 @@ func Run(game Game, cfg config.WindowConfig, renderCfg config.RenderConfig) erro
 		WithSize(cfg.Width, cfg.Height).
 		WithResizable(true).
 		WithContinuousRender(true).
-		WithVSync(renderCfg.VSync).
-		WithLowLatencyVSync(lowLatencyVSync(renderCfg)).
-		WithMaxFPS(renderCfg.MaxFPS)
+		WithVSync(present.VSync).
+		WithLowLatencyVSync(present.LowLatency).
+		WithMaxFPS(present.MaxFPS)
 	if cfg.Fullscreen {
 		appConfig = appConfig.WithFullscreen()
 	}
@@ -484,7 +487,7 @@ func (r *runner) close() {
 // Hyprland with wp_fifo_v1 it misses vblanks (40-45 FPS on 60 Hz). Uncapped
 // vsync keeps FIFO pacing so the GPU is never left spinning.
 func lowLatencyVSync(renderCfg config.RenderConfig) bool {
-	return renderCfg.VSync && renderCfg.MaxFPS > 0
+	return BuildPresentRequest(renderCfg).LowLatency
 }
 
 func configureGogpuVSync(renderCfg config.RenderConfig) {
@@ -862,6 +865,8 @@ func (r *runner) applyRuntimeSettings() {
 	r.renderCfg.SmoothSprites = provider.RuntimeSmoothSprites()
 	r.renderCfg.Bloom = provider.RuntimeBloom()
 	r.renderCfg.SSAO = provider.RuntimeSSAO()
+	r.renderCfg.FXAA = provider.RuntimeFXAA()
+	r.renderCfg.EnhancedLighting = provider.RuntimeEnhancedLighting()
 	if fullscreen := provider.RuntimeFullscreen(); fullscreen != r.fullscreen {
 		r.app.SetFullscreen(fullscreen)
 		r.fullscreen = fullscreen
@@ -918,6 +923,8 @@ func (r *runner) draw(ctx *gogpu.Context) error {
 	r.gpu.smoothSprites = r.renderCfg.SmoothSprites
 	r.gpu.bloomEnabled = r.renderCfg.Bloom
 	r.gpu.ssaoEnabled = r.renderCfg.SSAO
+	r.gpu.fxaaEnabled = r.renderCfg.FXAA
+	r.gpu.enhancedEnabled = r.renderCfg.EnhancedLighting
 	r.screen.BeginFrame()
 	r.screen.SetScreenScale(scaleX, scaleY)
 	r.resetUIDrawMeasurement()

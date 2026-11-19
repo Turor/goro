@@ -324,7 +324,7 @@ func TestActorAnchorOutsideViewportKeepsBodyVisibleBelowScreen(t *testing.T) {
 	if actorAnchorOutsideViewport(400, 600+150, 800, 600, 1) {
 		t.Fatal("actor should remain visible while its body can still overlap the bottom edge")
 	}
-	if !actorAnchorOutsideViewport(400, 600+260, 800, 600, 1) {
+	if !actorAnchorOutsideViewport(400, 600+420, 800, 600, 1) {
 		t.Fatal("actor should be culled after the whole billboard is beyond the bottom edge")
 	}
 }

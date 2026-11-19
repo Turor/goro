@@ -57,7 +57,7 @@ func TestSettingsTabsFitSmallWindowAndKeepSelectionAfterToggle(t *testing.T) {
 		app.Window().HandleEvent(uitest.Release(p.X, p.Y))
 	}
 	for _, section := range []struct{ tab, lastControl string }{
-		{"Display", "Ambient occlusion"},
+		{"Display", "Enhanced lighting"},
 		{"Sound", "SFX Vol"},
 		{"Gameplay", "Keyboard & joypad controls"},
 	} {
@@ -66,9 +66,24 @@ func TestSettingsTabsFitSmallWindowAndKeepSelectionAfterToggle(t *testing.T) {
 		if _, ok := labels[section.lastControl]; !ok {
 			t.Fatalf("%s: last control %q is missing", section.tab, section.lastControl)
 		}
+		wx, wy, ww, wh := centeredWindowRect(ctx, settingsWindowW, settingsWindowH)
+		left, top := float32(wx), float32(wy)
+		right, bottom := left+float32(ww), top+float32(wh)
 		for label, bounds := range labels {
-			if bounds.Min.X < 0 || bounds.Min.Y < 0 || bounds.Max.X > 640 || bounds.Max.Y > 480 {
-				t.Fatalf("%s: control %q outside 640x480: %v", section.tab, label, bounds)
+			height := bounds.Max.Y - bounds.Min.Y
+			if height < 8 || bounds.Min.X < left || bounds.Min.Y < top || bounds.Max.X > right || bounds.Max.Y > bottom {
+				t.Fatalf("%s: control %q outside the settings window: bounds=%v height=%g window=(%g,%g)-(%g,%g)", section.tab, label, bounds, height, left, top, right, bottom)
+			}
+		}
+		if section.tab == "Display" {
+			for _, label := range []string{"FXAA", "Enhanced lighting"} {
+				bounds, ok := labels[label]
+				if !ok {
+					t.Fatalf("Display: %s is missing", label)
+				}
+				if height := bounds.Max.Y - bounds.Min.Y; height < 20 {
+					t.Fatalf("Display: %s is clipped: height=%g bounds=%v", label, height, bounds)
+				}
 			}
 		}
 	}

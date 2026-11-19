@@ -162,10 +162,27 @@ func sessionItemFromNetwork(item network.InventoryItem) session.InventoryItem {
 		Equipped:     item.Equipped,
 		Damaged:      item.Damaged,
 		Refine:       item.Refine,
+		Grade:        item.Grade,
 		Cards:        item.Cards,
+		Options:      copySessionItemOptions(item.Options),
+		ForgeOptions: copySessionForgeOptions(item.ForgeOptions),
 	}
 	normalizeSessionInventoryItem(&sessionItem)
 	return sessionItem
+}
+
+func copySessionItemOptions(in [5]network.ItemOption) (out [5]session.ItemOption) {
+	for i, opt := range in {
+		out[i] = session.ItemOption{Index: opt.Index, Value: opt.Value, Param: opt.Param}
+	}
+	return out
+}
+
+func copySessionForgeOptions(in [3]network.ItemOption) (out [3]session.ItemOption) {
+	for i, opt := range in {
+		out[i] = session.ItemOption{Index: opt.Index, Value: opt.Value, Param: opt.Param}
+	}
+	return out
 }
 
 func addOrReplaceSessionInventoryItem(s *session.Session, item session.InventoryItem) {

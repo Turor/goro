@@ -23,6 +23,7 @@ type BasicMenuCallbacks struct {
 	OnMap    func()
 	OnComm   func()
 	OnFriend func()
+	OnWarpra func()
 }
 
 type basicMenuButton struct {
@@ -39,6 +40,7 @@ var basicMenuButtons = []basicMenuButton{
 	{key: "map", label: "Map"},
 	{key: "comm", label: "Comm"},
 	{key: "friend", label: "Friend"},
+	{key: "warpra", label: "Warpra"},
 }
 
 func (m *BasicMenu) Update(ctx client.Context, callbacks BasicMenuCallbacks) bool {
@@ -175,9 +177,18 @@ func basicMenuBounds() (int, int, int, int) {
 func basicMenuSize(collapsed bool) (int, int) {
 	w, h := characterWindowWidth, basicMenuToggleH
 	if !collapsed {
-		h += basicMenuToggleGap + basicMenuPad*2 + basicMenuRows*basicMenuButtonH + (basicMenuRows-1)*basicMenuGapY
+		rows := basicMenuRowCount()
+		h += basicMenuToggleGap + basicMenuPad*2 + rows*basicMenuButtonH + (rows-1)*basicMenuGapY
 	}
 	return w, h
+}
+
+func basicMenuRowCount() int {
+	need := (len(basicMenuButtons) + basicMenuCols - 1) / basicMenuCols
+	if basicMenuRows > need {
+		return basicMenuRows
+	}
+	return need
 }
 
 func (m *BasicMenu) toggleCollapsed() {
@@ -219,12 +230,14 @@ func (m *BasicMenu) widgetTree() widget.Widget {
 		m.content = toggle
 		return m.content
 	}
-	rows := make([]widget.Widget, 0, basicMenuRows)
-	for row := 0; row < basicMenuRows; row++ {
+	rowCount := basicMenuRowCount()
+	rows := make([]widget.Widget, 0, rowCount)
+	for row := 0; row < rowCount; row++ {
 		buttons := make([]widget.Widget, 0, basicMenuCols)
 		for col := 0; col < basicMenuCols; col++ {
 			index := row*basicMenuCols + col
-			if index < 0 || index >= len(basicMenuButtons) {
+			if index >= len(basicMenuButtons) {
+				buttons = append(buttons, primitives.Box().Width(float32(basicMenuButtonW)).Height(float32(basicMenuButtonH)))
 				continue
 			}
 			button := basicMenuButtons[index]
@@ -282,6 +295,8 @@ func (m *BasicMenu) invoke(key string) {
 		callback = m.callbacks.OnComm
 	case "friend":
 		callback = m.callbacks.OnFriend
+	case "warpra":
+		callback = m.callbacks.OnWarpra
 	}
 	if callback != nil {
 		callback()

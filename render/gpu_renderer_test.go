@@ -22,6 +22,9 @@ func TestRendererShadersParse(t *testing.T) {
 		"hallucination":   hallucinationShaderWGSL,
 		"ssao":            ssaoShaderWGSL,
 		"ssao-depth":      worldShaderWGSL + ssaoDepthShaderWGSL,
+		"fxaa":            fxaaShaderWGSL,
+		"world-array":     worldMeshArrayShaderSource(),
+		"billboard-array": worldBillboardArrayShaderWGSL,
 	} {
 		ast, err := naga.Parse(source)
 		if err != nil {
@@ -42,6 +45,9 @@ func TestRendererShadersGenerateSPIRV(t *testing.T) {
 		"hallucination":   hallucinationShaderWGSL,
 		"ssao":            ssaoShaderWGSL,
 		"ssao-depth":      worldShaderWGSL + ssaoDepthShaderWGSL,
+		"fxaa":            fxaaShaderWGSL,
+		"world-array":     worldMeshArrayShaderSource(),
+		"billboard-array": worldBillboardArrayShaderWGSL,
 	} {
 		ast, err := naga.Parse(source)
 		if err != nil {

@@ -76,6 +76,10 @@ func (m *System) Lighting(rsw *res.RSW) Lighting {
 	return lighting
 }
 
+func (l Lighting) Direction() scene.Point3 {
+	return l.direction
+}
+
 func (l Lighting) groundScale(normal scene.Point3) scene.Point3 {
 	weight := math.Max(scene.Dot3(scene.Normalize3(normal), l.direction), 0)
 	return scene.Point3{

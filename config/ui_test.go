@@ -15,6 +15,7 @@ func TestUISettingsRoundTrip(t *testing.T) {
 	}
 	want := UISettings{
 		InventoryOpen: true, SkillsOpen: true, PetOpen: true,
+		CompanionOpen: true, CompanionTab: 3,
 		HomunculusSkillsOpen: true, MercenaryOpen: true, CartOpen: true,
 		BasicInfoCompact: true, BasicMenuCollapsed: true, SkillTree: true,
 		MinimapHidden: true, ShortcutRows: 3,
@@ -30,10 +31,12 @@ func TestUISettingsRoundTrip(t *testing.T) {
 		GuildPosition:            WindowPosition{X: 60, Y: 70, Set: true},
 		CartPosition:             WindowPosition{X: 70, Y: 80, Set: true},
 		WorldMapPosition:         WindowPosition{X: 80, Y: 90, Set: true},
+		WarpraPosition:           WindowPosition{X: 85, Y: 95, Set: true},
 		EmotesPosition:           WindowPosition{X: 90, Y: 100, Set: true},
 		ChatShortcutsPosition:    WindowPosition{X: 100, Y: 110, Set: true},
 		SettingsPosition:         WindowPosition{X: 110, Y: 120, Set: true},
 		PetPosition:              WindowPosition{X: 120, Y: 130, Set: true},
+		CompanionPosition:        WindowPosition{X: 125, Y: 135, Set: true},
 		HomunculusPosition:       WindowPosition{X: 130, Y: 140, Set: true},
 		HomunculusSkillsPosition: WindowPosition{X: 140, Y: 150, Set: true},
 		MercenaryPosition:        WindowPosition{X: 150, Y: 160, Set: true},
@@ -74,6 +77,7 @@ func TestUISettingsRoundTrip(t *testing.T) {
 func TestUISettingsValidation(t *testing.T) {
 	for _, entry := range []string{
 		"shortcut_rows = 0", "shortcut_rows = 4", "shortcut_rows = three", "skills_open = sometimes", "bogus = true",
+		"companion_tab = -1", "companion_tab = 4", "companion_tab = pet",
 		"shortcut_position = 10", "console_position = x,20", "console_position = 10,20,30",
 		"stats_position = 10,no",
 		"skills_position = 10,20,30", "homunculus_skills_position = nowhere",

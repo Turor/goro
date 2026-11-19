@@ -23,6 +23,7 @@ import (
 // invalid file is logged and also keeps the built-in layout. It never fails
 // startup.
 func loadUILayout(cfg config.Config) {
+	loadUITheme(cfg)
 	path := cfg.UILayoutPath()
 	applied, warnings, err := rotheme.LoadLayoutFile(path)
 	// ParseLayout already caps warnings at MaxLayoutWarnings plus a total.
@@ -38,6 +39,25 @@ func loadUILayout(cfg config.Config) {
 			glog.Errorf("ui layout: %v (using the built-in font)", err)
 		}
 	}
+}
+
+// loadUITheme selects the palette theme saved in goro.ini before
+// ui-layout.ini is applied on top of it. An unknown or broken theme is logged
+// and the default theme stays.
+func loadUITheme(cfg config.Config) {
+	rotheme.SetThemesDir(cfg.ThemesDir())
+	if cfg.UILayout.Theme == "" {
+		return
+	}
+	warnings, err := rotheme.SetTheme(cfg.UILayout.Theme)
+	for _, warning := range warnings {
+		glog.Warnf("ui theme: %s", warning)
+	}
+	if err != nil {
+		glog.Errorf("ui theme %q not applied, using the default theme: %v", cfg.UILayout.Theme, err)
+		return
+	}
+	glog.Infof("ui theme loaded theme=%s", rotheme.ActiveTheme())
 }
 
 // DumpUILayout writes every layout key with its built-in default to path, or

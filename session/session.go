@@ -63,6 +63,7 @@ type Session struct {
 	Movement             Movement
 	Homunculus           Companion
 	Mercenary            Companion
+	Warpra               WarpraCatalog
 }
 
 func New() *Session {
@@ -107,6 +108,7 @@ func (s *Session) SelectCharacter(character Character) {
 	s.Movement = Movement{}
 	s.Homunculus = Companion{}
 	s.Mercenary = Companion{}
+	s.Warpra = WarpraCatalog{}
 }
 
 func (s *Session) SelectedCharacter() Character {
@@ -378,7 +380,17 @@ type InventoryItem struct {
 	Equipped     bool
 	Damaged      bool
 	Refine       uint8
+	Grade        uint8
 	Cards        [4]uint32
+	Options      [5]ItemOption
+	ForgeOptions [3]ItemOption
+}
+
+// ItemOption is one renewal random option or forge option.
+type ItemOption struct {
+	Index int16
+	Value int16
+	Param uint8
 }
 
 type Stats struct {

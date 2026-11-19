@@ -102,6 +102,51 @@ type UILayoutConfig struct {
 	Watch bool
 	// DumpPath, when set, writes the full default layout there and exits.
 	DumpPath string
+	// Theme names the palette theme under ui-layout.ini: a built-in theme
+	// (default, dark, complementary, analogous, triadic) or <name>.ini in the
+	// themes folder. Empty means the default theme. The settings window saves
+	// it as [ui_layout] theme.
+	Theme string
+}
+
+// ThemesDirName is the folder next to goro.ini that holds user theme files.
+const ThemesDirName = "themes"
+
+// maxThemeNameLen bounds a saved theme name.
+const maxThemeNameLen = 40
+
+// ThemesDir returns the folder searched for user theme files.
+func (cfg Config) ThemesDir() string {
+	dir := "."
+	if cfg.ConfigPath != "" {
+		dir = filepath.Dir(cfg.ConfigPath)
+	}
+	return filepath.Join(dir, ThemesDirName)
+}
+
+// validateThemeName accepts the names a theme file may have: lower-case
+// letters, digits, '_' and '-'. Empty means the default theme.
+func validateThemeName(name string) error {
+	if len(name) > maxThemeNameLen {
+		return fmt.Errorf("ui_layout theme is longer than %d characters", maxThemeNameLen)
+	}
+	for _, r := range name {
+		if !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '_' || r == '-') {
+			return fmt.Errorf("ui_layout theme %q may use only a-z, 0-9, '_' and '-'", name)
+		}
+	}
+	return nil
+}
+
+// SaveUITheme remembers the selected theme in goro.ini ([ui_layout] theme).
+func (cfg Config) SaveUITheme(name string) (string, error) {
+	name = strings.ToLower(strings.TrimSpace(name))
+	if err := validateThemeName(name); err != nil {
+		return "", err
+	}
+	return cfg.saveConfigValues(map[string]map[string]string{
+		"uilayout": {"theme": name},
+	})
 }
 
 // DefaultUILayoutFile is the override file name looked up next to goro.ini.
@@ -173,6 +218,8 @@ type RenderConfig struct {
 	MSAA               bool
 	Bloom              bool
 	SSAO               bool
+	FXAA               bool
+	EnhancedLighting   bool
 	VSync              bool
 	MaxFPS             int
 	FPS                bool
@@ -188,6 +235,9 @@ type RenderConfig struct {
 
 type NetworkConfig struct {
 	Trace bool
+	// Capture is a JSON path for framed s2c packets (Phase 5 golden replay).
+	// Empty disables recording. Set with --capture or GORO_CAPTURE.
+	Capture string
 }
 
 type FogConfig struct {
@@ -264,6 +314,8 @@ type UserSettings struct {
 	MSAA             bool
 	Bloom            bool
 	SSAO             bool
+	FXAA             bool
+	EnhancedLighting bool
 	BGMVolume        float64
 	SFXVolume        float64
 	NoShift          bool
@@ -339,6 +391,8 @@ func (cfg Config) SaveUserSettings(settings UserSettings) (string, error) {
 			"msaa":              formatINIValueBool(settings.MSAA),
 			"bloom":             formatINIValueBool(settings.Bloom),
 			"ssao":              formatINIValueBool(settings.SSAO),
+			"fxaa":              formatINIValueBool(settings.FXAA),
+			"enhanced_lighting": formatINIValueBool(settings.EnhancedLighting),
 			"vsync":             formatINIValueBool(settings.VSync),
 			"max_fps":           strconv.Itoa(settings.MaxFPS),
 			"fps":               formatINIValueBool(settings.FPS),
@@ -562,6 +616,8 @@ func parseCLI(cfg *Config, args []string) error {
 	fs.IntVar(&cfg.Render.Anisotropy, "anisotropy", cfg.Render.Anisotropy, "anisotropic texture filtering: 0 (off), 2, 4, 8, 16")
 	fs.BoolVar(&cfg.Render.TextureUpscaling, "texture-upscaling", cfg.Render.TextureUpscaling, "upscale terrain, model, and world sprite textures 2x with xBR")
 	fs.BoolVar(&cfg.Render.SSAO, "ssao", cfg.Render.SSAO, "enable subtle ambient occlusion for terrain and models")
+	fs.BoolVar(&cfg.Render.FXAA, "fxaa", cfg.Render.FXAA, "enable FXAA on the resolved world color")
+	fs.BoolVar(&cfg.Render.EnhancedLighting, "enhanced-lighting", cfg.Render.EnhancedLighting, "shade the world from the map sun, tiled point lights, and a directional shadow")
 	fs.BoolVar(&cfg.Render.Bloom, "bloom", cfg.Render.Bloom, "enable subtle bloom for bright world pixels")
 	fs.BoolVar(&cfg.Render.MSAA, "msaa", cfg.Render.MSAA, "enable 4x multisample anti-aliasing for the world")
 	fs.BoolVar(&cfg.Render.SmoothSprites, "smooth-sprites", cfg.Render.SmoothSprites, "smooth world sprites (false uses nearest-neighbor filtering)")
@@ -577,6 +633,7 @@ func parseCLI(cfg *Config, args []string) error {
 	fs.BoolVar(&cfg.Render.Stats, "render-stats", cfg.Render.Stats, "show render stats")
 	fs.BoolVar(&cfg.Render.WorldDebugStats, "world-debug-stats", cfg.Render.WorldDebugStats, "show world renderer debug stats")
 	fs.BoolVar(&cfg.Network.Trace, "net-trace", cfg.Network.Trace, "log network reads and writes")
+	fs.StringVar(&cfg.Network.Capture, "capture", cfg.Network.Capture, "write framed server packets to this JSON capture (golden replay)")
 	fs.BoolVar(&cfg.Fog.Enabled, "fog", cfg.Fog.Enabled, "enable map fog")
 	fs.BoolVar(&cfg.Gameplay.NoShift, "no-shift", cfg.Gameplay.NoShift, "allow support skills to target enemies without holding Shift")
 	fs.BoolVar(&cfg.Gameplay.NoCtrl, "no-ctrl", cfg.Gameplay.NoCtrl, "keep attacking with one click without holding Ctrl")
@@ -610,6 +667,9 @@ func parseCLI(cfg *Config, args []string) error {
 	}
 	if windowed {
 		cfg.Window.Fullscreen = false
+	}
+	if cfg.Network.Capture == "" {
+		cfg.Network.Capture = strings.TrimSpace(os.Getenv("GORO_CAPTURE"))
 	}
 	return nil
 }
@@ -732,6 +792,10 @@ func applyConfigValue(cfg *Config, section, key, value string) error {
 		return setBool(value, &cfg.Render.TextureUpscaling)
 	case "render.ssao":
 		return setBool(value, &cfg.Render.SSAO)
+	case "render.fxaa":
+		return setBool(value, &cfg.Render.FXAA)
+	case "render.enhancedlighting":
+		return setBool(value, &cfg.Render.EnhancedLighting)
 	case "render.bloom":
 		return setBool(value, &cfg.Render.Bloom)
 	case "render.msaa":
@@ -762,6 +826,8 @@ func applyConfigValue(cfg *Config, section, key, value string) error {
 		return setBool(value, &cfg.Render.WorldDebugStats)
 	case "network.trace":
 		return setBool(value, &cfg.Network.Trace)
+	case "network.capture":
+		cfg.Network.Capture = value
 	case "fog.enabled":
 		return setBool(value, &cfg.Fog.Enabled)
 	case "gameplay.noshift":
@@ -790,6 +856,12 @@ func applyConfigValue(cfg *Config, section, key, value string) error {
 		cfg.UILayout.Path = value
 	case "uilayout.watch":
 		return setBool(value, &cfg.UILayout.Watch)
+	case "uilayout.theme":
+		name := strings.ToLower(strings.TrimSpace(value))
+		if err := validateThemeName(name); err != nil {
+			return err
+		}
+		cfg.UILayout.Theme = name
 	default:
 		return fmt.Errorf("unknown key %q in section %q", key, section)
 	}
@@ -886,7 +958,7 @@ func validateMaxFPS(fps int) error {
 }
 
 func upsertINIValues(src string, values map[string]map[string]string) string {
-	sectionOrder := []string{"window", "render", "audio", "fog", "gameplay", "login", "chatshortcuts", "script", "ui"}
+	sectionOrder := []string{"window", "render", "audio", "fog", "gameplay", "login", "chatshortcuts", "script", "ui", "uilayout"}
 	seenSections := make(map[string]bool)
 	written := make(map[string]map[string]bool)
 	for section := range values {
@@ -950,10 +1022,19 @@ func upsertINIValues(src string, values map[string]map[string]string) string {
 		if len(out) > 0 && strings.TrimSpace(out[len(out)-1]) != "" {
 			out = append(out, "")
 		}
-		out = append(out, "["+section+"]")
+		out = append(out, "["+iniSectionHeader(section)+"]")
 		flushMissing(section)
 	}
 	return strings.Join(out, "\n") + "\n"
+}
+
+// iniSectionHeader is how a new section is written: the documented name for
+// sections whose normalized key drops an underscore.
+func iniSectionHeader(section string) string {
+	if section == "uilayout" {
+		return "ui_layout"
+	}
+	return section
 }
 
 func sortedINIKeys(values map[string]string) []string {

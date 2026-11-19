@@ -16,6 +16,8 @@ type runtimeSettings struct {
 	msaa             atomic.Bool
 	bloom            atomic.Bool
 	ssao             atomic.Bool
+	fxaa             atomic.Bool
+	enhancedLighting atomic.Bool
 }
 
 func newRuntimeSettings(cfg config.Config) *runtimeSettings {
@@ -29,6 +31,8 @@ func newRuntimeSettings(cfg config.Config) *runtimeSettings {
 	settings.SetMSAA(cfg.Render.MSAA)
 	settings.SetBloom(cfg.Render.Bloom)
 	settings.SetSSAO(cfg.Render.SSAO)
+	settings.SetFXAA(cfg.Render.FXAA)
+	settings.SetEnhancedLighting(cfg.Render.EnhancedLighting)
 	return settings
 }
 
@@ -131,5 +135,25 @@ func (s *runtimeSettings) SSAO() bool {
 func (s *runtimeSettings) SetSSAO(value bool) {
 	if s != nil {
 		s.ssao.Store(value)
+	}
+}
+
+func (s *runtimeSettings) FXAA() bool {
+	return s != nil && s.fxaa.Load()
+}
+
+func (s *runtimeSettings) SetFXAA(value bool) {
+	if s != nil {
+		s.fxaa.Store(value)
+	}
+}
+
+func (s *runtimeSettings) EnhancedLighting() bool {
+	return s != nil && s.enhancedLighting.Load()
+}
+
+func (s *runtimeSettings) SetEnhancedLighting(value bool) {
+	if s != nil {
+		s.enhancedLighting.Store(value)
 	}
 }

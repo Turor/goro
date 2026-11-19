@@ -80,11 +80,11 @@ func TestKnightRealAssetsAndRendering(t *testing.T) {
 		spec, _ := Lookup(id)
 		for _, component := range spec.Components {
 			for _, path := range append([]string{component.TextureFile}, component.TextureFiles...) {
-				if path != "" && m.EffectFileTexture(manager, path) == nil {
+				if path != "" && !TextureLoaded(m.EffectFileTexture(manager, path)) {
 					t.Fatalf("effect %d missing texture %s", id, path)
 				}
 			}
-			if component.TextureName != "" && m.effectTexture(manager, component.TextureName) == nil {
+			if component.TextureName != "" && !TextureLoaded(m.effectTexture(manager, component.TextureName)) {
 				t.Fatalf("effect %d missing texture %s", id, component.TextureName)
 			}
 			if component.StrFile != "" {
@@ -94,7 +94,7 @@ func TestKnightRealAssetsAndRendering(t *testing.T) {
 				}
 				for _, layer := range str.Layers {
 					for _, path := range layer.Textures {
-						if m.strEffectTexture(manager, path) == nil {
+						if !TextureLoaded(m.strEffectTexture(manager, path)) {
 							t.Fatalf("STR %s missing %s", component.StrFile, path)
 						}
 					}

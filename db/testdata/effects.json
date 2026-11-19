@@ -1,0 +1,29 @@
+{
+  "effects": {
+    "7": {
+      "duration_ms": 400,
+      "layer": 1,
+      "z_order": 2,
+      "depth": 0.25,
+      "sfx": ["custom.wav"],
+      "components": [
+        {
+          "kind": "str",
+          "file": "custom",
+          "attached_entity": true,
+          "layer": 1,
+          "depth": 0.25
+        }
+      ]
+    }
+  },
+  "skill_effects": {
+    "5": {
+      "success_effect_ids_self": [7],
+      "effect_timing": "action_start"
+    }
+  },
+  "skill_actions": {
+    "5": "attack"
+  }
+}

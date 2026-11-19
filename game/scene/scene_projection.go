@@ -124,7 +124,13 @@ func (p Projection) VisibleForTriangle(x, y, z float64) bool {
 	if clipW <= 1 || !finite4(clipX, clipY, clipZ, clipW) {
 		return false
 	}
-	return clipZ >= -clipW && clipZ <= clipW
+	// The test point is an object base. Sprites and buildings extend well
+	// beyond that point, so the horizontal and vertical clip limits are twice
+	// the real view. Depth stays exact so objects behind the camera stay out.
+	limit := clipW * 2
+	return clipX >= -limit && clipX <= limit &&
+		clipY >= -limit && clipY <= limit &&
+		clipZ >= -clipW && clipZ <= clipW
 }
 
 func (p Projection) ProjectPoint(x, y, z float64) (Point2, bool) {

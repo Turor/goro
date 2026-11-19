@@ -7,6 +7,7 @@ import (
 	"github.com/kivutar/goro/config"
 	"github.com/kivutar/goro/game/scene"
 	"github.com/kivutar/goro/glog"
+	gameui "github.com/kivutar/goro/ui"
 )
 
 type windowPreferences struct {
@@ -40,10 +41,12 @@ func (u *worldUI) windowPositions(s *config.UISettings) []windowPositionBinding 
 		{&u.social.GuildWindow, &s.GuildPosition},
 		{&u.cartWindow, &s.CartPosition},
 		{&u.worldMap, &s.WorldMapPosition},
+		{&u.warpra, &s.WarpraPosition},
 		{&u.emoteWindow, &s.EmotesPosition},
 		{&u.chatShortcuts, &s.ChatShortcutsPosition},
 		{&u.settingsWindow, &s.SettingsPosition},
 		{&u.pet.Info, &s.PetPosition},
+		{&u.companions.Companion, &s.CompanionPosition},
 		{&u.companions.HomunculusInfo, &s.HomunculusPosition},
 		{&u.companions.HomunculusSkill, &s.HomunculusSkillsPosition},
 		{&u.companions.MercenaryInfo, &s.MercenaryPosition},
@@ -71,6 +74,7 @@ func (m *WorldMode) restoreUISettings(ctx client.Context) {
 		}
 		m.ui.characterWindow.SetCompact(s.BasicInfoCompact)
 		m.ui.basicMenu.SetCollapsed(s.BasicMenuCollapsed)
+		m.ui.companions.Companion.SetTab(gameui.ClampCompanionTab(s.CompanionTab))
 		m.ui.skillWindow.SetTreeMode(ctx, s.SkillTree)
 		m.ui.shortcutBar.SetVisibleRows(ctx, s.ShortcutRows)
 		for _, binding := range m.ui.windowPositions(&s) {
@@ -113,6 +117,12 @@ func (m *WorldMode) restoreUISettings(ctx client.Context) {
 			if err := m.ui.worldMap.OpenWindow(ctx); err != nil {
 				glog.Warnf("restore world map window: %v", err)
 			}
+		}
+		if s.WarpraOpen {
+			m.ui.warpra.OpenWindow(ctx)
+		}
+		if s.CompanionOpen {
+			m.companions().OpenCompanionWindow(ctx)
 		}
 		p.last = m.uiSettings()
 		p.zoomTarget = p.last.CameraZoom
@@ -169,10 +179,13 @@ func (m *WorldMode) uiSettings() config.UISettings {
 		GuildOpen:            u.social.GuildWindow.IsOpen() || p.GuildOpen,
 		CartOpen:             u.cartWindow.IsOpen() || p.CartOpen,
 		WorldMapOpen:         u.worldMap.IsOpen(),
+		WarpraOpen:           u.warpra.IsOpen(),
 		EmotesOpen:           u.emoteWindow.IsOpen(),
 		ChatShortcutsOpen:    u.chatShortcuts.IsOpen(),
 		SettingsOpen:         u.settingsWindow.IsOpen(),
 		PetOpen:              u.pet.Info.IsOpen() || p.PetOpen,
+		CompanionOpen:        u.companions.Companion.IsOpen(),
+		CompanionTab:         int(u.companions.Companion.Tab()),
 		HomunculusOpen:       u.companions.HomunculusInfo.IsOpen() || p.HomunculusOpen,
 		HomunculusSkillsOpen: u.companions.HomunculusSkill.IsOpen() || p.HomunculusSkillsOpen,
 		MercenaryOpen:        u.companions.MercenaryInfo.IsOpen() || p.MercenaryOpen,

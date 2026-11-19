@@ -59,12 +59,20 @@ action), which match Hercules `packets_shuffle_main.h` for this date.
   wear to `0x0998`, ground skills to `0x0366`, and the ground-skill talkbox
   to 31 bytes.
 
+## Warpra (`0x0EF4` / `0x0EFE` / `0x0EFF`)
+
+Turoran `turoran_warpra` destination list, warp and 50,000,000-zeny unlock.
+`0x0EFE` is variable-length and may arrive in MORE-flag chunks; `0x0EFF` is
+8 bytes. `0x0EF4` is client-to-server only (list / warp / buy) and is not in
+the ZC length table. Catalog contents come from the live server; tests use
+golden fixtures of the Hercules struct layout.
+
 ## Not yet in this profile
 
-Turoran custom features (`0x0EF1`, `0x0EF5` and the rest), equipment
-locations above 16 bits (shadow gear), item options and grades, guild storage
-(inventory type 3), the extra hotkey tabs, and the remaining map packets
-(`0x0A9B`, `0x097B`, `0x0446`, `0x02D9`, `0x0AE2`, `0x0A3B`, `0x099B`,
-`0x0441`, `0x007F`) are framed and skipped. Builders that do not take a client
-date (party, guild, trade, vending, mail) are not checked against the 20250716
-handler map yet.
+The remaining Turoran custom features (`0x0EF1`, `0x0EF5`, stable, Eden),
+equipment locations above 16 bits (shadow gear), item options and grades,
+guild storage (inventory type 3), the extra hotkey tabs, and the remaining
+map packets (`0x0A9B`, `0x097B`, `0x0446`, `0x02D9`, `0x0AE2`, `0x0A3B`,
+`0x099B`, `0x0441`, `0x007F`) are framed and skipped. Builders that do not
+take a client date (party, guild, trade, vending, mail) are not checked
+against the 20250716 handler map yet.

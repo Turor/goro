@@ -29,6 +29,13 @@ type Frame struct {
 	camera             Camera3D
 	hallucination      bool
 	hallucinationPhase float32
+
+	sunLight      SunLight
+	pointLights   []PointLight
+	viewProj      [16]float32
+	shadowVP      [16]float32
+	hasMapLight   bool
+	enhancedLight bool
 }
 
 func NewFrame(width, height int) *Frame {
@@ -69,6 +76,25 @@ func (f *Frame) BeginFrame() {
 	f.camera = Camera3D{}
 	f.hallucination = false
 	f.hallucinationPhase = 0
+	f.sunLight = SunLight{}
+	f.pointLights = f.pointLights[:0]
+	f.viewProj = [16]float32{}
+	f.shadowVP = [16]float32{}
+	f.hasMapLight = false
+	f.enhancedLight = false
+}
+
+// SetMapLighting publishes the map sun, point lights, and shadow matrix for this frame.
+func (f *Frame) SetMapLighting(sun SunLight, points []PointLight, viewProj, shadowVP [16]float32, enhanced bool) {
+	if f == nil {
+		return
+	}
+	f.sunLight = sun
+	f.pointLights = append(f.pointLights[:0], points...)
+	f.viewProj = viewProj
+	f.shadowVP = shadowVP
+	f.hasMapLight = true
+	f.enhancedLight = enhanced
 }
 
 func (f *Frame) SetHallucination(elapsed time.Duration) {

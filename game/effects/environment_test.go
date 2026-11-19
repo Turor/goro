@@ -299,7 +299,7 @@ func TestEnvironmentAssetsAndRendering(t *testing.T) {
 				files = append(files, c.TextureFile)
 			}
 			for _, file := range files {
-				if m.EffectFileTexture(manager, file) == nil {
+				if !TextureLoaded(m.EffectFileTexture(manager, file)) {
 					t.Fatalf("missing texture %s", file)
 				}
 			}

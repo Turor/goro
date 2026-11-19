@@ -18,10 +18,13 @@ type UISettings struct {
 	GuildOpen                bool
 	CartOpen                 bool
 	WorldMapOpen             bool
+	WarpraOpen               bool
 	EmotesOpen               bool
 	ChatShortcutsOpen        bool
 	SettingsOpen             bool
 	PetOpen                  bool
+	CompanionOpen            bool
+	CompanionTab             int
 	HomunculusOpen           bool
 	HomunculusSkillsOpen     bool
 	MercenaryOpen            bool
@@ -42,10 +45,12 @@ type UISettings struct {
 	GuildPosition            WindowPosition
 	CartPosition             WindowPosition
 	WorldMapPosition         WindowPosition
+	WarpraPosition           WindowPosition
 	EmotesPosition           WindowPosition
 	ChatShortcutsPosition    WindowPosition
 	SettingsPosition         WindowPosition
 	PetPosition              WindowPosition
+	CompanionPosition        WindowPosition
 	HomunculusPosition       WindowPosition
 	HomunculusSkillsPosition WindowPosition
 	MercenaryPosition        WindowPosition
@@ -94,10 +99,12 @@ func (s *UISettings) boolFields() map[string]*bool {
 		"guild_open":             &s.GuildOpen,
 		"cart_open":              &s.CartOpen,
 		"world_map_open":         &s.WorldMapOpen,
+		"warpra_open":            &s.WarpraOpen,
 		"emotes_open":            &s.EmotesOpen,
 		"chat_shortcuts_open":    &s.ChatShortcutsOpen,
 		"settings_open":          &s.SettingsOpen,
 		"pet_open":               &s.PetOpen,
+		"companion_open":         &s.CompanionOpen,
 		"homunculus_open":        &s.HomunculusOpen,
 		"homunculus_skills_open": &s.HomunculusSkillsOpen,
 		"mercenary_open":         &s.MercenaryOpen,
@@ -122,10 +129,12 @@ func (s *UISettings) positionFields() map[string]*WindowPosition {
 		"guild_position":             &s.GuildPosition,
 		"cart_position":              &s.CartPosition,
 		"world_map_position":         &s.WorldMapPosition,
+		"warpra_position":            &s.WarpraPosition,
 		"emotes_position":            &s.EmotesPosition,
 		"chat_shortcuts_position":    &s.ChatShortcutsPosition,
 		"settings_position":          &s.SettingsPosition,
 		"pet_position":               &s.PetPosition,
+		"companion_position":         &s.CompanionPosition,
 		"homunculus_position":        &s.HomunculusPosition,
 		"homunculus_skills_position": &s.HomunculusSkillsPosition,
 		"mercenary_position":         &s.MercenaryPosition,
@@ -151,6 +160,14 @@ func (s *UISettings) apply(key, value string) error {
 			return fmt.Errorf("shortcut_rows must be between 1 and 3")
 		}
 		s.ShortcutRows = rows
+		return nil
+	}
+	if key == "companiontab" {
+		tab, err := strconv.Atoi(value)
+		if err != nil || tab < 0 || tab > 3 {
+			return fmt.Errorf("companion_tab must be between 0 and 3")
+		}
+		s.CompanionTab = tab
 		return nil
 	}
 	for name, field := range s.boolFields() {
@@ -191,6 +208,7 @@ func (cfg Config) SaveUISettings(settings UISettings) (string, error) {
 	}
 	values := map[string]string{
 		"shortcut_rows": strconv.Itoa(settings.ShortcutRows),
+		"companion_tab": strconv.Itoa(settings.CompanionTab),
 		"camera_zoom":   strconv.FormatFloat(settings.CameraZoom, 'f', -1, 64),
 	}
 	for key, value := range settings.boolFields() {

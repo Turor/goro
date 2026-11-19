@@ -216,17 +216,28 @@ type FloorItemDisappear struct {
 	ID uint32
 }
 
+// ItemOption is one renewal random option or forge option.
+// Index and Value are signed. A zero Index means the slot is empty.
+type ItemOption struct {
+	Index int16
+	Value int16
+	Param uint8
+}
+
 type ItemPickupAck struct {
-	Index      uint16
-	Amount     uint16
-	ItemID     uint32
-	Location   uint16
-	Identified bool
-	Type       uint8
-	Damaged    bool
-	Refine     uint8
-	Result     uint8
-	Cards      [4]uint32
+	Index        uint16
+	Amount       uint16
+	ItemID       uint32
+	Location     uint16
+	Identified   bool
+	Type         uint8
+	Damaged      bool
+	Refine       uint8
+	Grade        uint8
+	Result       uint8
+	Cards        [4]uint32
+	Options      [5]ItemOption
+	ForgeOptions [3]ItemOption
 }
 
 type UseItemAck struct {
@@ -249,7 +260,10 @@ type InventoryItem struct {
 	Equipped     bool
 	Damaged      bool
 	Refine       uint8
+	Grade        uint8
 	Cards        [4]uint32
+	Options      [5]ItemOption
+	ForgeOptions [3]ItemOption
 }
 
 type InventoryItemDelete struct {

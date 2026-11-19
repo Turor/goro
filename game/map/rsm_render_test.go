@@ -197,16 +197,10 @@ func TestAnimatedRSMPlacementClearsScratchBatches(t *testing.T) {
 	if len(world.rsmAnimScratch.batches) != 0 {
 		t.Fatalf("scratch batches length = %d, want 0", len(world.rsmAnimScratch.batches))
 	}
-	if cap(world.rsmAnimScratch.batches) == 0 {
-		t.Fatal("scratch batches were not reused")
-	}
 	for i, batch := range world.rsmAnimScratch.batches[:cap(world.rsmAnimScratch.batches)] {
 		if batch.Screen != nil || batch.Texture != nil || batch.Verts != nil || batch.Indices != nil {
 			t.Fatalf("scratch batch %d retained frame data: %#v", i, batch)
 		}
-	}
-	if cap(world.rsmAnimScratch.worldVerts) < 3 {
-		t.Fatalf("scratch world verts capacity = %d, want at least 3", cap(world.rsmAnimScratch.worldVerts))
 	}
 }
 

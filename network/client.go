@@ -47,6 +47,15 @@ type Client struct {
 
 	mapKeepaliveInterval time.Duration
 	mapKeepaliveStop     chan struct{}
+
+	observer RecvObserver
+}
+
+// RecvObserver watches framed server-to-client packets. Capture recorders
+// implement it; the client never writes credentials through this hook.
+type RecvObserver interface {
+	OnConnect()
+	OnPackets([]Packet)
 }
 
 const sendQueueSize = 256
@@ -93,9 +102,26 @@ func (c *Client) Connect(ctx context.Context, address string, port int) error {
 	c.status = fmt.Sprintf("connected to %s:%d", address, port)
 	c.mu.Unlock()
 
+	if obs := c.observerSnapshot(); obs != nil {
+		obs.OnConnect()
+	}
+
 	go c.readLoop(conn, framer)
 	go c.writeLoop(conn, sendCh)
 	return nil
+}
+
+// SetObserver records framed s2c packets for golden captures. Call before Connect.
+func (c *Client) SetObserver(obs RecvObserver) {
+	c.mu.Lock()
+	c.observer = obs
+	c.mu.Unlock()
+}
+
+func (c *Client) observerSnapshot() RecvObserver {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.observer
 }
 
 func (c *Client) Close() {
@@ -641,7 +667,11 @@ func (c *Client) readLoop(conn net.Conn, framer *Framer) {
 			if frameErr != nil {
 				c.errs = append(c.errs, FrameError{Err: frameErr})
 			}
+			obs := c.observer
 			c.mu.Unlock()
+			if obs != nil && len(packets) > 0 {
+				obs.OnPackets(packets)
+			}
 		}
 		if err != nil {
 			if err == io.EOF {

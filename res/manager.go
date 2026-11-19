@@ -35,6 +35,8 @@ type Manager struct {
 	itemMetadataLoaded       bool
 	nonPCResourceNames       map[int]string
 	nonPCResourceNamesLoaded bool
+	randomOptionNames        map[int]string
+	randomOptionNamesLoaded  bool
 	indoorRswNames           map[string]struct{}
 	indoorRswNamesLoaded     bool
 	cameraViewPoints         map[string]CameraViewPoint
@@ -68,6 +70,8 @@ type Manager struct {
 	skillTreeData            *db.SkillTreeData
 	skillTreeWarnings        []string
 	skillTreeRetryAt         time.Time
+	effectDataLoaded         bool
+	effectDataRetryAt        time.Time
 	invalidations            dataInvalidationQueue
 	songTalks                map[SongTalkKind][]string
 	songTalksLoaded          map[SongTalkKind]bool

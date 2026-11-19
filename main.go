@@ -46,6 +46,8 @@ func main() {
 			glog.Infof("updated to %s; restarting", res.Version)
 			closeLog()
 			os.Exit(0)
+		case res.Outcome == updater.UpToDate:
+			glog.Infof("update up to date %s (build %d)", res.Version, res.Build)
 		case res.Reason != "":
 			glog.Infof("update %s: %s", res.Outcome, res.Reason)
 		}
