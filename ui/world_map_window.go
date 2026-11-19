@@ -8,6 +8,7 @@ import (
 
 	"github.com/gogpu/ui/event"
 	"github.com/gogpu/ui/geometry"
+	"github.com/gogpu/ui/primitives"
 	"github.com/gogpu/ui/widget"
 	"github.com/kivutar/goro/network"
 	"github.com/kivutar/goro/res"
@@ -42,6 +43,9 @@ type WorldMapWindow struct {
 	lastDungeon   string
 	pendingMap    string
 	pendingRegion int
+	atlases       []res.WorldMapAtlas
+	atlasIndex    int
+	sections      []res.WorldMapEntry
 }
 
 type worldMapMember struct {
@@ -64,10 +68,18 @@ func (w *WorldMapWindow) Toggle(ctx Context) error {
 }
 
 func (w *WorldMapWindow) OpenWindow(ctx Context) error {
-	if ctx.Resources == nil || len(ctx.Resources.WorldMapEntries()) == 0 {
-		return fmt.Errorf("mapPosTable.txt is missing or empty")
+	w.atlases = res.LiveWorldMapAtlases()
+	if w.art == nil && ctx.Resources != nil && len(w.atlases) > 0 {
+		if img, _, err := res.LoadImage(ctx.Resources, res.WorldMapImageCandidates(w.atlases[0].ID)); err == nil {
+			w.art = img
+			w.sections = w.atlases[0].Entries()
+			w.atlasIndex = 0
+		}
 	}
 	if w.art == nil {
+		if ctx.Resources == nil || len(ctx.Resources.WorldMapEntries()) == 0 {
+			return fmt.Errorf("mapPosTable.txt is missing or empty")
+		}
 		var err error
 		w.art, _, err = res.LoadImage(ctx.Resources, []string{
 			"data/texture/유저인터페이스/worldmap.bmp", "data/texture/interface/worldmap.bmp", "worldmap.bmp",
@@ -77,12 +89,13 @@ func (w *WorldMapWindow) OpenWindow(ctx Context) error {
 		}
 	}
 	screenW, screenH := ctx.ScreenSize()
-	size := worldMapSize(w.art.Bounds().Size(), screenW, screenH)
-	w.EnsureWindow(size.X, size.Y+ROWindowTitleHeight)
-	w.SetSize(size.X, size.Y+ROWindowTitleHeight)
+	frameW, frameH := w.frameSize(screenW, screenH)
+	w.EnsureWindow(frameW, frameH)
+	w.SetSize(frameW, frameH)
 	w.setTitleButtonCount(2)
-	if w.scaled == nil || w.scaled.Bounds().Size() != size {
-		w.scaled = scaleWorldMapImage(w.art, size)
+	mapSize := w.mapSize(screenW, screenH)
+	if w.scaled == nil || w.scaled.Bounds().Size() != mapSize {
+		w.scaled = scaleWorldMapImage(w.art, mapSize)
 	}
 	if w.previews == nil {
 		w.previews = make(map[string]image.Image)
@@ -113,13 +126,17 @@ func (w *WorldMapWindow) reloadLayout() {
 		hovered = w.board.hovered
 	}
 	screenW, screenH := w.ctx.ScreenSize()
-	size := worldMapSize(w.art.Bounds().Size(), screenW, screenH)
-	w.SetSize(size.X, size.Y+ROWindowTitleHeight)
-	if w.scaled == nil || w.scaled.Bounds().Size() != size {
-		w.scaled = scaleWorldMapImage(w.art, size)
+	frameW, frameH := w.frameSize(screenW, screenH)
+	w.SetSize(frameW, frameH)
+	mapSize := w.mapSize(screenW, screenH)
+	if w.scaled == nil || w.scaled.Bounds().Size() != mapSize {
+		w.scaled = scaleWorldMapImage(w.art, mapSize)
 	}
 	w.SetContent(w.widgetTree(w.ctx))
 	if w.board != nil {
+		if hovered < 0 || hovered >= len(w.board.entries) {
+			hovered = -1
+		}
 		w.board.hovered = hovered
 	}
 	w.UpdatePresentation(w.ctx)
@@ -159,7 +176,7 @@ func (w *WorldMapWindow) Close() {
 
 func (w *WorldMapWindow) widgetTree(ctx Context) widget.Widget {
 	w.board = &worldMapWidget{
-		resources: ctx.Resources, entries: ctx.Resources.WorldMapEntries(),
+		resources: ctx.Resources, entries: w.activeEntries(ctx),
 		image: w.scaled, sourceSize: w.art.Bounds().Size(), previews: w.previews,
 		hovered: -1, showNames: w.showNames, marks: w.marks,
 		onClick: func(index int) { w.clickEntry(ctx, index) },
@@ -167,13 +184,77 @@ func (w *WorldMapWindow) widgetTree(ctx Context) widget.Widget {
 	w.board.SetVisible(true)
 	w.board.SetEnabled(true)
 	w.board.SetRepaintBoundary(true)
+	content := widget.Widget(w.board)
+	if rail := w.regionRail(ctx); rail != nil {
+		content = primitives.HBox(rail, w.board).Gap(worldMapPreviewEdge)
+	}
 	return Win(Title("World Map"), CloseButton(true), OnClose(w.Close),
 		TitleButton(rotheme.IconButtonSearch, func() {
 			w.showNames = !w.showNames
 			w.board.showNames = w.showNames
 			w.redraw(ctx)
 		}),
-		Size(float32(w.width), float32(w.baseHeight())), Content(w.board))
+		Size(float32(w.width), float32(w.baseHeight())), Content(content))
+}
+
+func (w *WorldMapWindow) activeEntries(ctx Context) []res.WorldMapEntry {
+	if len(w.sections) > 0 {
+		return w.sections
+	}
+	if ctx.Resources == nil {
+		return nil
+	}
+	return ctx.Resources.WorldMapEntries()
+}
+
+func (w *WorldMapWindow) hasRegionRail() bool {
+	return len(w.atlases) > 1
+}
+
+func (w *WorldMapWindow) mapSize(screenW, screenH int) image.Point {
+	availW := screenW
+	if w.hasRegionRail() {
+		availW -= worldMapRailW + int(worldMapPreviewEdge)
+	}
+	return worldMapSize(w.art.Bounds().Size(), availW, screenH)
+}
+
+func (w *WorldMapWindow) frameSize(screenW, screenH int) (int, int) {
+	size := w.mapSize(screenW, screenH)
+	width := size.X
+	if w.hasRegionRail() {
+		width += worldMapRailW + int(worldMapPreviewEdge)
+	}
+	return width, size.Y + ROWindowTitleHeight
+}
+
+func (w *WorldMapWindow) selectAtlas(ctx Context, index int) {
+	if ctx.Resources == nil || index < 0 || index >= len(w.atlases) {
+		return
+	}
+	img, _, err := res.LoadImage(ctx.Resources, res.WorldMapImageCandidates(w.atlases[index].ID))
+	if err != nil {
+		return
+	}
+	w.atlasIndex = index
+	w.art = img
+	w.scaled = nil
+	w.sections = w.atlases[index].Entries()
+	if w.IsOpen() {
+		w.reloadLayout()
+	}
+}
+
+func (w *WorldMapWindow) regionRail(ctx Context) widget.Widget {
+	if len(w.atlases) < 2 {
+		return nil
+	}
+	buttons := make([]widget.Widget, 0, len(w.atlases))
+	for i, atlas := range w.atlases {
+		i, name := i, atlas.Name
+		buttons = append(buttons, rotheme.Button(name, func() { w.selectAtlas(ctx, i) }))
+	}
+	return primitives.Box(buttons...).Width(float32(worldMapRailW)).Gap(worldMapPreviewEdge)
 }
 
 // Capture only data the atlas uses, never live session/world pointers in Draw.
@@ -454,13 +535,13 @@ func (w *worldMapWidget) Draw(_ widget.Context, canvas widget.Canvas) {
 		}
 		if w.showNames {
 			size := worldMapNameSize
-			width := rotheme.MeasureText(canvas, entry.MapName, size, false)
+			width := rotheme.MeasureText(canvas, worldMapEntryLabel(entry), size, false)
 			if width > r.Width() && width > 0 {
 				size *= r.Width() / width
 			}
 			label := geometry.NewRect(r.Min.X, r.Min.Y+(r.Height()-worldMapNameH)/2, r.Width(), worldMapNameH)
 			canvas.DrawRect(label, worldMapLabelFill)
-			rotheme.DrawText(canvas, entry.MapName, label, size, rotheme.Default.Colors.Text, false, widget.TextAlignCenter)
+			rotheme.DrawText(canvas, worldMapEntryLabel(entry), label, size, rotheme.Default.Colors.Text, false, widget.TextAlignCenter)
 		}
 		if entry.MapName == w.currentMap {
 			drawWorldMapStar(canvas, geometry.Pt(r.Min.X+r.Width()/2, r.Min.Y+r.Height()/2))
@@ -526,7 +607,7 @@ func (w *worldMapWidget) drawPreview(canvas widget.Canvas, entry res.WorldMapEnt
 	canvas.StrokeRoundRect(panel, rotheme.Default.Colors.WindowBorder, worldMapPreviewRadius, worldMapPreviewBorder)
 	labelW := width - worldMapPreviewPadX*2
 	label := geometry.NewRect(panel.Min.X+worldMapPreviewPadX, panel.Min.Y+worldMapPreviewLabelY, labelW, worldMapPreviewLabelH)
-	rotheme.DrawLabel(canvas, entry.MapName, label, widget.TextAlignCenter)
+	rotheme.DrawLabel(canvas, worldMapEntryLabel(entry), label, widget.TextAlignCenter)
 	img := w.previews[entry.MapName]
 	if img == nil {
 		rotheme.DrawText(canvas, "No minimap available", geometry.NewRect(panel.Min.X+worldMapPreviewPadX, panel.Min.Y+worldMapPreviewImageY, labelW, worldMapPreviewImageH),
@@ -558,4 +639,11 @@ func (w *worldMapWidget) drawPreview(canvas widget.Canvas, entry res.WorldMapEnt
 		y += worldMapPreviewRowH
 		rows--
 	}
+}
+
+func worldMapEntryLabel(entry res.WorldMapEntry) string {
+	if entry.Name != "" {
+		return entry.Name
+	}
+	return entry.MapName
 }
