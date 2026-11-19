@@ -85,6 +85,8 @@ type Manager struct {
 	attendanceRewardsLoaded  bool
 	worldMapEntries          []WorldMapEntry
 	worldMapEntriesLoaded    bool
+	hatEffectPlayback        map[int]int
+	hatEffectsLoaded         bool
 	mapDisplayNames          map[string]string
 	mapDisplayNamesLoaded    bool
 }
