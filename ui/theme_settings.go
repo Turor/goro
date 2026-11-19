@@ -3,8 +3,10 @@ package ui
 import "github.com/kivutar/goro/ui/rotheme"
 
 var (
-	settingsWindowW       = 300
-	settingsWindowH       = 359
+	settingsWindowW = 300
+	// 421 fits the Display tab through Enhanced lighting. A shorter
+	// window gives the last checkboxes zero height, so they are not drawn.
+	settingsWindowH       = 421
 	settingsTabW          = 88
 	settingsTabH          = 24
 	settingsTabOverlap    = -1
