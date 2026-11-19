@@ -296,7 +296,7 @@ func normalizeSessionInventoryItem(item *session.InventoryItem) {
 	}
 }
 
-func inventoryEquipAckDefaultLocation(s *session.Session, index uint16) uint16 {
+func inventoryEquipAckDefaultLocation(s *session.Session, index uint16) uint32 {
 	if s == nil || index == 0 {
 		return 0
 	}

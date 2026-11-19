@@ -259,20 +259,32 @@ func statsDerivedWidget(stats session.Stats) widget.Widget {
 func statsRightColumnWidget(s *session.Session, stats session.Stats) widget.Widget {
 	return primitives.Box(
 		statsDerivedWidget(stats),
-		statsDetailsWidget(s, stats.Points),
+		statsDetailsWidget(s, stats),
 	).Gap(rotheme.TableGap)
 }
 
-func statsDetailsWidget(s *session.Session, points int) widget.Widget {
+func statsDetailsWidget(s *session.Session, stats session.Stats) widget.Widget {
 	return rotheme.Table(
 		[]rotheme.TableRow{
 			{
 				{Text: "Status Point", Width: statsDerivedPairWidth, Align: widget.TextAlignLeft, Head: true},
-				{Text: fmt.Sprintf("%d", points), Width: statsDerivedPairWidth, Align: widget.TextAlignRight},
+				{Text: fmt.Sprintf("%d", stats.Points), Width: statsDerivedPairWidth, Align: widget.TextAlignRight},
 			},
 			{
 				{Text: "Guild", Width: statsDerivedPairWidth, Align: widget.TextAlignLeft, Head: true},
 				{Text: statsGuildName(s), Width: statsDerivedPairWidth, Align: widget.TextAlignRight},
+			},
+			{
+				{Text: "Trait Point", Width: statsDerivedPairWidth, Align: widget.TextAlignLeft, Head: true},
+				{Text: fmt.Sprintf("%d", stats.TraitPoints), Width: statsDerivedPairWidth, Align: widget.TextAlignRight},
+			},
+			{
+				{Text: "POW/STA/WIS", Width: statsDerivedPairWidth, Align: widget.TextAlignLeft, Head: true},
+				{Text: fmt.Sprintf("%d/%d/%d", stats.Pow, stats.Sta, stats.Wis), Width: statsDerivedPairWidth, Align: widget.TextAlignRight},
+			},
+			{
+				{Text: "SPL/CON/CRT", Width: statsDerivedPairWidth, Align: widget.TextAlignLeft, Head: true},
+				{Text: fmt.Sprintf("%d/%d/%d", stats.Spl, stats.Con, stats.Crt), Width: statsDerivedPairWidth, Align: widget.TextAlignRight},
 			},
 		},
 		rotheme.TableRowHeightOpt(float32(statsRowH)),
@@ -294,7 +306,7 @@ func statsWindowSnapshot(s *session.Session) string {
 	stats := sessionStats(s)
 	rows := statsRows(s)
 	return fmt.Sprintf(
-		"%d|%d/%d/%d/%d/%d/%d|%d/%d/%d/%d/%d/%d|%d/%d/%d/%d/%d/%d/%d/%d/%d/%d/%d/%d/%d|%s",
+		"%d|%d/%d/%d/%d/%d/%d|%d/%d/%d/%d/%d/%d|%d/%d/%d/%d/%d/%d/%d/%d/%d/%d/%d/%d/%d|%s|%d|%d/%d/%d/%d/%d/%d",
 		stats.Points,
 		rows[0].value, rows[1].value, rows[2].value, rows[3].value, rows[4].value, rows[5].value,
 		rows[0].bonus, rows[1].bonus, rows[2].bonus, rows[3].bonus, rows[4].bonus, rows[5].bonus,
@@ -302,6 +314,7 @@ func statsWindowSnapshot(s *session.Session) string {
 		stats.Hit, stats.Critical, stats.Defense, stats.DefenseBonus,
 		stats.MDefense, stats.MDefenseBonus, stats.Flee, stats.FleeBonus, stats.ASPD+stats.ASPDBonus,
 		statsGuildName(s),
+		stats.TraitPoints, stats.Pow, stats.Sta, stats.Wis, stats.Spl, stats.Con, stats.Crt,
 	)
 }
 
@@ -424,5 +437,17 @@ func setSessionStat(s *session.Session, statusID uint16, value int) {
 	case network.StatusLuk:
 		s.Stats.Luk = value
 		s.Selected.Luk = uint8(value)
+	case network.StatusPow:
+		s.Stats.Pow = value
+	case network.StatusSta:
+		s.Stats.Sta = value
+	case network.StatusWis:
+		s.Stats.Wis = value
+	case network.StatusSpl:
+		s.Stats.Spl = value
+	case network.StatusCon:
+		s.Stats.Con = value
+	case network.StatusCrt:
+		s.Stats.Crt = value
 	}
 }

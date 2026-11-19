@@ -639,6 +639,16 @@ func (m *WorldMode) handleNetworkPacket(ctx client.Context, pkt network.Packet, 
 		m.npc().HandleStoragePasswordResult(ctx, result)
 		return nil, false
 	}
+	if guildItems, ok, err := network.ParseGuildStorageItemList(pkt); err != nil {
+		glog.Errorf("parse guild storage 0x%04X: %v", pkt.ID, err)
+	} else if ok {
+		applyStorageItemList(ctx, guildItems)
+		if ctx.Session != nil {
+			ctx.Session.Storage.Open = true
+		}
+		m.ui.storageWindow.OpenWindow(ctx)
+		return nil, false
+	}
 	if storageItems, ok, err := network.ParseStorageItemList(pkt); err != nil {
 		glog.Errorf("parse storage item list 0x%04X: %v", pkt.ID, err)
 	} else if ok {

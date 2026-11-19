@@ -3,6 +3,8 @@ package session
 import "time"
 
 type Session struct {
+	PetAutoFeed          bool
+	HomunAutoFeed        bool
 	AccountID            uint32
 	CharID               uint32
 	AuthCode             uint32
@@ -372,8 +374,8 @@ type InventoryItem struct {
 	Index        uint16
 	ItemID       uint32
 	Type         uint8
-	Location     uint16 // Allowed equipment slots.
-	WearLocation uint16 // Occupied equipment slots, or zero when unequipped.
+	Location     uint32 // Allowed equipment slots.
+	WearLocation uint32 // Occupied equipment slots, or zero when unequipped.
 	Identified   bool
 	Amount       int
 	Equip        bool
@@ -415,6 +417,11 @@ type Stats struct {
 	IntCost int
 	DexCost int
 	LukCost int
+
+	TraitPoints                                                int
+	Pow, Sta, Wis, Spl, Con, Crt                               int
+	PowBonus, StaBonus, WisBonus, SplBonus, ConBonus, CrtBonus int
+	PowCost, StaCost, WisCost, SplCost, ConCost, CrtCost       int
 
 	Attack        int
 	AttackBonus   int
@@ -491,6 +498,7 @@ type Hotkeys struct {
 	Loaded  bool
 	Version int
 	Slots   []HotkeySlot
+	Extra   map[uint16][]HotkeySlot
 }
 
 type Movement struct {

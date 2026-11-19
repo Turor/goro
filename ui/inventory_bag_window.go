@@ -901,7 +901,7 @@ func inventoryItemIndexes(items []session.InventoryItem) []uint16 {
 	return indexes
 }
 
-func inventoryItemEquipLocation(item session.InventoryItem) uint16 {
+func inventoryItemEquipLocation(item session.InventoryItem) uint32 {
 	if item.Location != 0 {
 		return item.Location
 	}

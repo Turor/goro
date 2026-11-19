@@ -72,7 +72,7 @@ func TestStatsGuildNameUsesAvailableSessionState(t *testing.T) {
 }
 
 func TestStatsDetailsSplitAtDerivedTableCenter(t *testing.T) {
-	details := statsDetailsWidget(&session.Session{GuildName: "Knights"}, 12)
+	details := statsDetailsWidget(&session.Session{GuildName: "Knights"}, session.Stats{Points: 12})
 	details.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(
 		statsDerivedColumnWidth,
 		2*float32(statsRowH)+rotheme.TableGap,

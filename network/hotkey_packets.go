@@ -23,6 +23,7 @@ type HotkeySlot struct {
 }
 
 type HotkeyList struct {
+	Tab   uint16
 	Slots []HotkeySlot
 }
 

@@ -95,6 +95,23 @@ func (m *System) HandleCompanionWindowAction(ctx client.Context, action gameui.C
 		m.HandleMercenaryInfoAction(ctx, gameui.MercenaryInfoAction{Kind: gameui.MercenaryInfoActionSkill})
 	case gameui.CompanionActionMercenaryDelete:
 		m.HandleMercenaryInfoAction(ctx, gameui.MercenaryInfoAction{Kind: gameui.MercenaryInfoActionDelete})
+	case gameui.CompanionActionPetAutoFeed:
+		m.sendAutoFeed(ctx, network.ConfigPetFeed, ctx.Session != nil && ctx.Session.PetAutoFeed)
+	case gameui.CompanionActionHomunAutoFeed:
+		m.sendAutoFeed(ctx, network.ConfigHomunFeed, ctx.Session != nil && ctx.Session.HomunAutoFeed)
+	}
+}
+
+func (m *System) sendAutoFeed(ctx client.Context, typ uint32, currentlyOn bool) {
+	if ctx.Network == nil {
+		return
+	}
+	value := uint32(1)
+	if currentlyOn {
+		value = 0
+	}
+	if err := ctx.Network.SendConfig(typ, value); err != nil && m.bindings.Error != nil {
+		m.bindings.Error("Autofeed request failed.")
 	}
 }
 

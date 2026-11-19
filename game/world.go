@@ -148,6 +148,8 @@ type worldUI struct {
 	attendance      gameui.AttendanceWindow
 	achievements    gameui.AchievementWindow
 	gradeUI         gameui.GradeEnchantWindow
+	searchStore     gameui.SearchStoreWindow
+	equipSwitch     gameui.EquipSwitchWindow
 	emoteWindow     gameui.EmoteWindow
 	chatShortcuts   gameui.ChatShortcutsWindow
 	skillTextPrompt gameui.TextPromptWindow
@@ -188,6 +190,8 @@ func (u *worldUI) nonConsoleKeyboardInputBlockedExcept(ctx client.Context, excep
 		u.attendance.IsOpen() ||
 		u.achievements.IsOpen() ||
 		u.gradeUI.IsOpen() ||
+		u.searchStore.IsOpen() ||
+		u.equipSwitch.IsOpen() ||
 		!u.npcInputAvailable() ||
 		open(&u.settingsWindow.Window) ||
 		u.chatShortcuts.IsOpen() ||
@@ -860,6 +864,12 @@ func (m *WorldMode) Update(ctx client.Context) (Mode, error) {
 	if m.ui.gradeUI.Update(ctx) {
 		return nil, nil
 	}
+	if m.ui.searchStore.Update(ctx) {
+		return nil, nil
+	}
+	if m.ui.equipSwitch.Update(ctx) {
+		return nil, nil
+	}
 	if m.ui.warpra.Update(ctx) {
 		return nil, nil
 	}
@@ -1162,6 +1172,8 @@ func (m *WorldMode) basicMenuCallbacks(ctx client.Context) gameui.BasicMenuCallb
 			}
 		},
 		OnAchievement: func() { m.ui.achievements.Open(ctx) },
+		OnSearch:      func() { m.ui.searchStore.Toggle(ctx) },
+		OnSwitch:      func() { m.ui.equipSwitch.Toggle(ctx) },
 	}
 }
 
@@ -1305,6 +1317,8 @@ func (m *WorldMode) nextWorldMode() *WorldMode {
 	next.ui.attendance = m.ui.attendance
 	next.ui.achievements = m.ui.achievements
 	next.ui.gradeUI = m.ui.gradeUI
+	next.ui.searchStore = m.ui.searchStore
+	next.ui.equipSwitch = m.ui.equipSwitch
 	next.ui.emoteWindow = m.ui.emoteWindow
 	next.ui.chatShortcuts = m.ui.chatShortcuts
 	next.ui.social.FriendsWindow = m.ui.social.FriendsWindow

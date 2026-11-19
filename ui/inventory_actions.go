@@ -69,7 +69,7 @@ func equipInventoryItem(ctx Context, item session.InventoryItem) {
 	}
 }
 
-func inventoryItemEquipLocationForSession(s *session.Session, item session.InventoryItem) uint16 {
+func inventoryItemEquipLocationForSession(s *session.Session, item session.InventoryItem) uint32 {
 	location := inventoryItemEquipLocation(item)
 	if location&(db.EquipAccessory1|db.EquipAccessory2) != db.EquipAccessory1|db.EquipAccessory2 {
 		return location

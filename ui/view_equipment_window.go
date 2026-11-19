@@ -145,7 +145,7 @@ func (w *ViewEquipmentWindow) slotWidget(ctx Context, itemInfo *ItemWindows, slo
 	})
 }
 
-func (w *ViewEquipmentWindow) itemForSlot(location uint16) (session.InventoryItem, bool) {
+func (w *ViewEquipmentWindow) itemForSlot(location uint32) (session.InventoryItem, bool) {
 	for _, item := range w.items {
 		if item.Equipped && item.WearLocation&location != 0 {
 			return item, true

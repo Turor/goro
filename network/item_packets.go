@@ -228,7 +228,7 @@ type ItemPickupAck struct {
 	Index        uint16
 	Amount       uint16
 	ItemID       uint32
-	Location     uint16
+	Location     uint32
 	Identified   bool
 	Type         uint8
 	Damaged      bool
@@ -252,8 +252,8 @@ type InventoryItem struct {
 	Index        uint16
 	ItemID       uint32
 	Type         uint8
-	Location     uint16 // Allowed equipment slots.
-	WearLocation uint16 // Occupied equipment slots, or zero when unequipped.
+	Location     uint32 // Allowed equipment slots.
+	WearLocation uint32 // Occupied equipment slots, or zero when unequipped.
 	Identified   bool
 	Amount       uint16
 	Equip        bool
@@ -293,7 +293,7 @@ type ItemCompositionAck struct {
 
 type InventoryEquipAck struct {
 	Index    uint16
-	Location uint16
+	Location uint32
 	Success  bool
 	Unequip  bool
 }
@@ -472,7 +472,7 @@ func parseItemPickupAckLocation16(packet Packet) (ItemPickupAck, bool, error) {
 		Identified: packet.Data[8] != 0,
 		Damaged:    packet.Data[9] != 0,
 		Refine:     packet.Data[10],
-		Location:   binary.LittleEndian.Uint16(packet.Data[19:21]),
+		Location:   uint32(binary.LittleEndian.Uint16(packet.Data[19:21])),
 		Type:       packet.Data[21],
 		Result:     packet.Data[22],
 	}, true, nil
@@ -489,7 +489,7 @@ func parseItemPickupAckLocation32(packet Packet) (ItemPickupAck, bool, error) {
 		Identified: packet.Data[8] != 0,
 		Damaged:    packet.Data[9] != 0,
 		Refine:     packet.Data[10],
-		Location:   uint16(binary.LittleEndian.Uint32(packet.Data[19:23])),
+		Location:   binary.LittleEndian.Uint32(packet.Data[19:23]),
 		Type:       packet.Data[23],
 		Result:     packet.Data[24],
 	}, true, nil
@@ -539,6 +539,10 @@ func ParseStorageItemList(packet Packet) ([]InventoryItem, bool, error) {
 	}
 }
 
+func ParseGuildStorageItemList(packet Packet) ([]InventoryItem, bool, error) {
+	return parseItemList2025(packet, InventoryTypeGuildStorage)
+}
+
 func ParseCartItemList(packet Packet) ([]InventoryItem, bool, error) {
 	switch packet.ID {
 	case 0x0123:
@@ -579,7 +583,7 @@ func parseNormalInventoryItems(packet Packet, entrySize int) ([]InventoryItem, b
 			Type:       packet.Data[offset+4],
 			Identified: packet.Data[offset+5] != 0,
 			Amount:     binary.LittleEndian.Uint16(packet.Data[offset+6 : offset+8]),
-			Location:   binary.LittleEndian.Uint16(packet.Data[offset+8 : offset+10]),
+			Location:   uint32(binary.LittleEndian.Uint16(packet.Data[offset+8 : offset+10])),
 			Cards:      cards,
 		})
 	}
@@ -603,7 +607,7 @@ func parseNormalInventoryItems4(packet Packet) ([]InventoryItem, bool, error) {
 			Type:       packet.Data[offset+4],
 			Identified: flag&1 != 0,
 			Amount:     binary.LittleEndian.Uint16(packet.Data[offset+5 : offset+7]),
-			Location:   uint16(binary.LittleEndian.Uint32(packet.Data[offset+7 : offset+11])),
+			Location:   binary.LittleEndian.Uint32(packet.Data[offset+7 : offset+11]),
 			Cards:      readItemCards(packet.Data, offset+11),
 		})
 	}
@@ -625,8 +629,8 @@ func parseEquipInventoryItems(packet Packet, entrySize int) ([]InventoryItem, bo
 			ItemID:       uint32(binary.LittleEndian.Uint16(packet.Data[offset+2 : offset+4])),
 			Type:         packet.Data[offset+4],
 			Identified:   packet.Data[offset+5] != 0,
-			Location:     binary.LittleEndian.Uint16(packet.Data[offset+6 : offset+8]),
-			WearLocation: wearState,
+			Location:     uint32(binary.LittleEndian.Uint16(packet.Data[offset+6 : offset+8])),
+			WearLocation: uint32(wearState),
 			Amount:       1,
 			Equip:        true,
 			Equipped:     wearState != 0,
@@ -654,8 +658,8 @@ func parseEquipInventoryItems4(packet Packet, entrySize int) ([]InventoryItem, b
 			ItemID:       uint32(binary.LittleEndian.Uint16(packet.Data[offset+2 : offset+4])),
 			Type:         packet.Data[offset+4],
 			Identified:   flag&1 != 0,
-			Location:     uint16(binary.LittleEndian.Uint32(packet.Data[offset+5 : offset+9])),
-			WearLocation: uint16(wearState),
+			Location:     binary.LittleEndian.Uint32(packet.Data[offset+5 : offset+9]),
+			WearLocation: uint32(wearState),
 			Amount:       1,
 			Equip:        true,
 			Equipped:     wearState != 0,
@@ -1146,7 +1150,7 @@ func ParseInventoryEquipAck(packet Packet) (InventoryEquipAck, bool, error) {
 		}
 		return InventoryEquipAck{
 			Index:    binary.LittleEndian.Uint16(packet.Data[2:4]),
-			Location: binary.LittleEndian.Uint16(packet.Data[4:6]),
+			Location: uint32(binary.LittleEndian.Uint16(packet.Data[4:6])),
 			Success:  packet.Data[6] != 0,
 		}, true, nil
 	case 0x00AC:
@@ -1155,7 +1159,7 @@ func ParseInventoryEquipAck(packet Packet) (InventoryEquipAck, bool, error) {
 		}
 		return InventoryEquipAck{
 			Index:    binary.LittleEndian.Uint16(packet.Data[2:4]),
-			Location: binary.LittleEndian.Uint16(packet.Data[4:6]),
+			Location: uint32(binary.LittleEndian.Uint16(packet.Data[4:6])),
 			Success:  packet.Data[6] != 0,
 			Unequip:  true,
 		}, true, nil
@@ -1637,7 +1641,7 @@ func (c *Client) SendWeaponRefine(index uint32) error {
 	return err
 }
 
-func (c *Client) SendWearEquip(index, location uint16) error {
+func (c *Client) SendWearEquip(index uint16, location uint32) error {
 	packet := BuildWearEquipPacketForClientDate(index, location, c.clientDate)
 	err := c.Send(packet)
 	if err == nil {

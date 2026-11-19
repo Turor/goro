@@ -19,7 +19,7 @@ func inventoryItemTypeIsAmmo(itemType uint8) bool {
 	return itemType == db.ItemTypeAmmo
 }
 
-func inventoryItemDefaultEquipLocation(itemType uint8) uint16 {
+func inventoryItemDefaultEquipLocation(itemType uint8) uint32 {
 	if inventoryItemTypeIsAmmo(itemType) {
 		return db.EquipAmmo
 	}

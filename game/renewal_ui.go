@@ -63,6 +63,46 @@ func (m *WorldMode) handleRenewalUIPacket(ctx client.Context, pkt network.Packet
 	if m.handleGradePacket(ctx, pkt) {
 		return true
 	}
+	if open, ok, err := network.ParseSearchStoreOpen(pkt); err != nil {
+		glog.Errorf("parse search store open 0x%04X: %v", pkt.ID, err)
+		return true
+	} else if ok {
+		_ = open
+		m.ui.searchStore.Open(ctx)
+		return true
+	}
+	if ack, ok, err := network.ParseSearchStoreAck(pkt); err != nil {
+		glog.Errorf("parse search store 0x%04X: %v", pkt.ID, err)
+		return true
+	} else if ok {
+		m.ui.searchStore.SetAck(ctx, ack)
+		return true
+	}
+	if cfg, ok, err := network.ParseConfigFlag(pkt); err != nil {
+		glog.Errorf("parse config 0x%04X: %v", pkt.ID, err)
+		return true
+	} else if ok {
+		if ctx.Session != nil {
+			switch cfg.Type {
+			case network.ConfigPetFeed:
+				ctx.Session.PetAutoFeed = cfg.Value != 0
+			case network.ConfigHomunFeed:
+				ctx.Session.HomunAutoFeed = cfg.Value != 0
+			}
+		}
+		return true
+	}
+	if add, ok, err := network.ParseRodexAddAck(pkt); err != nil {
+		glog.Errorf("parse rodex add 0x%04X: %v", pkt.ID, err)
+		return true
+	} else if ok {
+		if add.Result == 0 {
+			m.ui.rodex.SetMessage(ctx, "Item attached.")
+		} else {
+			m.ui.rodex.SetMessage(ctx, "Could not attach item.")
+		}
+		return true
+	}
 	return false
 }
 

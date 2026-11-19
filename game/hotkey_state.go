@@ -19,6 +19,14 @@ func applyHotkeyList(ctx client.Context, list network.HotkeyList) {
 			Level: slot.Level,
 		}
 	}
+	if list.Tab != 0 {
+		if ctx.Session.Hotkeys.Extra == nil {
+			ctx.Session.Hotkeys.Extra = map[uint16][]session.HotkeySlot{}
+		}
+		ctx.Session.Hotkeys.Extra[list.Tab] = slots
+		glog.Debugf("hotkey extra tab=%d slots=%d", list.Tab, len(slots))
+		return
+	}
 	ctx.Session.Hotkeys.Slots = slots
 	ctx.Session.Hotkeys.Loaded = true
 	ctx.Session.Hotkeys.Version++

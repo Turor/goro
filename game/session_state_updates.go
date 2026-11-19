@@ -96,6 +96,18 @@ func setSessionStat(s *session.Session, statusID uint16, value int) {
 	case network.StatusLuk:
 		s.Stats.Luk = value
 		s.Selected.Luk = uint8(value)
+	case network.StatusPow:
+		s.Stats.Pow = value
+	case network.StatusSta:
+		s.Stats.Sta = value
+	case network.StatusWis:
+		s.Stats.Wis = value
+	case network.StatusSpl:
+		s.Stats.Spl = value
+	case network.StatusCon:
+		s.Stats.Con = value
+	case network.StatusCrt:
+		s.Stats.Crt = value
 	}
 }
 
@@ -116,6 +128,18 @@ func setSessionStatCost(s *session.Session, statusID uint16, value int) {
 		s.Stats.DexCost = value
 	case network.StatusULuk:
 		s.Stats.LukCost = value
+	case network.StatusUPow:
+		s.Stats.PowCost = value
+	case network.StatusUSta:
+		s.Stats.StaCost = value
+	case network.StatusUWis:
+		s.Stats.WisCost = value
+	case network.StatusUSpl:
+		s.Stats.SplCost = value
+	case network.StatusUCon:
+		s.Stats.ConCost = value
+	case network.StatusUCrt:
+		s.Stats.CrtCost = value
 	}
 }
 
