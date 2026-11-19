@@ -215,7 +215,7 @@ func (m *Minimap) ensureWindow(width, height int) {
 	if !m.window.EnsureWindow(width, height) {
 		return
 	}
-	m.window.setTitleButtonCount(2)
+	m.window.setTitleButtonCount(1)
 	m.window.SetBackground(widget.Color{})
 	m.window.CloseOnEsc = false
 }
@@ -224,11 +224,18 @@ func (m *Minimap) SetWorldMapOpener(fn func()) {
 	m.openWorldMap = fn
 }
 
+// Rebuild the title-bar closures on this minimap. A copied window still points at the previous one.
+func (m *Minimap) Rebind(ctx Context) {
+	if m.hidden || m.widget == nil {
+		return
+	}
+	m.window.RebindContent(ctx, m.widgetTree())
+}
+
 func (m *Minimap) widgetTree() widget.Widget {
 	return Win(
 		Title("Mini Map"),
 		CloseButton(false),
-		TitleButton(rotheme.IconButtonMinus, func() { m.Toggle(m.window.ctx) }),
 		TitleButton(rotheme.IconButtonExpand, func() {
 			if m.openWorldMap != nil {
 				m.openWorldMap()

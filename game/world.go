@@ -458,6 +458,8 @@ func (m *WorldMode) rebindPersistentUI(ctx client.Context) {
 	m.ui.instanceWindow.Rebind(ctx, func() { m.destroyInstance(ctx) })
 	m.bindWarpra(ctx)
 	m.ui.worldMap.Rebind(ctx)
+	m.ui.minimap.SetWorldMapOpener(func() { m.openWorldMap(ctx) })
+	m.ui.minimap.Rebind(ctx)
 	m.ui.levelUpNotifications.Rebind(ctx)
 	m.ui.emoteWindow.OnSelect = m.ui.chatShortcuts.SelectEmotion
 	m.ui.emoteWindow.Rebind(ctx, &m.ui.console)
