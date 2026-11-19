@@ -102,3 +102,10 @@ func (m *Screen) updatePincode(ctx client.Context) bool {
 func (m *Screen) pinBlocksCharacterSelect() bool {
 	return m.pincodeRequired || m.pincode.IsOpen()
 }
+
+func (m *Screen) restorePincode(ctx client.Context) {
+	if !m.pincodeRequired || !m.pincode.IsOpen() {
+		return
+	}
+	m.pincode.Republish(ctx)
+}

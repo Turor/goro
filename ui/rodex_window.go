@@ -36,6 +36,9 @@ func (w *RodexWindow) OpenMailbox(ctx Context) {
 	w.EnsureWindow(rodexWindowW, rodexWindowH)
 	w.compose = false
 	w.message = ""
+	w.mail = nil
+	w.selected = network.RodexMailHeader{}
+	w.body = ""
 	w.Window.Open(ctx, w.widgetTree(ctx))
 	w.OnLayoutReload(func() {
 		w.SetSize(rodexWindowW, rodexWindowH)
@@ -60,7 +63,7 @@ func (w *RodexWindow) Toggle(ctx Context) {
 }
 
 func (w *RodexWindow) SetList(ctx Context, list network.RodexMailList) {
-	w.mail = list.Mail
+	w.mail = append(w.mail, list.Mail...)
 	if w.IsOpen() {
 		w.SetContent(w.widgetTree(ctx))
 		w.Publish(ctx)

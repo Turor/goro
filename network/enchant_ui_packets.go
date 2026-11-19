@@ -36,7 +36,7 @@ func BuildRandomEnchantPacket(group int64, index uint16) []byte {
 	data := make([]byte, 12)
 	binary.LittleEndian.PutUint16(data[0:2], PacketCZRequestRandomEnchant)
 	binary.LittleEndian.PutUint64(data[2:10], uint64(group))
-	binary.LittleEndian.PutUint16(data[10:12], ToClientInventoryIndex(index))
+	binary.LittleEndian.PutUint16(data[10:12], index)
 	return data
 }
 
@@ -44,7 +44,7 @@ func BuildPerfectEnchantPacket(group int64, index uint16, itemID int32) []byte {
 	data := make([]byte, 16)
 	binary.LittleEndian.PutUint16(data[0:2], PacketCZRequestPerfectEnchant)
 	binary.LittleEndian.PutUint64(data[2:10], uint64(group))
-	binary.LittleEndian.PutUint16(data[10:12], ToClientInventoryIndex(index))
+	binary.LittleEndian.PutUint16(data[10:12], index)
 	binary.LittleEndian.PutUint32(data[12:16], uint32(itemID))
 	return data
 }
@@ -53,7 +53,7 @@ func BuildUpgradeEnchantPacket(group int64, index uint16, slot uint16) []byte {
 	data := make([]byte, 14)
 	binary.LittleEndian.PutUint16(data[0:2], PacketCZRequestUpgradeEnchant)
 	binary.LittleEndian.PutUint64(data[2:10], uint64(group))
-	binary.LittleEndian.PutUint16(data[10:12], ToClientInventoryIndex(index))
+	binary.LittleEndian.PutUint16(data[10:12], index)
 	binary.LittleEndian.PutUint16(data[12:14], slot)
 	return data
 }
@@ -62,7 +62,7 @@ func BuildResetEnchantPacket(group int64, index uint16) []byte {
 	data := make([]byte, 12)
 	binary.LittleEndian.PutUint16(data[0:2], PacketCZRequestResetEnchant)
 	binary.LittleEndian.PutUint64(data[2:10], uint64(group))
-	binary.LittleEndian.PutUint16(data[10:12], ToClientInventoryIndex(index))
+	binary.LittleEndian.PutUint16(data[10:12], index)
 	return data
 }
 

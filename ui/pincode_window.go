@@ -48,6 +48,7 @@ type PincodeWindow struct {
 }
 
 func (w *PincodeWindow) OpenPrompt(ctx Context, mode PincodeMode, message string) {
+	w.Unpublish(ctx)
 	w.EnsureWindow(pincodeWindowW, pincodeWindowH)
 	w.mode = mode
 	w.message = message
@@ -62,6 +63,15 @@ func (w *PincodeWindow) OpenPrompt(ctx Context, mode PincodeMode, message string
 		w.SetSize(pincodeWindowW, pincodeWindowH)
 		w.SetContent(w.widgetTree(w.ctx))
 	})
+	w.Publish(ctx)
+}
+
+func (w *PincodeWindow) Republish(ctx Context) {
+	if !w.IsOpen() {
+		return
+	}
+	w.Unpublish(ctx)
+	w.SetContent(w.widgetTree(ctx))
 	w.Publish(ctx)
 }
 

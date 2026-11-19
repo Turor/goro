@@ -104,7 +104,7 @@ func ParseRodexMailList(p Packet) (RodexMailList, bool, error) {
 			Type:     p.Data[off+10],
 			Sender:   decodeROFixedString(p.Data[off+11 : off+35]),
 			Expire:   int32(binary.LittleEndian.Uint32(p.Data[off+35 : off+39])),
-			Title:    string(p.Data[off+41 : off+41+titleLen]),
+			Title:    decodeROFixedString(p.Data[off+41 : off+41+titleLen]),
 		}
 		list.Mail = append(list.Mail, entry)
 		off += fixed + titleLen

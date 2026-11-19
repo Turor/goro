@@ -129,6 +129,7 @@ func (m *Screen) showCharacterSelectWindow(ctx client.Context) {
 	if m.charSelectWindow != nil {
 		m.charSelectWindow.Publish(ctx)
 	}
+	m.restorePincode(ctx)
 }
 
 func (m *Screen) updateCharacterDelete(ctx client.Context) bool {

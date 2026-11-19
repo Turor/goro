@@ -79,11 +79,8 @@ func TestBankPackets(t *testing.T) {
 }
 
 func TestRefineUIPackets(t *testing.T) {
-	if ToClientInventoryIndex(3) != 5 || FromClientInventoryIndex(5) != 3 {
-		t.Fatal("index offset")
-	}
 	sel := BuildRefiningSelectItemPacket(3)
-	if binary.LittleEndian.Uint16(sel[2:4]) != 5 {
+	if binary.LittleEndian.Uint16(sel[2:4]) != 3 {
 		t.Fatalf("select index %v", sel)
 	}
 	req := BuildReqRefiningPacket(3, 985, true)
@@ -93,7 +90,7 @@ func TestRefineUIPackets(t *testing.T) {
 	body := make([]byte, refineMaterialHeaderLen+refineMaterialEntrySize)
 	binary.LittleEndian.PutUint16(body[0:2], PacketZCRefiningMaterials)
 	binary.LittleEndian.PutUint16(body[2:4], uint16(len(body)))
-	binary.LittleEndian.PutUint16(body[4:6], 5)
+	binary.LittleEndian.PutUint16(body[4:6], 3)
 	body[6] = 1
 	binary.LittleEndian.PutUint32(body[7:11], 985)
 	body[11] = 80
@@ -106,7 +103,7 @@ func TestRefineUIPackets(t *testing.T) {
 
 func TestEnchantUIPackets(t *testing.T) {
 	pkt := BuildRandomEnchantPacket(12, 4)
-	if len(pkt) != 12 || binary.LittleEndian.Uint16(pkt[10:12]) != 6 {
+	if len(pkt) != 12 || binary.LittleEndian.Uint16(pkt[10:12]) != 4 {
 		t.Fatalf("random %v", pkt)
 	}
 	perf := BuildPerfectEnchantPacket(12, 4, 6223)

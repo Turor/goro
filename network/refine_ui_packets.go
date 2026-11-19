@@ -13,9 +13,6 @@ const (
 	PacketCZCloseRefiningUI    uint16 = 0x0aa4
 	PacketZCBroadcastRefine    uint16 = 0x0ada
 
-	// Official client inventory indexes are offset by 2 on these packets.
-	clientInventoryIndexOffset = 2
-
 	refineMaterialEntrySize = 9 // itemId u32 + chance i8 + zeny i32
 	refineMaterialHeaderLen = 7 // type2 + len2 + itemIndex2 + blessing1
 )
@@ -37,17 +34,6 @@ type RefineBroadcast struct {
 	ItemID      uint32
 	RefineLevel int8
 	Status      int8
-}
-
-func ToClientInventoryIndex(index uint16) uint16 {
-	return index + clientInventoryIndexOffset
-}
-
-func FromClientInventoryIndex(index uint16) uint16 {
-	if index < clientInventoryIndexOffset {
-		return 0
-	}
-	return index - clientInventoryIndexOffset
 }
 
 func ParseOpenRefiningUI(p Packet) (bool, error) {
@@ -77,7 +63,7 @@ func ParseRefineMaterialList(p Packet) (RefineMaterialList, bool, error) {
 	}
 	count := body / refineMaterialEntrySize
 	list := RefineMaterialList{
-		Index:     FromClientInventoryIndex(binary.LittleEndian.Uint16(p.Data[4:6])),
+		Index:     binary.LittleEndian.Uint16(p.Data[4:6]),
 		Blessing:  p.Data[6] != 0,
 		Materials: make([]RefineMaterial, count),
 	}
@@ -112,14 +98,14 @@ func ParseRefineBroadcast(p Packet) (RefineBroadcast, bool, error) {
 func BuildRefiningSelectItemPacket(index uint16) []byte {
 	data := make([]byte, 4)
 	binary.LittleEndian.PutUint16(data[0:2], PacketCZRefiningSelectItem)
-	binary.LittleEndian.PutUint16(data[2:4], ToClientInventoryIndex(index))
+	binary.LittleEndian.PutUint16(data[2:4], index)
 	return data
 }
 
 func BuildReqRefiningPacket(index uint16, itemID uint32, blessing bool) []byte {
 	data := make([]byte, 9)
 	binary.LittleEndian.PutUint16(data[0:2], PacketCZReqRefining)
-	binary.LittleEndian.PutUint16(data[2:4], ToClientInventoryIndex(index))
+	binary.LittleEndian.PutUint16(data[2:4], index)
 	binary.LittleEndian.PutUint32(data[4:8], itemID)
 	if blessing {
 		data[8] = 1
