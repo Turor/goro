@@ -1060,6 +1060,9 @@ func (m *System) AddIfMissing(ctx client.Context, effectID int, actorID uint32) 
 
 func (m *System) HasActive(effectID int, actorID uint32, now time.Time) bool {
 	for _, effect := range m.Active {
+		if effect.hatOwned {
+			continue
+		}
 		if effect.EffectID == effectID && effect.ActorID == actorID && !effect.Expired(now) {
 			return true
 		}
@@ -1071,7 +1074,7 @@ func (m *System) Remove(effectID int, actorID uint32) bool {
 	removed := false
 	active := m.Active[:0]
 	for _, effect := range m.Active {
-		if effect.EffectID == effectID && effect.ActorID == actorID {
+		if !effect.hatOwned && effect.EffectID == effectID && effect.ActorID == actorID {
 			removed = true
 			continue
 		}
