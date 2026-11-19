@@ -476,3 +476,19 @@ func setSessionInventoryItemAmount(s *session.Session, index uint16, amount int)
 		return
 	}
 }
+
+func applySwapEquipInfo(ctx client.Context, slots []network.SwapEquipSlot) {
+	if ctx.Session == nil {
+		return
+	}
+	byIndex := map[uint16]uint32{}
+	for _, slot := range slots {
+		byIndex[slot.Index] = slot.Position
+	}
+	for i := range ctx.Session.Inventory.Items {
+		item := &ctx.Session.Inventory.Items[i]
+		if pos, ok := byIndex[item.Index]; ok {
+			item.SwitchLocation = pos
+		}
+	}
+}

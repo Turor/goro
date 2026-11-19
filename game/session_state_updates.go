@@ -164,6 +164,23 @@ func applySkillInfoUpdate(ctx client.Context, update network.SkillInfoUpdate) {
 	glog.Debugf("skill update id=%d level=%d sp=%d range=%d upgradable=%t", update.Skill.ID, update.Skill.Level, update.Skill.SPCost, update.Skill.Range, update.Skill.Upgradable)
 }
 
+func removeSessionSkill(s *session.Session, id uint16) {
+	if s == nil || id == 0 {
+		return
+	}
+	list := &s.Skills.List
+	if id >= db.SkillGdApproval && id < db.SkillGdLast {
+		list = &s.Guild.Skills
+	}
+	for i := range *list {
+		if (*list)[i].ID != id {
+			continue
+		}
+		*list = append((*list)[:i], (*list)[i+1:]...)
+		return
+	}
+}
+
 func upsertSessionSkill(s *session.Session, skill session.Skill) {
 	list := &s.Skills.List
 	if skill.ID >= db.SkillGdApproval && skill.ID < db.SkillGdLast {

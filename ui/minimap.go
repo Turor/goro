@@ -45,6 +45,9 @@ type Minimap struct {
 	compassRevision  uint64
 	compassDrawnRev  uint64
 	boss             *minimapBossMarker
+	mvp              map[uint32]minimapBossMarker
+	mvpRevision      uint64
+	mvpDrawnRev      uint64
 	bossRevision     uint64
 	guild            map[uint32]minimapGuildMarker
 	guildRevision    uint64
@@ -111,6 +114,7 @@ func (m *Minimap) Update(ctx Context) bool {
 		compassChanged = m.clearCompassMarkers()
 		m.clearGuildMarkers()
 		m.ClearBossMarker()
+		m.ClearMvpMarkers()
 	}
 	if m.pruneCompassMarkers(now) {
 		compassChanged = true
@@ -126,11 +130,12 @@ func (m *Minimap) Update(ctx Context) bool {
 	m.widget.compassMarkers = m.compassSnapshot()
 	m.widget.guildMarkers = m.guildSnapshot()
 	m.widget.bossMarker = m.boss
+	m.widget.mvpMarkers = m.mvpSnapshot()
 	markerChanged := m.playerMarkerChanged(ctx.World.Player.X, ctx.World.Player.Y, ctx.World.Player.Dir)
 	visualKey := m.currentVisualKey(ctx, now)
 	visualChanged := visualKey != m.visualKey
 	needsPublish := false
-	fullRedraw := mapChanged || visualChanged || compassChanged || m.compassDrawnRev != m.compassRevision || m.guildDrawnRev != m.guildRevision
+	fullRedraw := mapChanged || visualChanged || compassChanged || m.compassDrawnRev != m.compassRevision || m.guildDrawnRev != m.guildRevision || m.mvpDrawnRev != m.mvpRevision
 	markerOnly := markerChanged && !fullRedraw
 	drawPendingMarker := m.pendingMarker && !markerChanged
 	needsRedraw := fullRedraw || drawPendingMarker
@@ -163,6 +168,8 @@ func (m *Minimap) Update(ctx Context) bool {
 		m.markRedraw(ctx)
 		m.compassDrawnRev = m.compassRevision
 		m.guildDrawnRev = m.guildRevision
+		m.mvpDrawnRev = m.mvpRevision
+		m.mvpDrawnRev = m.mvpRevision
 	} else if needsRedraw {
 		if fullRedraw {
 			m.clearPendingMarker()
@@ -173,6 +180,7 @@ func (m *Minimap) Update(ctx Context) bool {
 		}
 		m.compassDrawnRev = m.compassRevision
 		m.guildDrawnRev = m.guildRevision
+		m.mvpDrawnRev = m.mvpRevision
 	}
 	if markerOnly {
 		m.queuePendingMarker(oldMarker)
@@ -358,6 +366,47 @@ func (m *Minimap) SetBossMarker(x, y int) {
 	m.boss = &marker
 	m.bossRevision++
 	m.markCompassDirty()
+}
+
+type MinimapMvpMark struct {
+	GID uint32
+	X   uint16
+	Y   uint16
+}
+
+func (m *Minimap) ApplyMvpMinimap(full bool, marks []MinimapMvpMark) {
+	if full || m.mvp == nil {
+		m.mvp = map[uint32]minimapBossMarker{}
+	}
+	for _, mark := range marks {
+		if mark.X == ^uint16(0) || mark.Y == ^uint16(0) {
+			delete(m.mvp, mark.GID)
+			continue
+		}
+		m.mvp[mark.GID] = minimapBossMarker{x: int(mark.X), y: int(mark.Y)}
+	}
+	m.mvpRevision++
+	m.markCompassDirty()
+}
+
+func (m *Minimap) ClearMvpMarkers() {
+	if len(m.mvp) == 0 {
+		return
+	}
+	m.mvp = nil
+	m.mvpRevision++
+	m.markCompassDirty()
+}
+
+func (m *Minimap) mvpSnapshot() []minimapBossMarker {
+	if len(m.mvp) == 0 {
+		return nil
+	}
+	out := make([]minimapBossMarker, 0, len(m.mvp))
+	for _, mark := range m.mvp {
+		out = append(out, mark)
+	}
+	return out
 }
 
 func (m *Minimap) ClearBossMarker() {
@@ -620,6 +669,7 @@ type minimapWidget struct {
 	now            time.Time
 	compassMarkers []minimapCompassMarker
 	bossMarker     *minimapBossMarker
+	mvpMarkers     []minimapBossMarker
 	guildMarkers   []minimapGuildMarker
 	dirtyRect      geometry.Rect
 }
@@ -653,6 +703,9 @@ func (w *minimapWidget) Draw(_ widget.Context, canvas widget.Canvas) {
 			drawMinimapGuildMarkers(canvas, rect, mapW, mapH, w.ctx, w.guildMarkers)
 			drawMinimapPartyMarkers(canvas, rect, mapW, mapH, w.ctx)
 			drawMinimapBossMarker(canvas, rect, mapW, mapH, w.bossMarker)
+			for i := range w.mvpMarkers {
+				drawMinimapBossMarker(canvas, rect, mapW, mapH, &w.mvpMarkers[i])
+			}
 			drawMinimapPlayerMarker(canvas, rect, mapW, mapH, w.ctx.World.Player.X, w.ctx.World.Player.Y, w.arrow)
 			drawMinimapCompassMarkers(canvas, rect, mapW, mapH, w.compassMarkers, w.now, w.ctx.Started)
 		}
