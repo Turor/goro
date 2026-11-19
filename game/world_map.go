@@ -15,9 +15,14 @@ func (m *WorldMode) toggleWorldMapFromInput(ctx client.Context) bool {
 		return false
 	}
 	ctx.Input.ConsumeKeyCodePress(gpucontext.KeyGrave)
+	m.openWorldMap(ctx)
+	return true
+}
+
+// Map button and the minimap view-on control. Same toggle as roBrowser's map button.
+func (m *WorldMode) openWorldMap(ctx client.Context) {
 	if err := m.ui.worldMap.Toggle(ctx); err != nil {
 		m.ui.console.AddErrorMessage("World map unavailable: %v", err)
 		glog.Warnf("world map: %v", err)
 	}
-	return true
 }

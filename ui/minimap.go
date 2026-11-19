@@ -24,6 +24,7 @@ import (
 const minimapCompassDuration = 15 * time.Second
 
 type Minimap struct {
+	openWorldMap     func()
 	mapName          string
 	img              image.Image
 	mapImageTried    bool
@@ -214,14 +215,25 @@ func (m *Minimap) ensureWindow(width, height int) {
 	if !m.window.EnsureWindow(width, height) {
 		return
 	}
+	m.window.setTitleButtonCount(2)
 	m.window.SetBackground(widget.Color{})
 	m.window.CloseOnEsc = false
+}
+
+func (m *Minimap) SetWorldMapOpener(fn func()) {
+	m.openWorldMap = fn
 }
 
 func (m *Minimap) widgetTree() widget.Widget {
 	return Win(
 		Title("Mini Map"),
 		CloseButton(false),
+		TitleButton(rotheme.IconButtonMinus, func() { m.Toggle(m.window.ctx) }),
+		TitleButton(rotheme.IconButtonExpand, func() {
+			if m.openWorldMap != nil {
+				m.openWorldMap()
+			}
+		}),
 		Size(float32(minimapWidth), float32(minimapHeight)),
 		Content(m.widget),
 	)

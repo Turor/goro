@@ -1046,6 +1046,7 @@ func (m *WorldMode) Update(ctx client.Context) (Mode, error) {
 			return nil, nil
 		}
 	}
+	m.ui.minimap.SetWorldMapOpener(func() { m.openWorldMap(ctx) })
 	minimapDragging := m.ui.minimap.Update(ctx)
 	m.effects().SyncLevel99AuraEffects(ctx, now)
 	pointerBlocked := minimapDragging || m.mapPointerBlocked(ctx)
@@ -1196,7 +1197,7 @@ func (m *WorldMode) basicMenuCallbacks(ctx client.Context) gameui.BasicMenuCallb
 		OnItems:  func() { m.ui.inventoryBag.Toggle(ctx) },
 		OnEquip:  func() { m.ui.equipmentWindow.Toggle(ctx) },
 		OnSkill:  func() { m.ui.skillWindow.Toggle(ctx) },
-		OnMap:    func() { m.ui.minimap.Toggle(ctx) },
+		OnMap:    func() { m.openWorldMap(ctx) },
 		OnComm:   func() { m.ui.social.ChatRoomCreate.Open(ctx) },
 		OnFriend: func() { m.ui.social.FriendsWindow.Toggle(ctx) },
 		OnWarpra: func() { m.ui.warpra.Toggle(ctx) },
