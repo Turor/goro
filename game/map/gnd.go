@@ -174,7 +174,9 @@ func cameraGroundFootprint(projection scene.Projection, screenWidth, screenHeigh
 	}
 
 	eye, forward, right, up := projection.CameraBasis()
-	tanHalfFOV := math.Tan(scene.DegreesToRadians(scene.SceneCameraFOV()) * 0.5)
+	// Match VisibleForTriangle: gather ground twice as wide as the view so
+	// cells under a tall object are still drawn when the cell center is off screen.
+	tanHalfFOV := math.Tan(scene.DegreesToRadians(scene.SceneCameraFOV())*0.5) * 2
 
 	samples := [][2]float64{
 		{-1, -1}, {1, -1}, {-1, 1}, {1, 1},
