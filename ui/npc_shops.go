@@ -100,7 +100,16 @@ func (w *BarterWindow) widgetTree(ctx Context) widget.Widget {
 			primitives.Expanded(rotheme.Label(fmt.Sprintf("#%d x%d for #%d x%d", it.ItemID, it.Amount, it.Currency, it.Cost))),
 			rotheme.Button("Trade", func() {
 				if ctx.Network != nil {
-					_ = ctx.Network.SendBarterPurchase(it.ItemID, 1, it.Index)
+					inv := uint16(0)
+					if ctx.Session != nil {
+						for _, item := range ctx.Session.Inventory.Items {
+							if item.ItemID == it.Currency {
+								inv = item.Index
+								break
+							}
+						}
+					}
+					_ = ctx.Network.SendBarterPurchase(it.ItemID, 1, inv, it.Index)
 				}
 			}),
 		).Height(float32(marketRowH)))

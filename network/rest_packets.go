@@ -39,8 +39,8 @@ type ConfigFlag struct {
 }
 
 type SearchStoreOpen struct {
-	Uses uint8
-	Type uint8
+	Effect uint16
+	Uses   uint8
 }
 
 type SearchStoreHit struct {
@@ -83,10 +83,13 @@ func ParseSearchStoreOpen(p Packet) (SearchStoreOpen, bool, error) {
 	if p.ID != PacketZCSearchStoreOpen {
 		return SearchStoreOpen{}, false, nil
 	}
-	if len(p.Data) < 4 {
+	if len(p.Data) < 5 {
 		return SearchStoreOpen{}, false, fmt.Errorf("ZC_OPEN_SEARCH_STORE: invalid length %d", len(p.Data))
 	}
-	return SearchStoreOpen{Uses: p.Data[2], Type: p.Data[3]}, true, nil
+	return SearchStoreOpen{
+		Effect: binary.LittleEndian.Uint16(p.Data[2:4]),
+		Uses:   p.Data[4],
+	}, true, nil
 }
 
 func ParseSearchStoreAck(p Packet) (SearchStoreAck, bool, error) {
@@ -97,21 +100,13 @@ func ParseSearchStoreAck(p Packet) (SearchStoreAck, bool, error) {
 		return SearchStoreAck{}, false, fmt.Errorf("ZC_SEARCH_STORE_INFO_ACK: invalid length %d", len(p.Data))
 	}
 	ack := SearchStoreAck{FirstPage: p.Data[4] != 0, NextPage: p.Data[5] != 0, Uses: p.Data[6]}
-	// storeId4 + AID4 + name80 + itemId4 + type1 + price4 + amount2 + slots16 + options + forge + refine1 + grade1
-	// Too variable; parse storeId/AID/name/itemId/price/amount with a conservative fixed prefix of 4+4+80+4+1+4+2 = 99
-	const prefix = 99
+	// 20250716 PACKET_ZC_SEARCH_STORE_INFO_ACK_sub:
+	// storeId4 + AID4 + shopName80 + itemId4 + type1 + price4 + amount2
+	// + EQUIPSLOTINFO 16 + options 5*5 + forge 3*5 + refine1 + grade1 = 157
+	const entry = 157
 	body := p.Data[7:]
-	if len(body) == 0 {
-		return ack, true, nil
-	}
-	if len(body)%prefix != 0 {
-		// still surface what we can from length field
-		return ack, true, nil
-	}
-	count := len(body) / prefix
-	ack.Hits = make([]SearchStoreHit, 0, count)
-	for i := 0; i < count; i++ {
-		e := body[i*prefix : (i+1)*prefix]
+	for i := 0; i+entry <= len(body); i += entry {
+		e := body[i : i+entry]
 		ack.Hits = append(ack.Hits, SearchStoreHit{
 			StoreID:  binary.LittleEndian.Uint32(e[0:4]),
 			AID:      binary.LittleEndian.Uint32(e[4:8]),

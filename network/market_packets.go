@@ -166,7 +166,7 @@ func ParseClanInfo(p Packet) (ClanInfo, bool, error) {
 	if p.ID != PacketZCClanInfo {
 		return ClanInfo{}, false, nil
 	}
-	if len(p.Data) < 4+4+24+24+16+2 {
+	if len(p.Data) < 4+4+24+24+16+1 {
 		return ClanInfo{}, false, fmt.Errorf("ZC_CLANINFO: invalid length %d", len(p.Data))
 	}
 	return ClanInfo{
@@ -220,13 +220,13 @@ func BuildMarketPurchasePacket(itemID uint32, qty int32) []byte {
 	return data
 }
 
-func BuildBarterPurchasePacket(itemID, amount, shopIndex uint32) []byte {
+func BuildBarterPurchasePacket(itemID, amount uint32, invIndex uint16, shopIndex uint32) []byte {
 	data := make([]byte, 18)
 	binary.LittleEndian.PutUint16(data[0:2], PacketCZBarterPurchase)
 	binary.LittleEndian.PutUint16(data[2:4], 18)
 	binary.LittleEndian.PutUint32(data[4:8], itemID)
 	binary.LittleEndian.PutUint32(data[8:12], amount)
-	binary.LittleEndian.PutUint16(data[12:14], 0)
+	binary.LittleEndian.PutUint16(data[12:14], invIndex)
 	binary.LittleEndian.PutUint32(data[14:18], shopIndex)
 	return data
 }
@@ -266,8 +266,8 @@ func (c *Client) SendBarterClose() error   { return c.Send(BuildEmptyPacket(Pack
 func (c *Client) SendMarketPurchase(itemID uint32, qty int32) error {
 	return c.Send(BuildMarketPurchasePacket(itemID, qty))
 }
-func (c *Client) SendBarterPurchase(itemID, amount, shopIndex uint32) error {
-	return c.Send(BuildBarterPurchasePacket(itemID, amount, shopIndex))
+func (c *Client) SendBarterPurchase(itemID, amount uint32, invIndex uint16, shopIndex uint32) error {
+	return c.Send(BuildBarterPurchasePacket(itemID, amount, invIndex, shopIndex))
 }
 func (c *Client) SendClanChat(msg string) error { return c.Send(BuildClanChatPacket(msg)) }
 func (c *Client) SendHotkeyTab(tab, index uint16, slot HotkeySlot) error {

@@ -453,7 +453,11 @@ func (w *StatsWindow) ApplyStatusChangeAck(ctx Context, ack network.StatusChange
 		return
 	}
 	setSessionStat(ctx.Session, ack.StatusID, ack.Value)
-	if ctx.Session.Stats.Points > 0 {
+	if isTraitStatus(ack.StatusID) {
+		if ctx.Session.Stats.TraitPoints > 0 {
+			ctx.Session.Stats.TraitPoints--
+		}
+	} else if ctx.Session.Stats.Points > 0 {
 		ctx.Session.Stats.Points--
 	}
 	glog.Debugf("status increase ack status=%d success=true value=%d", ack.StatusID, ack.Value)

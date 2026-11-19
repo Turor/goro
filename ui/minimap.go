@@ -169,7 +169,6 @@ func (m *Minimap) Update(ctx Context) bool {
 		m.compassDrawnRev = m.compassRevision
 		m.guildDrawnRev = m.guildRevision
 		m.mvpDrawnRev = m.mvpRevision
-		m.mvpDrawnRev = m.mvpRevision
 	} else if needsRedraw {
 		if fullRedraw {
 			m.clearPendingMarker()
