@@ -20,7 +20,7 @@ func TestWindowShortcutsToggle(t *testing.T) {
 		{"inventory", gpucontext.KeyE, false, func(m *WorldMode) *gameui.Window { return &m.ui.inventoryBag.Window }},
 		{"equipment", gpucontext.KeyQ, false, func(m *WorldMode) *gameui.Window { return &m.ui.equipmentWindow.Window }},
 		{"skills", gpucontext.KeyS, false, func(m *WorldMode) *gameui.Window { return &m.ui.skillWindow.Window }},
-		{"stats", gpucontext.KeyA, false, func(m *WorldMode) *gameui.Window { return &m.ui.statsWindow.Window }},
+		{"gear", gpucontext.KeyA, false, func(m *WorldMode) *gameui.Window { return &m.ui.equipmentWindow.Window }},
 		{"party", gpucontext.KeyZ, false, func(m *WorldMode) *gameui.Window { return &m.ui.social.FriendsWindow.Window }},
 		{"friends", gpucontext.KeyH, false, func(m *WorldMode) *gameui.Window { return &m.ui.social.FriendsWindow.Window }},
 		{"cart", gpucontext.KeyW, false, func(m *WorldMode) *gameui.Window { return &m.ui.cartWindow.Window }},

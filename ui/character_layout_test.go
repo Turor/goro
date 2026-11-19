@@ -73,8 +73,8 @@ func TestCharacterGroupLayoutReload(t *testing.T) {
 	if bar == nil || bar.fill == defFill || bar.fill.R < 0.99 {
 		t.Fatalf("exp bar fill = %+v, want the reloaded red", bar)
 	}
-	if equipment.width != 420 || viewed.width != 420 {
-		t.Fatalf("equipment width = %d, viewed = %d, want 420", equipment.width, viewed.width)
+	if equipment.width != gearWindowSizeWidth() || viewed.width != 420 {
+		t.Fatalf("equipment width = %d, viewed = %d, want gear %d and paperdoll 420", equipment.width, viewed.width, gearWindowSizeWidth())
 	}
 	if stats.height != defStatsH+6*6 {
 		t.Fatalf("status height = %d, want %d", stats.height, defStatsH+6*6)

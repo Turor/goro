@@ -1195,7 +1195,7 @@ func (m *WorldMode) openEscapeMenuFromInput(ctx client.Context) bool {
 
 func (m *WorldMode) basicMenuCallbacks(ctx client.Context) gameui.BasicMenuCallbacks {
 	return gameui.BasicMenuCallbacks{
-		OnStatus: func() { m.ui.statsWindow.Toggle(ctx) },
+		OnStatus: func() { m.ui.equipmentWindow.Toggle(ctx) },
 		OnOption: func() { m.ui.escapeMenu.Toggle(ctx) },
 		OnItems:  func() { m.ui.inventoryBag.Toggle(ctx) },
 		OnEquip:  func() { m.ui.equipmentWindow.Toggle(ctx) },
@@ -1312,7 +1312,7 @@ func (m *WorldMode) handleMapChange(ctx client.Context, change network.MapChange
 
 func (m *WorldMode) handleLevelUpNotificationAction(ctx client.Context, action gameui.LevelUpNotificationAction) bool {
 	if action&gameui.LevelUpNotificationBase != 0 {
-		m.ui.statsWindow.OpenWindow(ctx)
+		m.ui.equipmentWindow.OpenIfClosed(ctx)
 	}
 	if action&gameui.LevelUpNotificationJob != 0 {
 		m.ui.skillWindow.OpenWindow(ctx)

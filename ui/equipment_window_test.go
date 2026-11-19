@@ -103,7 +103,8 @@ func TestEquipmentWindowOpensCentered(t *testing.T) {
 	if !window.Window.IsOpen() {
 		t.Fatal("equipment window did not open")
 	}
-	if window.Window.x != (1280-equipmentWindowWidth)/2 || window.Window.y != (720-equipmentWindowHeight)/2 {
+	gearW, gearH := gearWindowSize()
+	if window.Window.x != (1280-gearW)/2 || window.Window.y != (720-gearH)/2 {
 		t.Fatalf("equipment position = %d,%d, want centered", window.Window.x, window.Window.y)
 	}
 }
