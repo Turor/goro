@@ -103,6 +103,55 @@ func (m *WorldMode) handleRenewalUIPacket(ctx client.Context, pkt network.Packet
 		}
 		return true
 	}
+	if open, ok, err := network.ParseRouletteOpen(pkt); err != nil {
+		glog.Errorf("parse roulette open 0x%04X: %v", pkt.ID, err)
+		return true
+	} else if ok {
+		m.ui.roulette.SetOpen(ctx, open)
+		return true
+	}
+	if spin, ok, err := network.ParseRouletteSpin(pkt); err != nil {
+		glog.Errorf("parse roulette spin 0x%04X: %v", pkt.ID, err)
+		return true
+	} else if ok {
+		m.ui.roulette.SetSpin(ctx, spin)
+		return true
+	}
+	if items, ok, err := network.ParseMarketOpen(pkt); err != nil {
+		glog.Errorf("parse market 0x%04X: %v", pkt.ID, err)
+		return true
+	} else if ok {
+		m.ui.market.OpenList(ctx, items)
+		return true
+	}
+	if items, ok, err := network.ParseBarterList(pkt); err != nil {
+		glog.Errorf("parse barter 0x%04X: %v", pkt.ID, err)
+		return true
+	} else if ok {
+		m.ui.barter.OpenList(ctx, items)
+		return true
+	}
+	if info, ok, err := network.ParseClanInfo(pkt); err != nil {
+		glog.Errorf("parse clan 0x%04X: %v", pkt.ID, err)
+		return true
+	} else if ok {
+		m.ui.clan.SetInfo(ctx, info)
+		return true
+	}
+	if info, ok, err := network.ParseClanOnline(pkt); err != nil {
+		glog.Errorf("parse clan online 0x%04X: %v", pkt.ID, err)
+		return true
+	} else if ok {
+		m.ui.clan.SetInfo(ctx, info)
+		return true
+	}
+	if msg, ok, err := network.ParseClanChat(pkt); err != nil {
+		glog.Errorf("parse clan chat 0x%04X: %v", pkt.ID, err)
+		return true
+	} else if ok {
+		m.ui.console.AddMessage("%s", msg)
+		return true
+	}
 	return false
 }
 

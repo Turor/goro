@@ -150,6 +150,10 @@ type worldUI struct {
 	gradeUI         gameui.GradeEnchantWindow
 	searchStore     gameui.SearchStoreWindow
 	equipSwitch     gameui.EquipSwitchWindow
+	roulette        gameui.RouletteWindow
+	market          gameui.MarketWindow
+	barter          gameui.BarterWindow
+	clan            gameui.ClanWindow
 	emoteWindow     gameui.EmoteWindow
 	chatShortcuts   gameui.ChatShortcutsWindow
 	skillTextPrompt gameui.TextPromptWindow
@@ -192,6 +196,10 @@ func (u *worldUI) nonConsoleKeyboardInputBlockedExcept(ctx client.Context, excep
 		u.gradeUI.IsOpen() ||
 		u.searchStore.IsOpen() ||
 		u.equipSwitch.IsOpen() ||
+		u.roulette.IsOpen() ||
+		u.market.IsOpen() ||
+		u.barter.IsOpen() ||
+		u.clan.IsOpen() ||
 		!u.npcInputAvailable() ||
 		open(&u.settingsWindow.Window) ||
 		u.chatShortcuts.IsOpen() ||
@@ -870,6 +878,18 @@ func (m *WorldMode) Update(ctx client.Context) (Mode, error) {
 	if m.ui.equipSwitch.Update(ctx) {
 		return nil, nil
 	}
+	if m.ui.roulette.Update(ctx) {
+		return nil, nil
+	}
+	if m.ui.market.Update(ctx) {
+		return nil, nil
+	}
+	if m.ui.barter.Update(ctx) {
+		return nil, nil
+	}
+	if m.ui.clan.Update(ctx) {
+		return nil, nil
+	}
 	if m.ui.warpra.Update(ctx) {
 		return nil, nil
 	}
@@ -1319,6 +1339,10 @@ func (m *WorldMode) nextWorldMode() *WorldMode {
 	next.ui.gradeUI = m.ui.gradeUI
 	next.ui.searchStore = m.ui.searchStore
 	next.ui.equipSwitch = m.ui.equipSwitch
+	next.ui.roulette = m.ui.roulette
+	next.ui.market = m.ui.market
+	next.ui.barter = m.ui.barter
+	next.ui.clan = m.ui.clan
 	next.ui.emoteWindow = m.ui.emoteWindow
 	next.ui.chatShortcuts = m.ui.chatShortcuts
 	next.ui.social.FriendsWindow = m.ui.social.FriendsWindow

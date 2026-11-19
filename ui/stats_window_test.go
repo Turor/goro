@@ -38,8 +38,8 @@ func TestStatsWindowSectionsLayOutHorizontally(t *testing.T) {
 		t.Fatalf("stats body has trailing horizontal space: body=%v right=%v", bodyBounds, right)
 	}
 	rightChildren := children[1].(interface{ Children() []widget.Widget }).Children()
-	if len(rightChildren) != 2 {
-		t.Fatalf("right stats children = %d, want derived and detail tables", len(rightChildren))
+	if len(rightChildren) != 3 {
+		t.Fatalf("right stats children = %d, want derived, details, and traits", len(rightChildren))
 	}
 	derived := rightChildren[0].(interface{ Bounds() geometry.Rect }).Bounds()
 	details := rightChildren[1].(interface{ Bounds() geometry.Rect }).Bounds()

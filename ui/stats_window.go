@@ -159,7 +159,7 @@ func (w *StatsWindow) statsBodyWidget(ctx Context) widget.Widget {
 
 	return primitives.HBox(
 		primary,
-		statsRightColumnWidget(ctx.Session, stats),
+		w.statsRightColumnWidget(ctx, stats),
 	).
 		Gap(statsSectionGap).
 		CrossAlign(primitives.CrossAxisStart)
@@ -256,11 +256,47 @@ func statsDerivedWidget(stats session.Stats) widget.Widget {
 	)
 }
 
-func statsRightColumnWidget(s *session.Session, stats session.Stats) widget.Widget {
+func (w *StatsWindow) statsRightColumnWidget(ctx Context, stats session.Stats) widget.Widget {
 	return primitives.Box(
 		statsDerivedWidget(stats),
-		statsDetailsWidget(s, stats),
+		statsDetailsWidget(ctx.Session, stats),
+		w.traitRowsWidget(ctx),
 	).Gap(rotheme.TableGap)
+}
+
+func (w *StatsWindow) traitRowsWidget(ctx Context) widget.Widget {
+	rows := traitRows(ctx.Session)
+	children := make([]widget.Widget, 0, len(rows))
+	for _, row := range rows {
+		row := row
+		children = append(children,
+			primitives.HBox(
+				statsLabelCell(row.label, statsDerivedLabelWidth).
+					Height(float32(statsRowH)).
+					Background(rotheme.Default.Colors.ButtonHover),
+				statsTextCell(formatStatValue(row.value, row.bonus), statsDerivedValueWidth, rotheme.Default.Colors.Text),
+				rotheme.IconButtonDisabled(rotheme.IconButtonPlus, !canIncreaseStat(ctx.Session, row), func() {
+					w.requestStatIncrease(ctx, row)
+				}),
+			).
+				Height(float32(statsRowH)).
+				CrossAlign(primitives.CrossAxisCenter).
+				Background(rotheme.Default.Colors.WindowFooter),
+		)
+	}
+	return primitives.Box(children...).Gap(rotheme.TableGap)
+}
+
+func traitRows(s *session.Session) []statRow {
+	stats := sessionStats(s)
+	return []statRow{
+		{label: "POW", statusID: network.StatusPow, value: stats.Pow, bonus: stats.PowBonus, cost: stats.PowCost},
+		{label: "STA", statusID: network.StatusSta, value: stats.Sta, bonus: stats.StaBonus, cost: stats.StaCost},
+		{label: "WIS", statusID: network.StatusWis, value: stats.Wis, bonus: stats.WisBonus, cost: stats.WisCost},
+		{label: "SPL", statusID: network.StatusSpl, value: stats.Spl, bonus: stats.SplBonus, cost: stats.SplCost},
+		{label: "CON", statusID: network.StatusCon, value: stats.Con, bonus: stats.ConBonus, cost: stats.ConCost},
+		{label: "CRT", statusID: network.StatusCrt, value: stats.Crt, bonus: stats.CrtBonus, cost: stats.CrtCost},
+	}
 }
 
 func statsDetailsWidget(s *session.Session, stats session.Stats) widget.Widget {
@@ -357,11 +393,24 @@ func sessionStats(s *session.Session) session.Stats {
 	return stats
 }
 
+func isTraitStatus(id uint16) bool {
+	return id >= network.StatusPow && id <= network.StatusCrt
+}
+
 func canIncreaseStat(s *session.Session, row statRow) bool {
-	if s == nil || row.value <= 0 || row.value >= 99 {
+	if s == nil {
 		return false
 	}
-	return sessionStats(s).Points >= statCost(row)
+	cap, pool := 99, sessionStats(s).Points
+	if isTraitStatus(row.statusID) {
+		cap, pool = 130, sessionStats(s).TraitPoints
+	} else if row.value <= 0 {
+		return false
+	}
+	if row.value >= cap {
+		return false
+	}
+	return pool >= statCost(row)
 }
 
 func statCost(row statRow) int {

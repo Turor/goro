@@ -75,8 +75,7 @@ costume/shadow equipment slots, 4th-job trait display, extra hotkey tabs,
 and guild storage (inventory type 3) are implemented.
 
 Still framed and skipped: remaining Turoran custom features (`0x0EF1`,
-`0x0EF5`, Eden), barter/NPC market, clan chat, roulette, item reform,
-Laphine, styling shop, and remaining map packets (`0x0A9B`, `0x097B`,
+`0x0EF5`, Eden), item reform, Laphine, styling shop, Eden, and remaining map packets (`0x0A9B`, `0x097B`,
 `0x0446`, `0x0A3B`, `0x099B`, `0x0441`, `0x007F`). Builders that do not
 take a client date (party, guild, trade, vending, legacy mail) are not
 checked against the 20250716 handler map yet.
