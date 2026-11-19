@@ -257,9 +257,13 @@ func Run(ctx context.Context, o Options) (Result, error) {
 			return Result{}, err
 		}
 	}
-	m, err := OpenEnvelope(envelope, o.PublicKey)
+	ring := NewKeyRing(filepath.Join(updates, "trusted-keys.json"), []ed25519.PublicKey{o.PublicKey})
+	m, err := OpenEnvelopeWithKeys(envelope, ring.Keys())
 	if err != nil {
 		return Result{}, err
+	}
+	if err := ring.AcceptNextKeys(m.NextKeys); err != nil {
+		o.logf("update: next-keys not persisted: %v", err)
 	}
 	res := Result{Version: m.Version, Build: m.Build}
 	installed := o.Installed

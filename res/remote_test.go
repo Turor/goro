@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -34,12 +35,31 @@ type fakeAssetServer struct {
 	indexFull int // list-files answered with a body
 	active    int
 	maxActive int
+
+	dataVersion uint64
+	changes     func(since uint64) []byte
+	manifest    []byte
+	versionHits int
+	changesHits int
+
+	v2        map[uint64]*v2Doc
+	v2Current uint64
+	v2Block   bool
+	metaHits  map[string]int
+}
+
+// v2Doc is one published GDAT2 version: canonical root, detached signature,
+// and shard bodies keyed by two-hex id.
+type v2Doc struct {
+	root   []byte
+	sig    []byte
+	shards map[string][]byte
 }
 
 func newFakeAssetServer(t *testing.T) *fakeAssetServer {
 	t.Helper()
 	f := &fakeAssetServer{t: t, files: map[string][]byte{}, etags: map[string]string{}, hits: map[string]int{},
-		delay: map[string]time.Duration{}, broken: map[string]bool{}}
+		delay: map[string]time.Duration{}, broken: map[string]bool{}, metaHits: map[string]int{}, v2: map[uint64]*v2Doc{}}
 	f.server = httptest.NewServer(http.HandlerFunc(f.serve))
 	t.Cleanup(f.server.Close)
 	return f
@@ -47,6 +67,47 @@ func newFakeAssetServer(t *testing.T) *fakeAssetServer {
 
 func (f *fakeAssetServer) serve(w http.ResponseWriter, r *http.Request) {
 	p := strings.TrimPrefix(r.URL.Path, "/client/")
+	f.mu.Lock()
+	version := f.dataVersion
+	f.mu.Unlock()
+	if version > 0 {
+		w.Header().Set("X-Data-Version", strconv.FormatUint(version, 10))
+	}
+	if p == "version" {
+		f.mu.Lock()
+		f.versionHits++
+		f.mu.Unlock()
+		_ = json.NewEncoder(w).Encode(map[string]uint64{"version": version})
+		return
+	}
+	if p == "changes" {
+		f.mu.Lock()
+		f.changesHits++
+		handler := f.changes
+		f.mu.Unlock()
+		since, _ := strconv.ParseUint(r.URL.Query().Get("since"), 10, 64)
+		if handler != nil {
+			_, _ = w.Write(handler(since))
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"version": version, "paths": []string{}})
+		return
+	}
+	if p == "data-manifest" {
+		f.mu.Lock()
+		body := f.manifest
+		f.mu.Unlock()
+		if len(body) == 0 {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write(body)
+		return
+	}
+	if strings.HasPrefix(p, "data-manifest/") {
+		f.serveV2(w, r, p)
+		return
+	}
 	if p == "list-files" {
 		f.mu.Lock()
 		gate := f.gate
@@ -107,6 +168,86 @@ func (f *fakeAssetServer) serve(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(data)
 }
 
+func (f *fakeAssetServer) serveV2(w http.ResponseWriter, r *http.Request, p string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.metaHits[p]++
+	if f.v2Block {
+		http.NotFound(w, r)
+		return
+	}
+	ver, kind, id, ok := parseV2Path(p, f.v2Current)
+	if !ok {
+		http.Error(w, "bad manifest path", http.StatusBadRequest)
+		return
+	}
+	doc := f.v2[ver]
+	if doc == nil {
+		http.NotFound(w, r)
+		return
+	}
+	switch kind {
+	case "root":
+		_, _ = w.Write(doc.root)
+	case "sig":
+		_, _ = w.Write(doc.sig)
+	case "shard":
+		body, found := doc.shards[id]
+		if !found {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write(body)
+	default:
+		http.NotFound(w, r)
+	}
+}
+
+func parseV2Path(p string, current uint64) (version uint64, kind, id string, ok bool) {
+	rest := strings.TrimPrefix(p, "data-manifest/")
+	if ver, rest, found := strings.Cut(rest, "/"); found && ver == "v" {
+		num, rest, found := strings.Cut(rest, "/")
+		n, err := strconv.ParseUint(num, 10, 64)
+		if err != nil || !found || (len(num) > 1 && num[0] == '0') {
+			return 0, "", "", false
+		}
+		version = n
+		switch {
+		case rest == "root":
+			return version, "root", "", true
+		case rest == "root.sig":
+			return version, "sig", "", true
+		default:
+			shard, found := strings.CutPrefix(rest, "shards/")
+			if !found || len(shard) != 2 || strings.Contains(shard, "/") {
+				return 0, "", "", false
+			}
+			return version, "shard", shard, true
+		}
+	}
+	if current == 0 {
+		return 0, "", "", true
+	}
+	switch {
+	case rest == "root":
+		return current, "root", "", true
+	case rest == "root.sig":
+		return current, "sig", "", true
+	default:
+		shard, found := strings.CutPrefix(rest, "shards/")
+		if !found || len(shard) != 2 {
+			return 0, "", "", false
+		}
+		return current, "shard", shard, true
+	}
+}
+
+func (f *fakeAssetServer) metaCount(p string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.metaHits[p]
+}
+
 func (f *fakeAssetServer) put(p string, data []byte, etag string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -141,6 +282,7 @@ func streamingManager(t *testing.T, root, cache, url string, aliases map[string]
 	if err := m.EnableRemote(RemoteOptions{BaseURL: url, CacheDir: cache, Aliases: aliases}); err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(m.StopRemote)
 	return m
 }
 

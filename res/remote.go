@@ -3,6 +3,7 @@ package res
 import (
 	"bytes"
 	"context"
+	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -21,6 +22,7 @@ import (
 	"time"
 
 	"github.com/kivutar/goro/glog"
+	"github.com/kivutar/goro/updater"
 )
 
 // Size caps for one streamed file and for the archive index (vars for tests).
@@ -55,6 +57,17 @@ type RemoteOptions struct {
 	Aliases map[string]string
 	// Client overrides the HTTP client (tests).
 	Client *http.Client
+	// TrustedKeys is the list of public keys that may sign a data manifest.
+	// Empty uses updater.TrustedPublicKeys. Tests pass throwaway keys.
+	TrustedKeys []ed25519.PublicKey
+	// ManifestMode is "report" (log mismatches, do not block) or "enforce"
+	// (fail closed after a manifest has been trusted). Empty means report.
+	ManifestMode string
+	// PollMin and PollMax bound the idle version poll (default 60–120s).
+	PollMin, PollMax time.Duration
+	// DeltaDebounce waits after a newer X-Data-Version before calling changes
+	// (default 2s). Tests lower this.
+	DeltaDebounce time.Duration
 }
 
 // TuroranRemoteAliases are the canonical names of the tables roBrowser's
@@ -104,6 +117,31 @@ type remoteSource struct {
 	// updated is called with the server path when a background refresh
 	// stored a changed file, so loaded tables can be rebuilt live.
 	updated func(string)
+
+	seenVersion      atomic.Uint64
+	cacheGen         atomic.Uint64
+	headerSeen       atomic.Bool
+	manifest         atomic.Pointer[signedRoot]
+	keyRing          *updater.KeyRing
+	cachedVersion    uint64
+	haveCached       bool
+	acceptedManifest uint64
+	manifestMode     string
+	manifestTrusted  bool
+	manifestAttack   bool
+	manifestTried    uint64
+	manifestMu       sync.Mutex
+	manifestWake     chan struct{}
+	shardMu          sync.Mutex
+	shards           map[string]*cachedShard
+	shardFlight      map[string]*shardCall
+	pollMin, pollMax time.Duration
+	deltaDebounce    time.Duration
+	jitter           func() float64
+	deltaWake        chan struct{}
+	stopCh           chan struct{}
+	stopOnce         sync.Once
+	workers          sync.WaitGroup
 }
 
 type remoteIndex struct {
@@ -135,6 +173,7 @@ type remoteMeta struct {
 	Path       string `json:"path"`
 	ETag       string `json:"etag,omitempty"`
 	Generation string `json:"generation,omitempty"`
+	CacheGen   uint64 `json:"cache_gen,omitempty"`
 }
 
 func newRemoteSource(opts RemoteOptions) (*remoteSource, error) {
@@ -172,21 +211,46 @@ func newRemoteSource(opts RemoteOptions) (*remoteSource, error) {
 			aliases[key] = target
 		}
 	}
-	return &remoteSource{
-		base:       base,
-		host:       strings.ToLower(base.Host),
-		cacheDir:   opts.CacheDir,
-		background: make(chan struct{}, remoteBackground),
-		pending:    make(map[string]*remotePending),
-		aliases:    aliases,
-		client:     client,
-		indexReady: make(chan struct{}),
-		missing:    make(map[string]struct{}),
-		validated:  make(map[string]struct{}),
-		inflight:   make(map[string]*remoteCall),
-		logged:     make(map[string]struct{}),
-		stale:      make(map[string]struct{}),
-	}, nil
+	embedded := opts.TrustedKeys
+	if len(embedded) == 0 {
+		embedded = updater.TrustedPublicKeys
+	}
+	mode, err := normalizeManifestMode(opts.ManifestMode)
+	if err != nil {
+		return nil, err
+	}
+	src := &remoteSource{
+		base:          base,
+		host:          strings.ToLower(base.Host),
+		cacheDir:      opts.CacheDir,
+		background:    make(chan struct{}, remoteBackground),
+		pending:       make(map[string]*remotePending),
+		aliases:       aliases,
+		client:        client,
+		indexReady:    make(chan struct{}),
+		missing:       make(map[string]struct{}),
+		validated:     make(map[string]struct{}),
+		inflight:      make(map[string]*remoteCall),
+		logged:        make(map[string]struct{}),
+		stale:         make(map[string]struct{}),
+		keyRing:       updater.NewKeyRing(filepath.Join(opts.CacheDir, "trusted-keys.json"), embedded),
+		manifestMode:  mode,
+		manifestWake:  make(chan struct{}, 1),
+		shards:        map[string]*cachedShard{},
+		shardFlight:   map[string]*shardCall{},
+		pollMin:       opts.PollMin,
+		pollMax:       opts.PollMax,
+		deltaDebounce: opts.DeltaDebounce,
+		jitter:        defaultJitter,
+		deltaWake:     make(chan struct{}, 1),
+		stopCh:        make(chan struct{}),
+	}
+	if src.deltaDebounce <= 0 {
+		src.deltaDebounce = deltaDebounceDefault
+	}
+	src.loadCachedVersion()
+	src.loadPersistedRoot()
+	return src, nil
 }
 
 // EnableRemote streams files that are not in the data directory or its local
@@ -208,7 +272,8 @@ func (m *Manager) EnableRemote(opts RemoteOptions) error {
 	m.resourceAliasesOnce = sync.Once{}
 	m.resourceAliases = nil
 	go source.loadIndex()
-	glog.Infof("remote data: streaming from %s (cache %s)", source.base.Redacted(), opts.CacheDir)
+	source.startVersionWorkers()
+	glog.Infof("remote data: streaming from %s (cache %s, manifest %s)", source.base.Redacted(), opts.CacheDir, source.manifestMode)
 	return nil
 }
 
@@ -379,13 +444,20 @@ func (r *remoteSource) fetch(p string) ([]byte, error) {
 	if cacheErr == nil {
 		switch r.revalidation(p, meta, generation) {
 		case revalidateNever:
-			return cached, nil
+			return r.useCached(p, dataPath, metaPath, cached)
 		case revalidateBackground:
 			// Serve the cached table now so startup never waits on the
 			// network; a changed overlay is picked up on the next run.
+			// A digest miss is not served: fall through and refetch.
+			checked, err := r.useCached(p, dataPath, metaPath, cached)
+			if err != nil {
+				cacheErr = err
+				cached = nil
+				break
+			}
 			r.markValidated(p)
 			go r.refresh(p, dataPath, metaPath, meta, generation)
-			return cached, nil
+			return checked, nil
 		}
 	}
 
@@ -394,7 +466,7 @@ func (r *remoteSource) fetch(p string) ([]byte, error) {
 	r.mu.Unlock()
 	if offline {
 		if cacheErr == nil {
-			return cached, nil
+			return r.useCached(p, dataPath, metaPath, cached)
 		}
 		return nil, errors.New("asset server offline")
 	}
@@ -417,19 +489,27 @@ func (r *remoteSource) fetch(p string) ([]byte, error) {
 			r.logOnce("file:"+p, "remote data: %s: %v", p, err)
 		}
 		if cacheErr == nil {
-			return cached, nil
+			return r.useCached(p, dataPath, metaPath, cached)
 		}
 		return nil, err
 	case status == http.StatusNotModified && cacheErr == nil:
+		checked, err := r.useCached(p, dataPath, metaPath, cached)
+		if err != nil {
+			return nil, err
+		}
 		r.markValidated(p)
 		if meta.Generation != generation && generation != "" {
 			meta.Generation = generation
 			r.writeMeta(metaPath, meta)
 		}
-		return cached, nil
+		return checked, nil
 	case status == http.StatusOK:
+		if err := r.verifyDigest(p, body); err != nil {
+			r.logOnce("digest:"+p, "remote data: discarding %s: %v", p, err)
+			return nil, err
+		}
 		r.markValidated(p)
-		if err := r.store(dataPath, metaPath, body, remoteMeta{Path: p, ETag: newETag, Generation: generation}); err != nil {
+		if err := r.store(dataPath, metaPath, body, remoteMeta{Path: p, ETag: newETag, Generation: generation, CacheGen: r.cacheGen.Load()}); err != nil {
 			r.logOnce("cache", "remote data: cannot write cache %s: %v", r.cacheDir, err)
 		}
 		return body, nil
@@ -444,10 +524,26 @@ func (r *remoteSource) fetch(p string) ([]byte, error) {
 	default:
 		r.logOnce("status:"+p, "remote data: %s returned HTTP %d", p, status)
 		if cacheErr == nil {
-			return cached, nil
+			return r.useCached(p, dataPath, metaPath, cached)
 		}
 		return nil, fmt.Errorf("HTTP %d", status)
 	}
+}
+
+// useCached returns a cached body only when it matches the accepted signed
+// manifest. Before a manifest exists, verifyDigest allows the body. A miss
+// deletes the copy so a later read cannot serve it again.
+func (r *remoteSource) useCached(p, dataPath, metaPath string, body []byte) ([]byte, error) {
+	if err := r.verifyDigest(p, body); err != nil {
+		_ = os.Remove(dataPath)
+		_ = os.Remove(metaPath)
+		r.mu.Lock()
+		delete(r.validated, p)
+		r.mu.Unlock()
+		r.logOnce("digest:"+p, "remote data: discarding cached %s: %v", p, err)
+		return nil, err
+	}
+	return body, nil
 }
 
 type revalidateMode int
@@ -467,6 +563,9 @@ func (r *remoteSource) revalidation(p string, meta remoteMeta, generation string
 	_, stale := r.stale[p]
 	r.mu.Unlock()
 	if stale {
+		return revalidateNow
+	}
+	if meta.CacheGen < r.cacheGen.Load() {
 		return revalidateNow
 	}
 	if done {
@@ -490,8 +589,12 @@ func (r *remoteSource) refresh(p, dataPath, metaPath string, meta remoteMeta, ge
 	case err != nil:
 		r.logOnce("refresh", "remote data: cannot refresh cached files: %v", err)
 	case status == http.StatusOK:
+		if err := r.verifyDigest(p, body); err != nil {
+			r.logOnce("digest:"+p, "remote data: discarding refresh of %s: %v", p, err)
+			break
+		}
 		old, _ := os.ReadFile(dataPath)
-		if err := r.store(dataPath, metaPath, body, remoteMeta{Path: p, ETag: etag, Generation: generation}); err != nil {
+		if err := r.store(dataPath, metaPath, body, remoteMeta{Path: p, ETag: etag, Generation: generation, CacheGen: r.cacheGen.Load()}); err != nil {
 			r.logOnce("cache", "remote data: cannot write cache %s: %v", r.cacheDir, err)
 		} else if r.updated != nil && !bytes.Equal(old, body) {
 			r.updated(p)
@@ -555,6 +658,7 @@ func (r *remoteSource) get(p, etag string) ([]byte, string, int, error) {
 		return nil, "", 0, connError{err}
 	}
 	defer resp.Body.Close()
+	r.noteVersionHeader(resp.Header)
 	if resp.StatusCode != http.StatusOK {
 		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
 		return nil, "", resp.StatusCode, nil
@@ -628,6 +732,10 @@ func (r *remoteSource) logOnce(key, format string, args ...any) {
 // again. Either way indexReady closes, so waiters never hang.
 func (r *remoteSource) loadIndex() {
 	defer close(r.indexReady)
+	r.refreshIndex()
+}
+
+func (r *remoteSource) refreshIndex() {
 	indexPath, etagPath := r.indexPaths()
 	cachedETag := ""
 	if cached, err := os.ReadFile(indexPath); err == nil {
@@ -692,6 +800,7 @@ func (r *remoteSource) getIndex(etag string) ([]byte, string, int, error) {
 		return nil, "", 0, err
 	}
 	defer resp.Body.Close()
+	r.noteVersionHeader(resp.Header)
 	if resp.StatusCode != http.StatusOK {
 		return nil, "", resp.StatusCode, nil
 	}

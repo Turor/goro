@@ -1,8 +1,14 @@
 # Live data invalidation (design)
 
-Status: design only. Nothing here is built yet in remoteclient2 or goro,
-except the client entry point described under "Client hook", which the Lua
-skill tree work ships so this flow can call it.
+Status: implemented in goro (`res` streaming layer) and remoteclient2
+(`DATA_VERSION=1`: header, `/version`, `/changes`, and a two-level signed
+manifest). Enable the remoteclient2 flag separately; old clients ignore the
+header. The signed object is a GDAT2 root (`GET data-manifest/root` and a
+detached `root.sig`). File lists live in 256 shards, fetched lazily. The
+operator signs an already-built root with `goro-sign-release sign-data-root`
+(same Ed25519 key as client updates) and copies `root.sig` onto the data
+host. `sign-data` still produces the legacy GDAT1 envelope; this client does
+not verify that URL. The signing seed never lives on the data server.
 
 ## Goal
 
@@ -87,16 +93,43 @@ as the skill trees, without a restart and without re-downloading everything.
   (singleflight: at most one `changes` request in flight). It waits about
   2 seconds of debounce, so a burst of responses during a map load triggers
   one request, then asks `changes?since=cachedVersion`.
+- The unsigned JSON cursor follows the same rollback rule as the signed
+  manifest: a `version` that is not strictly greater than `cachedVersion`
+  is ignored, and the worker stops instead of issuing another GET in a
+  tight loop. The next wake is a later header or the idle poll.
+- **Paths and full** are applied only after the signed GDAT2 root verifies
+  and the accepted manifest version is at least the changes version. Until
+  then nothing is evicted and `cachedVersion` stays put.
 - **Paths:** for each path, evict it from the streaming cache: mark it stale
   and forget any cached "not on server" answer. Then queue it for the game
   thread with `Manager.QueueDataInvalidation(paths...)`. Persist
-  `cachedVersion = version` only after that, so a crash re-asks.
+  `cachedVersion = version` only after that, and only when it is greater
+  than the cursor already stored, so a crash re-asks.
 - **Full:** mark every cached path stale (one generation counter that each
   entry's metadata is compared against), reload the archive index, and queue
   an invalidation of every loaded table.
-- If versions moved on while the request ran, the worker loops once more.
-  It never runs two requests at once. Failures retry with the offline
-  back-off.
+- If versions moved on while the request ran, the worker loops again after
+  the same debounce it uses before the first request. It never runs two
+  requests at once. Failures retry with the offline back-off.
+- Accepting a newer signed root bumps that same cache generation, so a
+  body stored before the root is revalidated before reuse. A conditional
+  304 still has its cached bytes digest-checked. In `enforce` mode a
+  mismatch is deleted and not returned. `report` (the default) logs it.
+- The accepted root (canonical bytes and detached signature) and the highest
+  accepted version are stored under the cache directory (`manifest-v2/`).
+  Every start re-verifies that signature when streaming is on. A
+  `data-version.json` cursor is not trust by itself. A root older than the
+  accepted version is rejected. After a manifest has been trusted for a
+  host, a missing root, a 404, or a bad signature is logged in `report`
+  mode and blocks streamed files in `enforce` mode.
+- Lookups use one normalization rule (case, slashes, a single leading
+  `data/` prefix, percent-decoding when the name contains `%`). The client
+  fetches only the shard named by the first byte of SHA-256 of that key and
+  checks the shard digest against the accepted root before using an entry.
+  A listed local, GRF, or cached file must match the signed size and
+  SHA-256. An unlisted local file stays usable.
+- Switch to enforce after a report-mode soak with `[data] manifest_mode = enforce`
+  or `--data-manifest-mode enforce`. Do not change the default in the client.
 
 ### Interaction with ETag caching
 

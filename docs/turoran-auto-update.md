@@ -117,11 +117,26 @@ git tree. Never commit or print them.
 
 ## Key rotation
 
-`updater.EmbeddedPublicKey` is the same key as Korangar's
-`EMBEDDED_UPDATE_PUBLIC_KEY`, and `TestEmbeddedKeyIsTheTuroranReleaseKey` pins
-it. Rotating the key needs a coordinated change in both clients, a release of
-each signed with the old key that carries the new key, and only then a switch
-of the controller seed.
+`updater.EmbeddedPublicKey` is the first entry of `updater.TrustedPublicKeys`,
+the same key as Korangar's `EMBEDDED_UPDATE_PUBLIC_KEY`.
+`TestEmbeddedKeyIsTheTuroranReleaseKey` pins it. The same key signs client
+updates (GORO1), legacy GDAT1 data envelopes, and GDAT2 data roots. A GDAT2
+root is signed with `goro-sign-release sign-data-root` (detached Ed25519 over
+the canonical root file, written as 128 lowercase hex characters plus a
+newline). That command does not hash a directory.
+
+Each signed release may carry a `next-keys` list. After verifying the
+signature with a key it already trusts, the client persists those public
+keys (`updates/trusted-keys.json` for updates, the streaming cache for
+data) and accepts them on later manifests. The client therefore already
+knows the new key before the old one retires.
+
+`scripts/release/rotate-signing-key.sh` reads the current seed from a local
+`--private-key PATH` (it never prints the seed) and signs an update or data
+manifest that lists the current public key plus `--new-public-key HEX`.
+
+Do not put the seed in git, in this repository's history, or on the data
+server. Tests generate throwaway keys; they never read a production seed.
 
 ## Local gate
 

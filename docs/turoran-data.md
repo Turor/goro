@@ -45,9 +45,24 @@ lacks is fetched on first use and kept in
 - **Freshness.** Archive files are reused from the cache and revalidated
   (`If-None-Match`) when the server's archive list changes. Cached text
   tables are served at once and refreshed in the background. If the refresh
-  brings a changed skill table, the skill tree reloads live; other overlay
-  changes show on the next run. The planned version-based invalidation is
-  in `docs/data-version-invalidation.md`.
+  brings a changed skill table, the skill tree reloads live. When the
+  server stamps `X-Data-Version`, the client keeps the newest version it
+  has seen, asks `changes?since=` once for the delta (or a full recheck
+  when the log says the client is too old), and polls `GET version` every
+  60–120 seconds with jitter while idle. A signed GDAT2 root for that
+  version (`data-manifest/root` plus a detached `root.sig`) is verified
+  against the trusted public-key list before any streamed file is cached
+  or used. File lists live in 256 shards, fetched only when a lookup needs
+  them. The accepted root is stored in the cache and the signature is
+  checked again on every start. Paths are normalized before they are
+  compared, so spelling and a single `data/` prefix do not have to match
+  the manifest byte for byte. Once that root is accepted, a body already
+  in the cache is digest-checked (and the cache generation is bumped)
+  before it is used again. In `enforce` mode a digest mismatch is
+  discarded; `report` (the default) logs it and does not block. An unsigned
+  `/changes` body cannot move the version cursor backward or evict paths
+  until a signed root covers that version, and a cursor that never catches
+  up does not tight-loop. Details: `docs/data-version-invalidation.md`.
 - **Failures.** A 404 is remembered for the run and the lookup falls through
   to the next candidate. A bad file (over 128 MB, cut short) only fails that
   file. If the server cannot be reached (dial, TLS, no response), cached
@@ -56,8 +71,12 @@ lacks is fetched on first use and kept in
   refreshes or prefetches at a time; files up to 128 MB, the index up to
   64 MB. Cache entries are keyed by host, so one `cache_dir` can serve
   several servers.
-- **Settings.** `[data] remote = auto|on|off`, `remote_url`, `cache_dir`, or
-  `--data-remote`, `--data-url`, `--data-cache`. `on` also streams files that
+- **Settings.** `[data] remote = auto|on|off`, `remote_url`, `cache_dir`,
+  `manifest_mode = report|enforce`, or `--data-remote`, `--data-url`,
+  `--data-cache`, `--data-manifest-mode`. `report` is the default: mismatches
+  are logged and play continues. Set `manifest_mode = enforce` after a
+  report-mode soak so a missing root, a bad signature, or a digest mismatch
+  fails closed. `on` also streams files that
   local archives lack; a streamed exact name then wins over a local
   archive's suffix-fallback match. `clientinfo.xml` and `sclientinfo.xml`
   are never streamed, in any directory: the server list stays local.

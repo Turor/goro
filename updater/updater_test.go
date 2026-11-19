@@ -71,6 +71,29 @@ func TestEnvelopeRoundTripAndTamper(t *testing.T) {
 	}
 }
 
+func TestGORO1NextKeysRoundTripAndTrustedList(t *testing.T) {
+	oldPub, oldPriv := generateSeed(t)
+	newPub, newPriv := generateSeed(t)
+	m := Manifest{Version: "main-0123456789ab", Build: 42, Files: []File{
+		{Path: "goro-linux-amd64-" + testSHA, SHA256: strings.Repeat("a", 64), Size: 5, URL: "x"},
+	}, NextKeys: []ed25519.PublicKey{oldPub, newPub}}
+	env := signed(t, oldPriv, m)
+	got, err := OpenEnvelope(env, oldPub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.NextKeys) != 2 {
+		t.Fatalf("next-keys %d", len(got.NextKeys))
+	}
+	later := signed(t, newPriv, Manifest{Version: "main-next", Build: 43, Files: m.Files})
+	if _, err := OpenEnvelopeWithKeys(later, []ed25519.PublicKey{oldPub, newPub}); err != nil {
+		t.Fatalf("new key on trusted list: %v", err)
+	}
+	if _, err := OpenEnvelope(later, oldPub); err == nil {
+		t.Fatal("old key alone accepted a new-key signature")
+	}
+}
+
 func TestKorangarManifestIsRejected(t *testing.T) {
 	key := testKey(t)
 	payload := "KRUP1\nmain-x\n1\n1\nkorangar-linux-" + testSHA + "\n" + strings.Repeat("a", 64) + "\n1\nx\n"
@@ -610,5 +633,45 @@ func TestLockOwnershipAndStaleTakeover(t *testing.T) {
 	matches, _ := filepath.Glob(filepath.Join(dir, ".lock.stale.*"))
 	if len(matches) != 0 {
 		t.Fatalf("stale leftovers: %v", matches)
+	}
+}
+
+func TestRunPersistsNextKeysAndAcceptsRotatedSigner(t *testing.T) {
+	oldPub, oldPriv := generateSeed(t)
+	newPub, newPriv := generateSeed(t)
+	f := newFixture(t, 20, "linux")
+	f.key = oldPriv
+	files := []File{}
+	for _, goos := range []string{"linux", "windows"} {
+		n := f.artifactName(goos)
+		files = append(files, File{Path: n, SHA256: SHA256Hex(f.newBin), Size: int64(len(f.newBin)), URL: n})
+	}
+	env := signed(t, oldPriv, Manifest{Version: "main-0123456789ab", Build: 20, Files: files, NextKeys: []ed25519.PublicKey{oldPub, newPub}})
+	if err := os.WriteFile(filepath.Join(f.rel, "manifest.goroup"), env, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	o := f.opts(f.manifestURL(), "linux")
+	o.PublicKey = oldPub
+	if res, err := Run(context.Background(), o); err != nil || res.Outcome != Applied {
+		t.Fatalf("first apply res=%+v err=%v", res, err)
+	}
+
+	f.writeRelease(t, 30, []byte("rotated goro binary"))
+	env2 := signed(t, newPriv, Manifest{Version: "main-rotated", Build: 30, Files: []File{
+		{Path: f.artifactName("linux"), SHA256: SHA256Hex([]byte("rotated goro binary")), Size: int64(len("rotated goro binary")), URL: f.artifactName("linux")},
+		{Path: f.artifactName("windows"), SHA256: SHA256Hex([]byte("rotated goro binary")), Size: int64(len("rotated goro binary")), URL: f.artifactName("windows")},
+	}})
+	if err := os.WriteFile(filepath.Join(f.rel, "manifest.goroup"), env2, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	o = f.opts(f.manifestURL(), "linux")
+	o.PublicKey = oldPub
+	o.Installed = 20
+	if res, err := Run(context.Background(), o); err != nil || res.Outcome != Applied {
+		t.Fatalf("rotated signer res=%+v err=%v", res, err)
+	}
+	got, _ := os.ReadFile(f.exe)
+	if string(got) != "rotated goro binary" {
+		t.Fatalf("exe %q", got)
 	}
 }

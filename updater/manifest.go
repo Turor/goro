@@ -16,12 +16,19 @@ const (
 	envelopeMagic = "GORO1SIG"
 	maxFiles      = 64
 	maxTokenLen   = 512
+	maxNextKeys   = 8
+	nextKeysLine  = "next-keys"
 )
 
 // EmbeddedPublicKey is the Turoran release public key (the same controller key
 // that signs Korangar releases). The matching seed never leaves the signing
 // controller and is never stored in this repository.
 var EmbeddedPublicKey = mustHexKey("fb3dd3d6b9e1955ee03a4786596f7d5562b7d96d7b6c177e6d38cf7abca7de18")
+
+// TrustedPublicKeys is the compiled-in list the client accepts signatures
+// from. The first entry is EmbeddedPublicKey. Signed next-key lists add
+// further keys at runtime before the old one retires.
+var TrustedPublicKeys = []ed25519.PublicKey{EmbeddedPublicKey}
 
 func mustHexKey(s string) ed25519.PublicKey {
 	b, err := hex.DecodeString(s)
@@ -41,9 +48,10 @@ type File struct {
 
 // Manifest is a verified release description.
 type Manifest struct {
-	Version string
-	Build   uint64
-	Files   []File
+	Version  string
+	Build    uint64
+	Files    []File
+	NextKeys []ed25519.PublicKey
 }
 
 // CanonicalPayload returns the exact bytes that are signed.
@@ -90,6 +98,9 @@ func CanonicalPayload(m Manifest) (string, error) {
 		b.WriteString(strconv.FormatInt(f.Size, 10) + "\n")
 		b.WriteString(f.URL + "\n")
 	}
+	if err := writeNextKeys(&b, m.NextKeys); err != nil {
+		return "", err
+	}
 	return b.String(), nil
 }
 
@@ -105,29 +116,18 @@ func SignEnvelope(payload string, key ed25519.PrivateKey) (string, error) {
 	return envelopeMagic + "\n" + hex.EncodeToString(sig) + "\n" + payload, nil
 }
 
-// OpenEnvelope verifies the signature and parses the payload.
+// OpenEnvelope verifies the signature with a single public key and parses
+// the payload.
 func OpenEnvelope(data []byte, pub ed25519.PublicKey) (Manifest, error) {
-	if len(pub) != ed25519.PublicKeySize || isZero(pub) {
-		return Manifest{}, errors.New("update public key is unset")
-	}
-	text := string(data)
-	rest, ok := strings.CutPrefix(text, envelopeMagic+"\n")
-	if !ok {
-		return Manifest{}, errors.New("missing GORO1SIG header")
-	}
-	sigHex, payload, ok := strings.Cut(rest, "\n")
-	if !ok {
-		return Manifest{}, errors.New("truncated signature envelope")
-	}
-	if !isLowerHex(sigHex, 128) {
-		return Manifest{}, errors.New("signature must be 128 lowercase hex chars")
-	}
-	if !strings.HasPrefix(payload, payloadMagic+"\n") {
-		return Manifest{}, errors.New("signed payload must be canonical GORO1")
-	}
-	sig, _ := hex.DecodeString(sigHex)
-	if !ed25519.Verify(pub, []byte(payload), sig) {
-		return Manifest{}, errors.New("manifest signature rejected")
+	return OpenEnvelopeWithKeys(data, []ed25519.PublicKey{pub})
+}
+
+// OpenEnvelopeWithKeys verifies the signature against any of the trusted
+// public keys and parses the payload. The first key that verifies wins.
+func OpenEnvelopeWithKeys(data []byte, keys []ed25519.PublicKey) (Manifest, error) {
+	payload, err := openSignedPayload(data, envelopeMagic, payloadMagic, keys)
+	if err != nil {
+		return Manifest{}, err
 	}
 	return ParsePayload(payload)
 }
@@ -185,6 +185,10 @@ func ParsePayload(payload string) (Manifest, error) {
 			return Manifest{}, err
 		}
 		m.Files = append(m.Files, f)
+	}
+	m.NextKeys, err = parseNextKeys(&lines, next)
+	if err != nil {
+		return Manifest{}, err
 	}
 	if len(lines) != 1 || lines[0] != "" {
 		return Manifest{}, errors.New("trailing manifest data")
@@ -270,4 +274,117 @@ func isZero(b []byte) bool {
 		}
 	}
 	return true
+}
+
+func writeNextKeys(b *strings.Builder, keys []ed25519.PublicKey) error {
+	if len(keys) == 0 {
+		return nil
+	}
+	if len(keys) > maxNextKeys {
+		return errors.New("too many next-keys")
+	}
+	hexes := make([]string, 0, len(keys))
+	seen := map[string]bool{}
+	for _, k := range keys {
+		if len(k) != ed25519.PublicKeySize || isZero(k) {
+			return errors.New("bad next-key")
+		}
+		h := hex.EncodeToString(k)
+		if seen[h] {
+			continue
+		}
+		seen[h] = true
+		hexes = append(hexes, h)
+	}
+	sort.Strings(hexes)
+	b.WriteString(nextKeysLine + "\n")
+	b.WriteString(strconv.Itoa(len(hexes)) + "\n")
+	for _, h := range hexes {
+		b.WriteString(h + "\n")
+	}
+	return nil
+}
+
+func parseNextKeys(lines *[]string, next func() (string, error)) ([]ed25519.PublicKey, error) {
+	if len(*lines) == 1 && (*lines)[0] == "" {
+		return nil, nil
+	}
+	label, err := next()
+	if err != nil {
+		return nil, err
+	}
+	if label != nextKeysLine {
+		return nil, errors.New("trailing manifest data")
+	}
+	cs, err := next()
+	if err != nil {
+		return nil, err
+	}
+	count, err := strconv.Atoi(cs)
+	if err != nil || count <= 0 || count > maxNextKeys {
+		return nil, errors.New("next-key count out of range")
+	}
+	var keys []ed25519.PublicKey
+	seen := map[string]bool{}
+	for i := 0; i < count; i++ {
+		h, err := next()
+		if err != nil {
+			return nil, err
+		}
+		if !isLowerHex(h, 64) {
+			return nil, errors.New("next-key must be 64 lowercase hex chars")
+		}
+		if seen[h] {
+			return nil, errors.New("duplicate next-key")
+		}
+		seen[h] = true
+		b, _ := hex.DecodeString(h)
+		if isZero(b) {
+			return nil, errors.New("refusing an all-zero next-key")
+		}
+		keys = append(keys, ed25519.PublicKey(b))
+	}
+	return keys, nil
+}
+
+func openSignedPayload(data []byte, envMagic, payMagic string, keys []ed25519.PublicKey) (string, error) {
+	if len(keys) == 0 {
+		return "", errors.New("no trusted public keys")
+	}
+	text := string(data)
+	rest, ok := strings.CutPrefix(text, envMagic+"\n")
+	if !ok {
+		return "", fmt.Errorf("missing %s header", envMagic)
+	}
+	sigHex, payload, ok := strings.Cut(rest, "\n")
+	if !ok {
+		return "", errors.New("truncated signature envelope")
+	}
+	if !isLowerHex(sigHex, 128) {
+		return "", errors.New("signature must be 128 lowercase hex chars")
+	}
+	if !strings.HasPrefix(payload, payMagic+"\n") {
+		return "", fmt.Errorf("signed payload must be canonical %s", payMagic)
+	}
+	sig, _ := hex.DecodeString(sigHex)
+	for _, pub := range keys {
+		if len(pub) != ed25519.PublicKeySize || isZero(pub) {
+			continue
+		}
+		if ed25519.Verify(pub, []byte(payload), sig) {
+			return payload, nil
+		}
+	}
+	return "", errors.New("manifest signature rejected")
+}
+
+func parsePublicKeyHex(h string) (ed25519.PublicKey, error) {
+	if !isLowerHex(h, 64) {
+		return nil, errors.New("public key must be 64 lowercase hex chars")
+	}
+	b, _ := hex.DecodeString(h)
+	if isZero(b) {
+		return nil, errors.New("refusing an all-zero public key")
+	}
+	return ed25519.PublicKey(b), nil
 }

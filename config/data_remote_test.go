@@ -101,6 +101,32 @@ func TestDataRemoteINIAndFlags(t *testing.T) {
 	}
 }
 
+func TestDataManifestMode(t *testing.T) {
+	dir := t.TempDir()
+	cfg, err := LoadConfig([]string{"--data-dir", dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Data.ManifestMode != DataManifestReport {
+		t.Fatalf("default mode %q", cfg.Data.ManifestMode)
+	}
+	cfg, err = LoadConfig([]string{"--data-dir", dir, "--data-manifest-mode", "enforce"})
+	if err != nil || cfg.Data.ManifestMode != DataManifestEnforce {
+		t.Fatalf("flag: %+v %v", cfg.Data, err)
+	}
+	ini := "[data]\nmanifest_mode = ENFORCE\n"
+	if err := os.WriteFile(filepath.Join(dir, "goro.ini"), []byte(ini), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err = LoadConfig([]string{"--data-dir", dir})
+	if err != nil || cfg.Data.ManifestMode != DataManifestEnforce {
+		t.Fatalf("ini: %+v %v", cfg.Data, err)
+	}
+	if _, err := LoadConfig([]string{"--data-dir", t.TempDir(), "--data-manifest-mode", "off"}); err == nil {
+		t.Fatal("bad manifest mode accepted")
+	}
+}
+
 func TestDataRemoteRejectsBadValues(t *testing.T) {
 	for _, args := range [][]string{
 		{"--data-remote", "maybe"},
