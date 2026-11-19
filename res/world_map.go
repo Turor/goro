@@ -10,6 +10,7 @@ import (
 // Region groups neighboring maps on the same image, not separate continents.
 type WorldMapEntry struct {
 	MapName string
+	Name    string
 	Region  int
 	Bounds  image.Rectangle
 }
@@ -57,4 +58,29 @@ func parseWorldMapEntries(data []byte) []WorldMapEntry {
 		seen[name] = true
 	}
 	return entries
+}
+
+func (a WorldMapAtlas) Entries(region int) []WorldMapEntry {
+	out := make([]WorldMapEntry, len(a.Maps))
+	for i, section := range a.Maps {
+		out[i] = WorldMapEntry{
+			MapName: strings.ToLower(section.ID),
+			Name:    section.Name,
+			Region:  region,
+			Bounds:  image.Rect(section.Left, section.Top, section.Left+section.Width, section.Top+section.Height),
+		}
+	}
+	return out
+}
+
+func WorldMapImageCandidates(id string) []string {
+	return []string{
+		"data/texture/유저인터페이스/" + id,
+		"data/texture/interface/" + id,
+		id,
+	}
+}
+
+func LiveWorldMapAtlases() []WorldMapAtlas {
+	return WorldMapAtlasesForEpisode(float64(WorldMapEpisode))
 }

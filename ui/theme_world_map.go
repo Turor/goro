@@ -32,6 +32,7 @@ var (
 	worldMapPreviewBaseH   float32 = 156
 	worldMapPreviewRowsTop float32 = 164
 	worldMapPreviewMax             = 128
+	worldMapRailW                  = 132
 	worldMapDotSize                = 4
 	worldMapMarkSize       float32 = 10
 	worldMapMarkInset      float32 = 3
@@ -68,6 +69,7 @@ func init() {
 	s.Float("preview_base_height", &worldMapPreviewBaseH, 40, 400, "preview panel height before party names")
 	s.Float("preview_rows_top", &worldMapPreviewRowsTop, 0, 400, "atlas height reserved above the party name rows")
 	s.Int("preview_max", &worldMapPreviewMax, 32, 512, "longest side of a preview minimap")
+	s.Int("rail_width", &worldMapRailW, 80, 240, "region rail width")
 	s.Int("dot_size", &worldMapDotSize, 1, 16, "player and party dot size")
 	s.Float("mark_size", &worldMapMarkSize, 4, 32, "warp lock or check mark size")
 	s.Float("mark_inset", &worldMapMarkInset, 0, 24, "warp mark inset from the tile corner")
