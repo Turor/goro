@@ -81,7 +81,7 @@ func (m *System) DrawRSWEffects(screen *render.Frame, ctx client.Context, projec
 			continue
 		}
 		x, y, z := rswEffectWorldPosition(ctx.World.GND, source)
-		visible := math.Hypot(x-projection.PlayerX, y-projection.PlayerY) < 26
+		visible := math.Hypot(x-projection.PlayerX, y-projection.PlayerY) < 52
 		if starts := emitter.emit(source, index, now, visible); !starts.IsZero() {
 			effect := effects.Instance{EffectID: int(source.ID), Params: source.Param, ActorID: uint32(index + 1),
 				X: int(math.Round(x)), Y: int(math.Round(y)), Starts: starts}

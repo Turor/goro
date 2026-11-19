@@ -345,7 +345,7 @@ func (m *WorldMode) collectSceneItemEntries(screen *render.Frame, ctx client.Con
 		groundZ := scene.TerrainHeightAt(ctx.World, x, y)
 		z := floorItemRenderHeight(ctx.World, item, now)
 		point := projection.Project(worldX, worldY, z)
-		if point.X < -48 || point.Y < -80 || point.X > float32(width+48) || point.Y > float32(height+48) { // theme:ok off-screen culling margin
+		if point.X < -96 || point.Y < -160 || point.X > float32(width+96) || point.Y > float32(height+96) { // theme:ok off-screen culling margin
 			continue
 		}
 		scale := scene.ActorBillboardScreenScale(projection, worldX, worldY, z) * groundItemScreenScale
