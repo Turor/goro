@@ -840,6 +840,7 @@ type Instance struct {
 	Size                                 float64
 	GroundSampleRotationRadiansPerSecond float64
 	Persistent                           bool
+	hatOwned                             bool
 	SpriteFrameOverride                  int
 	HasSpriteFrame                       bool
 }

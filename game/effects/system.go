@@ -58,7 +58,6 @@ type System struct {
 	EffectViewMiss map[string]struct{}
 	ActorBlurs     map[uint32][]ActorBlur
 	StarFlights    map[uint32]*StarFlight
-	hatAttached    map[hatAttachKey]int
 	whitePixel     *render.Image
 	textures       map[string]*render.Image
 	textureMiss    map[string]struct{}

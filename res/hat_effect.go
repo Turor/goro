@@ -21,18 +21,21 @@ func (m *Manager) loadHatEffects() {
 	if m == nil || m.hatEffectsLoaded {
 		return
 	}
-	m.hatEffectsLoaded = true
-	m.hatEffectPlayback = map[int]int{}
 	_, data, ok := m.ReadFirst([]string{
-		`data\luafiles514\lua files\hateffectinfo\hateffectinfo.lub`,
 		`data\luafiles514\lua files\hateffectinfo\hateffectinfo.lub`,
 		`lua files\hateffectinfo\hateffectinfo.lub`,
 		`hateffectinfo\hateffectinfo.lub`,
 		"hateffectinfo.lub",
 	})
 	if !ok {
+		if m.Root != "" || len(m.Archives) > 0 {
+			m.hatEffectsLoaded = true
+			m.hatEffectPlayback = map[int]int{}
+		}
 		return
 	}
+	m.hatEffectsLoaded = true
+	m.hatEffectPlayback = map[int]int{}
 	globals := map[string]luaValue{}
 	if err := executeLuaChunk(data, globals); err != nil {
 		return
