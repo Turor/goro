@@ -79,6 +79,10 @@ type Manager struct {
 	petTalksLoaded           bool
 	questMetadata            map[uint32]QuestMetadata
 	questMetadataLoaded      bool
+	achievementInfo          map[uint32]AchievementInfo
+	achievementInfoLoaded    bool
+	attendanceRewards        []AttendanceReward
+	attendanceRewardsLoaded  bool
 	worldMapEntries          []WorldMapEntry
 	worldMapEntriesLoaded    bool
 	mapDisplayNames          map[string]string

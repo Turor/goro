@@ -3,7 +3,7 @@ package ui
 import "github.com/kivutar/goro/ui/rotheme"
 
 var (
-	searchStoreWindowW = 420
+	searchStoreWindowW = 380
 	searchStoreWindowH = 280
 	searchStoreRowH    = 22
 	searchStorePad     = 10
