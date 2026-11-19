@@ -440,6 +440,9 @@ func (w *Window) IsOpen() bool {
 }
 
 func (w *Window) SetContent(content widget.Widget) {
+	if w.resizing {
+		return
+	}
 	w.cancelDragLayer(w.ctx)
 	w.content = content
 	w.applyUserFrame()
@@ -551,6 +554,12 @@ func (w *Window) baseHeight() int {
 // SetSize takes the base size; the title and footer token delta is added.
 func (w *Window) SetSize(width, height int) {
 	height += w.heightDelta
+	if w.resizing {
+		return
+	}
+	if w.userSized && w.userWidth > 0 && w.userHeight > 0 {
+		width, height = w.userWidth, w.userHeight
+	}
 	if w.width == width && w.height == height {
 		return
 	}
@@ -558,6 +567,9 @@ func (w *Window) SetSize(width, height int) {
 	w.width = width
 	w.height = height
 	w.placed = nil
+	if overlay := w.positionedOverlay(); overlay != nil {
+		overlay.setFrame(w.x, w.y, w.width, w.height)
+	}
 }
 
 func (w *Window) SetBackground(color widget.Color) {

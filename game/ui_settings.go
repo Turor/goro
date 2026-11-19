@@ -217,9 +217,14 @@ func (m *WorldMode) saveUISettings(ctx client.Context, retry bool) {
 	if !p.loaded || ctx.Config.Headless || ctx.Config.ConfigPath == "" {
 		return
 	}
+	for _, binding := range m.ui.windowPositions(&p.last) {
+		if binding.window.Resizing() {
+			return
+		}
+	}
 	if !retry {
 		for _, binding := range m.ui.windowPositions(&p.last) {
-			if binding.window.Dragging() || binding.window.Resizing() {
+			if binding.window.Dragging() {
 				return
 			}
 		}

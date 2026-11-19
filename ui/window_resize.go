@@ -55,7 +55,7 @@ func (w *Window) resizeHit(x, y int) bool {
 
 func (w *Window) resizeTo(ctx client.Context, width, height int) {
 	width, height = w.clampResize(ctx, width, height)
-	if width == w.width && height == w.height && w.userSized {
+	if width == w.width && height == w.height {
 		return
 	}
 	w.rememberSize(width, height)
@@ -74,8 +74,9 @@ func (w *Window) applyUserFrame() {
 	if !ok {
 		return
 	}
-	frame.Width(float32(w.width))
-	frame.Height(float32(w.height))
+	w.width, w.height = w.userWidth, w.userHeight
+	frame.Width(float32(w.userWidth))
+	frame.Height(float32(w.userHeight))
 	w.heightDelta = frame.heightDelta
 }
 
@@ -86,7 +87,6 @@ func (w *Window) startResize(ctx client.Context) {
 	w.resizeStartH = w.height
 	w.resizeAnchorX = ctx.Input.MouseX
 	w.resizeAnchorY = ctx.Input.MouseY
-	w.beginDragLayer(ctx)
 }
 
 func (w *Window) updateResize(ctx client.Context) bool {
