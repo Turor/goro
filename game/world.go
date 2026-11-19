@@ -1051,6 +1051,7 @@ func (m *WorldMode) Update(ctx client.Context) (Mode, error) {
 	m.ui.minimap.SetWorldMapOpener(func() { m.openWorldMap(ctx) })
 	minimapDragging := m.ui.minimap.Update(ctx)
 	m.effects().SyncLevel99AuraEffects(ctx, now)
+	m.effects().SyncHatEffects(ctx, now)
 	pointerBlocked := minimapDragging || m.mapPointerBlocked(ctx)
 	if !pointerBlocked {
 		m.updateCameraZoom(ctx)
