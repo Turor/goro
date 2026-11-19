@@ -778,12 +778,12 @@ func actorViewportCullMargins(scale float64) (left, right, top, bottom float64) 
 	if scale <= 0 || math.IsNaN(scale) || math.IsInf(scale, 0) {
 		scale = 1
 	}
-	side := math.Max(128, float64(scene.HumanoidBillboardWidth)*scale)
-	// Most entity pixels are above the feet/anchor. The lower screen edge needs
-	// a larger margin so tall sprites do not disappear while their body is still
-	// visible and only their feet are outside the viewport.
-	topMargin := math.Max(96, float64(scene.HumanoidBillboardHeight-scene.HumanoidBillboardAnchorY)*scale*2)
-	bottomMargin := math.Max(192, float64(scene.HumanoidBillboardAnchorY)*scale*1.6)
+	// Sprites stand up from the ground anchor. A 3D camera can put the body on
+	// screen while the feet are already outside the viewport, so the cull box
+	// is twice a humanoid billboard on every side.
+	side := math.Max(256, float64(scene.HumanoidBillboardWidth)*scale*2)
+	topMargin := math.Max(192, float64(scene.HumanoidBillboardHeight-scene.HumanoidBillboardAnchorY)*scale*4)
+	bottomMargin := math.Max(384, float64(scene.HumanoidBillboardAnchorY)*scale*3.2)
 	return side, side, topMargin, bottomMargin
 }
 
