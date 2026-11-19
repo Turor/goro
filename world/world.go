@@ -107,6 +107,7 @@ type Actor struct {
 	Sex              byte
 	HeadDir          uint8
 	IsAdmin          bool
+	HatEffects       []uint16
 	Appearance       bool
 	Moving           bool
 	FromX            int

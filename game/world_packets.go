@@ -379,6 +379,22 @@ func (m *WorldMode) handleNetworkPacket(ctx client.Context, pkt network.Packet, 
 		}
 		return nil, false
 	}
+	if hat, ok, err := network.ParseHatEffect(pkt); err != nil {
+		glog.Errorf("parse hat effect 0x%04X: %v", pkt.ID, err)
+	} else if ok {
+		applyHatEffect(ctx, hat)
+		return nil, false
+	}
+	if info, ok, err := network.ParsePersonalInformation(pkt); err != nil {
+		glog.Errorf("parse personal info 0x%04X: %v", pkt.ID, err)
+	} else if ok {
+		if ctx.Session != nil {
+			ctx.Session.PersonalExp = info.Exp
+			ctx.Session.PersonalDeath = info.Death
+			ctx.Session.PersonalDrop = info.Drop
+		}
+		return nil, false
+	}
 	if _, ok, err := network.ParseNotifyTime(pkt); err != nil {
 		glog.Errorf("parse notify time 0x%04X: %v", pkt.ID, err)
 	} else if ok {

@@ -221,3 +221,23 @@ func refreshLocalPlayerMoveSpeed(ctx client.Context) {
 	}
 	ctx.World.Player.Speed = speed
 }
+
+func applyHatEffect(ctx client.Context, hat network.HatEffect) {
+	if ctx.World == nil || hat.GID == 0 {
+		return
+	}
+	ids := hat.IDs
+	if !hat.Enabled {
+		ids = nil
+	}
+	if scene.IsLocalActor(ctx, hat.GID) {
+		ctx.World.Player.HatEffects = ids
+		return
+	}
+	actor, ok := ctx.World.Actors[hat.GID]
+	if !ok {
+		return
+	}
+	actor.HatEffects = ids
+	ctx.World.Actors[hat.GID] = actor
+}

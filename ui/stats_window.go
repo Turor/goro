@@ -322,10 +322,21 @@ func statsDetailsWidget(s *session.Session, stats session.Stats) widget.Widget {
 				{Text: "SPL/CON/CRT", Width: statsDerivedPairWidth, Align: widget.TextAlignLeft, Head: true},
 				{Text: fmt.Sprintf("%d/%d/%d", stats.Spl, stats.Con, stats.Crt), Width: statsDerivedPairWidth, Align: widget.TextAlignRight},
 			},
+			{
+				{Text: "EXP/Drop", Width: statsDerivedPairWidth, Align: widget.TextAlignLeft, Head: true},
+				{Text: personalExpDropText(s), Width: statsDerivedPairWidth, Align: widget.TextAlignRight},
+			},
 		},
 		rotheme.TableRowHeightOpt(float32(statsRowH)),
 		rotheme.TableColors(rotheme.Default.Colors.ButtonHover, rotheme.Default.Colors.WindowFooter),
 	)
+}
+
+func personalExpDropText(s *session.Session) string {
+	if s == nil {
+		return "0/0"
+	}
+	return fmt.Sprintf("%d/%d", s.PersonalExp, s.PersonalDrop)
 }
 
 func statsGuildName(s *session.Session) string {
