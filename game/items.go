@@ -108,16 +108,19 @@ func (m *WorldMode) applyItemPickupAck(ctx client.Context, ack network.ItemPicku
 		return session.InventoryItem{}, 0, false
 	}
 	item := session.InventoryItem{
-		Index:      ack.Index,
-		ItemID:     ack.ItemID,
-		Type:       ack.Type,
-		Location:   ack.Location,
-		Identified: ack.Identified,
-		Amount:     scene.MaxInt(1, int(ack.Amount)),
-		Equip:      inventoryItemTypeIsEquipment(ack.Type),
-		Damaged:    ack.Damaged,
-		Refine:     ack.Refine,
-		Cards:      ack.Cards,
+		Index:        ack.Index,
+		ItemID:       ack.ItemID,
+		Type:         ack.Type,
+		Location:     ack.Location,
+		Identified:   ack.Identified,
+		Amount:       scene.MaxInt(1, int(ack.Amount)),
+		Equip:        inventoryItemTypeIsEquipment(ack.Type),
+		Damaged:      ack.Damaged,
+		Refine:       ack.Refine,
+		Grade:        ack.Grade,
+		Cards:        ack.Cards,
+		Options:      copySessionItemOptions(ack.Options),
+		ForgeOptions: copySessionForgeOptions(ack.ForgeOptions),
 	}
 	gained := item.Amount
 	if ack.Result == itemPickupResultReceive {

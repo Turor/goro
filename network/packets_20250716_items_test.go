@@ -35,6 +35,8 @@ func equipItem2025(index uint16, itemID uint32, location, wear uint32, refine ui
 	for i, c := range cards {
 		put32(e, 15+4*i, c)
 	}
+	put16(e, 40, 8)
+	put16(e, 42, 15)
 	e[80] = refine
 	e[81] = 2     // grade
 	e[82] = 1 | 2 // identified, damaged
@@ -72,7 +74,7 @@ func TestParseInventoryLists2025(t *testing.T) {
 		t.Fatalf("equip list ok=%t err=%v items=%d", ok, err, len(items))
 	}
 	if it := items[0]; it.ItemID != 1201 || it.Location != 0x2 || !it.Equipped || it.WearLocation != 0x2 ||
-		it.Refine != 7 || it.Cards[0] != 4001234 || !it.Identified || !it.Damaged || !it.Equip || it.Amount != 1 {
+		it.Refine != 7 || it.Grade != 2 || it.Options[0].Index != 8 || it.Options[0].Value != 15 || it.Cards[0] != 4001234 || !it.Identified || !it.Damaged || !it.Equip || it.Amount != 1 {
 		t.Fatalf("equip item = %+v", it)
 	}
 	if it := items[1]; it.Index != 4 || it.ItemID != 2301 || it.Equipped || it.Location != 0x10 {
@@ -129,12 +131,15 @@ func TestParseItemPickupAck2025(t *testing.T) {
 	data[32] = 4
 	data[33] = 0
 	data[83] = 9
+	data[84] = 3
+	put16(data, 40, 12)
+	put16(data, 42, 50)
 	ack, ok, err := ParseItemPickupAck(Packet{ID: 0x0B41, Data: data})
 	if err != nil || !ok {
 		t.Fatalf("ok=%t err=%v", ok, err)
 	}
 	if ack.Index != 7 || ack.Amount != 3 || ack.ItemID != 1000123 || !ack.Identified || ack.Cards[0] != 4001234 ||
-		ack.Location != 0x2 || ack.Type != 4 || ack.Result != 0 || ack.Refine != 9 {
+		ack.Location != 0x2 || ack.Type != 4 || ack.Result != 0 || ack.Refine != 9 || ack.Grade != 3 || ack.Options[0].Index != 12 || ack.Options[0].Value != 50 {
 		t.Fatalf("ack = %+v", ack)
 	}
 }
