@@ -220,9 +220,35 @@ func TestLightFacingAxes(t *testing.T) {
 	if math.Abs(rightLen-2) > 1e-4 || math.Abs(upLen-2) > 1e-4 {
 		t.Fatalf("axis length right %.4f up %.4f, want 2", rightLen, upLen)
 	}
+	assertShadowPixelAxes(t, ray, 2, right, up)
+	noon := [3]float32{0, -1, 0}
+	noonRight, noonUp := LightFacingAxes(2, noon)
+	assertShadowPixelAxes(t, noon, 2, noonRight, noonUp)
 	if zr, zu := LightFacingAxes(2, [3]float32{}); zr != ([3]float32{}) || zu != ([3]float32{}) {
 		t.Fatalf("zero ray returned %v %v", zr, zu)
 	}
+}
+
+func assertShadowPixelAxes(t *testing.T, ray [3]float32, scale float32, right, up [3]float32) {
+	t.Helper()
+	dir := normalize3(ray)
+	hint := [3]float32{0, 1, 0}
+	if math.Abs(float64(dot3(dir, hint))) > 0.95 {
+		hint = [3]float32{0, 0, 1}
+	}
+	view := lookAt([3]float32{}, dir, hint)
+	camRight := [3]float32{view[0], view[4], view[8]}
+	camUp := [3]float32{view[1], view[5], view[9]}
+	wantRight := scale3(camRight, scale)
+	wantUp := scale3(camUp, -scale)
+	if !close3(right, wantRight) || !close3(up, wantUp) {
+		t.Fatalf("pixel axes right %v up %v, want shadow-camera right %v and negated up %v", right, up, wantRight, wantUp)
+	}
+}
+
+func close3(a, b [3]float32) bool {
+	const eps = 1e-4
+	return math.Abs(float64(a[0]-b[0])) < eps && math.Abs(float64(a[1]-b[1])) < eps && math.Abs(float64(a[2]-b[2])) < eps
 }
 
 func absDot(a, b [3]float32) float64 {

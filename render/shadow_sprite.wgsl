@@ -53,8 +53,10 @@ fn light_facing(axis_scale: f32, camera_right: vec3<f32>, camera_up: vec3<f32>) 
 	}
 	let side = normalize(side_raw);
 	let lift = normalize(cross(nray, side));
-	axes.right = side * axis_scale;
-	axes.up = lift * axis_scale;
+	// side is -cameraRight and lift is +cameraUp. Texture y=0 is a negative
+	// pixel (the head), so negate both to match color billboards.
+	axes.right = -side * axis_scale;
+	axes.up = -lift * axis_scale;
 	return axes;
 }
 

@@ -263,10 +263,11 @@ func saturate3(v [3]float32) [3]float32 {
 	return [3]float32{clamp01(v[0]), clamp01(v[1]), clamp01(v[2])}
 }
 
-// LightFacingAxes is the shadow-sprite basis. axisScale is the world length of
-// the camera right axis (world units per pixel). sunRay is the stored downward
-// ray. A zero ray or scale returns zero axes so the shader can keep the camera
-// basis. Both returned axes are perpendicular to a non-zero ray.
+// LightFacingAxes is the shadow-sprite pixel basis. axisScale is the world
+// length of one sprite pixel. sunRay is the stored downward ray. A zero ray
+// or scale returns zero axes so the shader can keep the stored camera basis.
+// Signs match color billboards: shadow-camera right, and negated shadow-camera
+// up, because texture y=0 is a negative pixel and that pixel is the head.
 func LightFacingAxes(axisScale float32, sunRay [3]float32) (right, up [3]float32) {
 	if axisScale == 0 || math.IsNaN(float64(axisScale)) || math.IsInf(float64(axisScale), 0) {
 		return [3]float32{}, [3]float32{}
@@ -284,7 +285,7 @@ func LightFacingAxes(axisScale float32, sunRay [3]float32) (right, up [3]float32
 		return [3]float32{}, [3]float32{}
 	}
 	lift := normalize3(cross3(ray, side))
-	return scale3(side, axisScale), scale3(lift, axisScale)
+	return scale3(side, -axisScale), scale3(lift, -axisScale)
 }
 
 func normalize3(v [3]float32) [3]float32 {
