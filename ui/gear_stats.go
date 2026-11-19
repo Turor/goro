@@ -51,7 +51,7 @@ func gearStatsColumn(ctx Context) widget.Widget {
 		scrollview.ScrollbarOpt(scrollview.ScrollbarAuto),
 	)
 	return primitives.Box(scroll).
-		Width(statsPrimaryColumnWidth).
+		Width(statsPrimaryColumnWidth + float32(ROScrollbarGutter)).
 		Height(float32(equipmentWindowContentH))
 }
 
