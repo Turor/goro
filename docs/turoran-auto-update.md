@@ -120,7 +120,10 @@ git tree. Never commit or print them.
 `updater.EmbeddedPublicKey` is the first entry of `updater.TrustedPublicKeys`,
 the same key as Korangar's `EMBEDDED_UPDATE_PUBLIC_KEY`.
 `TestEmbeddedKeyIsTheTuroranReleaseKey` pins it. The same key signs client
-updates (GORO1) and data manifests (GDAT1).
+updates (GORO1), legacy GDAT1 data envelopes, and GDAT2 data roots. A GDAT2
+root is signed with `goro-sign-release sign-data-root` (detached Ed25519 over
+the canonical root file, written as 128 lowercase hex characters plus a
+newline). That command does not hash a directory.
 
 Each signed release may carry a `next-keys` list. After verifying the
 signature with a key it already trusts, the client persists those public

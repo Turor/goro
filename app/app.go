@@ -81,9 +81,10 @@ func enableRemoteData(data config.DataConfig, resource *res.Manager) error {
 		return err
 	}
 	return resource.EnableRemote(res.RemoteOptions{
-		BaseURL:  data.RemoteURL,
-		CacheDir: cacheDir,
-		Aliases:  res.TuroranRemoteAliases,
+		BaseURL:      data.RemoteURL,
+		CacheDir:     cacheDir,
+		Aliases:      res.TuroranRemoteAliases,
+		ManifestMode: data.ManifestMode,
 	})
 }
 

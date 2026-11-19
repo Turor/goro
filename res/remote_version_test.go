@@ -89,21 +89,32 @@ func TestRemoteAdoptsFirstDataVersionWithoutDelta(t *testing.T) {
 	}
 }
 
-func signedDataManifest(t *testing.T, priv ed25519.PrivateKey, version uint64, files map[string][]byte) []byte {
+func publishSignedDataRoot(t *testing.T, srv *fakeAssetServer, priv ed25519.PrivateKey, version uint64, files map[string][]byte) {
 	t.Helper()
 	list := make([]updater.DataFile, 0, len(files))
 	for p, b := range files {
 		list = append(list, updater.DataFile{Path: p, SHA256: updater.SHA256Hex(b), Size: int64(len(b))})
 	}
-	payload, err := updater.CanonicalDataPayload(updater.DataManifest{Version: version, Files: list})
+	root, shards, err := updater.BuildDataTree(version, 0, 1_700_000_000, list, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	env, err := updater.SignDataEnvelope(payload, priv)
+	sig, err := updater.SignDataRoot(root, priv)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return []byte(env)
+	sh := make(map[string][]byte, len(shards))
+	for id, body := range shards {
+		sh[id] = []byte(body)
+	}
+	srv.mu.Lock()
+	defer srv.mu.Unlock()
+	if srv.v2 == nil {
+		srv.v2 = map[uint64]*v2Doc{}
+	}
+	srv.v2[version] = &v2Doc{root: []byte(root), sig: []byte(sig + "\n"), shards: sh}
+	srv.v2Current = version
+	srv.v2Block = false
 }
 
 func testKey(t *testing.T) (ed25519.PublicKey, ed25519.PrivateKey) {
@@ -122,7 +133,7 @@ func TestRemoteAppliesChangesSinceAndEvictsPaths(t *testing.T) {
 	srv.index = []string{"data\\a.txt", "data\\b.txt"}
 	srv.put("data/a.txt", []byte("a1"), "ea")
 	srv.put("data/b.txt", []byte("b1"), "eb")
-	srv.manifest = signedDataManifest(t, priv, 10, map[string][]byte{
+	publishSignedDataRoot(t, srv, priv, 10, map[string][]byte{
 		"data/a.txt": []byte("a1"),
 		"data/b.txt": []byte("b1"),
 	})
@@ -144,11 +155,11 @@ func TestRemoteAppliesChangesSinceAndEvictsPaths(t *testing.T) {
 	srv.dataVersion = 11
 	srv.files["data/a.txt"] = []byte("a2")
 	srv.etags["data/a.txt"] = "ea2"
-	srv.manifest = signedDataManifest(t, priv, 11, map[string][]byte{
+	srv.mu.Unlock()
+	publishSignedDataRoot(t, srv, priv, 11, map[string][]byte{
 		"data/a.txt": []byte("a2"),
 		"data/b.txt": []byte("b1"),
 	})
-	srv.mu.Unlock()
 	if _, err := m.ReadFile("data\\b.txt"); err != nil {
 		t.Fatal(err)
 	}
@@ -175,7 +186,7 @@ func TestRemoteTooOldChangesTriggersFullRecheck(t *testing.T) {
 	srv.index = []string{"data\\a.txt", "data\\b.txt"}
 	srv.put("data/a.txt", []byte("a1"), "e1")
 	srv.put("data/b.txt", []byte("b1"), "eb")
-	srv.manifest = signedDataManifest(t, priv, 5, map[string][]byte{
+	publishSignedDataRoot(t, srv, priv, 5, map[string][]byte{
 		"data/a.txt": []byte("a1"),
 		"data/b.txt": []byte("b1"),
 	})
@@ -192,11 +203,11 @@ func TestRemoteTooOldChangesTriggersFullRecheck(t *testing.T) {
 	srv.dataVersion = 50
 	srv.files["data/a.txt"] = []byte("a-new")
 	srv.etags["data/a.txt"] = "e2"
-	srv.manifest = signedDataManifest(t, priv, 50, map[string][]byte{
+	srv.mu.Unlock()
+	publishSignedDataRoot(t, srv, priv, 50, map[string][]byte{
 		"data/a.txt": []byte("a-new"),
 		"data/b.txt": []byte("b1"),
 	})
-	srv.mu.Unlock()
 	if _, err := m.ReadFile("data\\b.txt"); err != nil {
 		t.Fatal(err)
 	}
@@ -242,24 +253,13 @@ func TestRemoteDigestMismatchIsDiscarded(t *testing.T) {
 		t.Fatal(err)
 	}
 	good := []byte("good-bytes")
-	mft := updater.DataManifest{Version: 9, Files: []updater.DataFile{
-		{Path: "data/a.txt", SHA256: updater.SHA256Hex(good), Size: int64(len(good))},
-	}}
-	payload, err := updater.CanonicalDataPayload(mft)
-	if err != nil {
-		t.Fatal(err)
-	}
-	env, err := updater.SignDataEnvelope(payload, priv)
-	if err != nil {
-		t.Fatal(err)
-	}
 	srv := newFakeAssetServer(t)
 	srv.dataVersion = 9
 	srv.index = []string{"data\\a.txt", "data\\b.txt"}
 	srv.put("data/a.txt", []byte("tampered"), "e")
 	srv.put("data/b.txt", good, "g")
-	srv.manifest = []byte(env)
-	mgr := versionedManager(t, srv, RemoteOptions{TrustedKeys: []ed25519.PublicKey{pub}})
+	publishSignedDataRoot(t, srv, priv, 9, map[string][]byte{"data/a.txt": good, "data/b.txt": good})
+	mgr := versionedManager(t, srv, RemoteOptions{TrustedKeys: []ed25519.PublicKey{pub}, ManifestMode: "enforce"})
 	mgr.WaitRemoteIndex(3 * time.Second)
 	if !mgr.WaitRemoteManifest(3 * time.Second) {
 		t.Fatal("manifest not loaded")
@@ -279,23 +279,12 @@ func TestRemoteSignedManifestVerifiesMatchingFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	good := []byte("good-bytes")
-	mft := updater.DataManifest{Version: 9, Files: []updater.DataFile{
-		{Path: "data/a.txt", SHA256: updater.SHA256Hex(good), Size: int64(len(good))},
-	}}
-	payload, err := updater.CanonicalDataPayload(mft)
-	if err != nil {
-		t.Fatal(err)
-	}
-	env, err := updater.SignDataEnvelope(payload, priv)
-	if err != nil {
-		t.Fatal(err)
-	}
 	srv := newFakeAssetServer(t)
 	srv.dataVersion = 9
 	srv.index = []string{"data\\a.txt"}
 	srv.put("data/a.txt", good, "e")
-	srv.manifest = []byte(env)
-	mgr := versionedManager(t, srv, RemoteOptions{TrustedKeys: []ed25519.PublicKey{pub}})
+	publishSignedDataRoot(t, srv, priv, 9, map[string][]byte{"data/a.txt": good})
+	mgr := versionedManager(t, srv, RemoteOptions{TrustedKeys: []ed25519.PublicKey{pub}, ManifestMode: "enforce"})
 	mgr.WaitRemoteIndex(3 * time.Second)
 	if !mgr.WaitRemoteManifest(3 * time.Second) {
 		t.Fatal("manifest not loaded")
@@ -314,7 +303,7 @@ func TestRemoteManifestChecksBodyCachedBeforeIt(t *testing.T) {
 	srv.dataVersion = 9
 	srv.index = []string{"data\\prontera.gat"}
 	srv.put("data/prontera.gat", bad, "etag-bad")
-	mgr := versionedManager(t, srv, RemoteOptions{TrustedKeys: []ed25519.PublicKey{pub}})
+	mgr := versionedManager(t, srv, RemoteOptions{TrustedKeys: []ed25519.PublicKey{pub}, ManifestMode: "enforce"})
 	if !mgr.WaitRemoteIndex(3 * time.Second) {
 		t.Fatal("index")
 	}
@@ -323,11 +312,9 @@ func TestRemoteManifestChecksBodyCachedBeforeIt(t *testing.T) {
 		t.Fatalf("prime cache: %q %v", got, err)
 	}
 	hits := srv.hitCount("data/prontera.gat")
-	srv.mu.Lock()
-	srv.manifest = signedDataManifest(t, priv, 9, map[string][]byte{
+	publishSignedDataRoot(t, srv, priv, 9, map[string][]byte{
 		"data/prontera.gat": good,
 	})
-	srv.mu.Unlock()
 	if !mgr.remote.loadDataManifest() || !mgr.WaitRemoteManifest(time.Second) {
 		t.Fatal("manifest not accepted")
 	}
@@ -360,11 +347,9 @@ func TestRemoteManifestKeepsCachedBodyThatMatches(t *testing.T) {
 	if _, err := mgr.ReadFile("data\\prontera.gat"); err != nil {
 		t.Fatal(err)
 	}
-	srv.mu.Lock()
-	srv.manifest = signedDataManifest(t, priv, 9, map[string][]byte{
+	publishSignedDataRoot(t, srv, priv, 9, map[string][]byte{
 		"data/prontera.gat": good,
 	})
-	srv.mu.Unlock()
 	if !mgr.remote.loadDataManifest() {
 		t.Fatal("manifest")
 	}
@@ -461,7 +446,7 @@ func TestRemoteChangesStallDoesNotTightLoop(t *testing.T) {
 	srv.index = []string{"data\\a.gat", "data\\b.gat"}
 	srv.put("data/a.gat", bodyA, "ea")
 	srv.put("data/b.gat", bodyB, "eb")
-	srv.manifest = signedDataManifest(t, priv, 15, map[string][]byte{
+	publishSignedDataRoot(t, srv, priv, 15, map[string][]byte{
 		"data/a.gat": bodyA,
 		"data/b.gat": bodyB,
 	})

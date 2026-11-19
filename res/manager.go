@@ -238,12 +238,22 @@ func (m *Manager) readFileCandidates(names []string, exact bool) ([]byte, string
 func (m *Manager) readFileDirect(name string, exact bool) ([]byte, error) {
 	path, ok := m.Find(name)
 	if ok {
-		return m.readLoose(path)
+		data, err := m.readLoose(path)
+		if err != nil {
+			return nil, err
+		}
+		if err := m.verifyLocalData(name, data); err != nil {
+			return nil, err
+		}
+		return data, nil
 	}
 
 	for _, archive := range m.Archives {
 		data, err := archive.ReadFile(name)
 		if err == nil {
+			if err := m.verifyLocalData(name, data); err != nil {
+				return nil, err
+			}
 			return data, nil
 		}
 		if errors.Is(err, ErrGRFNotFound) {
@@ -253,6 +263,9 @@ func (m *Manager) readFileDirect(name string, exact bool) ([]byte, error) {
 			for _, match := range archive.NamesWithSuffix(name) {
 				data, err := archive.ReadFile(match)
 				if err == nil {
+					if err := m.verifyLocalData(match, data); err != nil {
+						return nil, err
+					}
 					return data, nil
 				}
 				if !errors.Is(err, ErrGRFNotFound) {

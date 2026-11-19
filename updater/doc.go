@@ -35,4 +35,10 @@
 // list every served file's path, size and SHA-256. The client ships
 // TrustedPublicKeys and accepts a signed next-key list before the old key
 // retires. See docs/turoran-auto-update.md.
+//
+// GDAT2 is the two-level data manifest: a small root (GDAT2ROOT) plus 256
+// shards (GDAT2SHARD). The signature is detached — 128 lowercase hex
+// characters, with or without one trailing newline — over the exact
+// canonical root bytes. Clients persist that root and re-verify it on every
+// start. sign-data-root signs an already-built root; it does not hash a tree.
 package updater

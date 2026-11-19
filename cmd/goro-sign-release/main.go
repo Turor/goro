@@ -1,14 +1,16 @@
 // Command goro-sign-release signs and verifies TuroranRO goro release
-// manifests (GORO1) and signed data manifests (GDAT1). It never prints
-// private key material.
+// manifests (GORO1), legacy data envelopes (GDAT1), and GDAT2 roots. It never
+// prints private key material.
 //
 //	goro-sign-release sign --private-key SEED --version V --build N --out PATH \
 //	    --file REL=SOURCE [--file REL=SOURCE]... [--url REL=URL]... \
 //	    [--next-key HEX]...
 //	goro-sign-release sign-data --private-key SEED --version N --out PATH \
 //	    --file REL=SOURCE [--file REL=SOURCE]... [--root DIR] [--next-key HEX]...
+//	goro-sign-release sign-data-root --private-key SEED --root PATH [--out PATH]
 //	goro-sign-release verify --manifest PATH [--public-key HEX]
 //	goro-sign-release verify-data --manifest PATH [--public-key HEX]
+//	goro-sign-release verify-data-root --root PATH [--sig PATH] [--public-key HEX]
 //	goro-sign-release public-key --private-key SEED
 //
 // SEED is a path to a 32-byte Ed25519 seed (raw, or 64 hex characters). The
@@ -45,17 +47,21 @@ func main() {
 
 func run(args []string, out io.Writer) error {
 	if len(args) == 0 {
-		return errors.New("usage: goro-sign-release sign|sign-data|verify|verify-data|public-key [flags]")
+		return errors.New("usage: goro-sign-release sign|sign-data|sign-data-root|verify|verify-data|verify-data-root|public-key [flags]")
 	}
 	switch args[0] {
 	case "sign":
 		return sign(args[1:], out)
 	case "sign-data":
 		return signData(args[1:], out)
+	case "sign-data-root":
+		return signDataRoot(args[1:], out)
 	case "verify":
 		return verify(args[1:], out)
 	case "verify-data":
 		return verifyData(args[1:], out)
+	case "verify-data-root":
+		return verifyDataRoot(args[1:], out)
 	case "public-key":
 		fs := flag.NewFlagSet("public-key", flag.ContinueOnError)
 		keyPath := fs.String("private-key", os.Getenv("GORO_UPDATE_SIGNING_KEY"), "seed path")
@@ -258,6 +264,96 @@ func signData(args []string, out io.Writer) error {
 	}
 	fmt.Fprintf(out, "signed %s version=%d files=%d next-keys=%d\n", *outPath, m.Version, len(m.Files), len(m.NextKeys))
 	return nil
+}
+
+// signDataRoot signs an already-built canonical GDAT2 root. It does not hash
+// a directory or build a file list.
+func signDataRoot(args []string, out io.Writer) error {
+	fs := flag.NewFlagSet("sign-data-root", flag.ContinueOnError)
+	keyPath := fs.String("private-key", os.Getenv("GORO_UPDATE_SIGNING_KEY"), "seed path")
+	rootPath := fs.String("root", "", "canonical GDAT2 root file")
+	outPath := fs.String("out", "", "signature path (default: root.sig next to a file named root, otherwise ROOT.sig)")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *rootPath == "" {
+		return errors.New("--root is required")
+	}
+	raw, err := os.ReadFile(*rootPath)
+	if err != nil {
+		return err
+	}
+	parsed, err := updater.ParseDataRoot(string(raw))
+	if err != nil {
+		return err
+	}
+	key, err := loadSeed(*keyPath)
+	if err != nil {
+		return err
+	}
+	sig, err := updater.SignDataRoot(string(raw), key)
+	if err != nil {
+		return err
+	}
+	pub := key.Public().(ed25519.PublicKey)
+	if _, err := updater.OpenDataRoot(raw, []byte(sig+"\n"), []ed25519.PublicKey{pub}); err != nil {
+		return fmt.Errorf("self-verify failed: %w", err)
+	}
+	dest := *outPath
+	if dest == "" {
+		dest = defaultRootSig(*rootPath)
+	}
+	if err := os.WriteFile(dest, []byte(sig+"\n"), 0o644); err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "signed %s version=%d previous=%d\n", dest, parsed.Version, parsed.PreviousVersion)
+	return nil
+}
+
+func verifyDataRoot(args []string, out io.Writer) error {
+	fs := flag.NewFlagSet("verify-data-root", flag.ContinueOnError)
+	rootPath := fs.String("root", "", "canonical GDAT2 root file")
+	sigPath := fs.String("sig", "", "detached signature (default: root.sig next to a file named root, otherwise ROOT.sig)")
+	pubHex := fs.String("public-key", "", "public key hex (default: embedded)")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *rootPath == "" {
+		return errors.New("--root is required")
+	}
+	pub := updater.EmbeddedPublicKey
+	if *pubHex != "" {
+		b, err := hex.DecodeString(*pubHex)
+		if err != nil || len(b) != ed25519.PublicKeySize {
+			return errors.New("bad --public-key")
+		}
+		pub = b
+	}
+	raw, err := os.ReadFile(*rootPath)
+	if err != nil {
+		return err
+	}
+	sigFile := *sigPath
+	if sigFile == "" {
+		sigFile = defaultRootSig(*rootPath)
+	}
+	sig, err := os.ReadFile(sigFile)
+	if err != nil {
+		return err
+	}
+	parsed, err := updater.OpenDataRoot(raw, sig, []ed25519.PublicKey{pub})
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "ok version=%d previous=%d created=%d next-keys=%d\n", parsed.Version, parsed.PreviousVersion, parsed.CreatedUnix, len(parsed.NextKeys))
+	return nil
+}
+
+func defaultRootSig(rootPath string) string {
+	if filepath.Base(rootPath) == "root" {
+		return filepath.Join(filepath.Dir(rootPath), "root.sig")
+	}
+	return rootPath + ".sig"
 }
 
 func verifyData(args []string, out io.Writer) error {

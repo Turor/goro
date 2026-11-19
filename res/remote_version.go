@@ -12,9 +12,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/kivutar/goro/glog"
-	"github.com/kivutar/goro/updater"
 )
 
 const (
@@ -22,7 +19,6 @@ const (
 	pollMaxDefault       = 120 * time.Second
 	pollOfflineMax       = 10 * time.Minute
 	deltaDebounceDefault = 2 * time.Second
-	dataManifestMax      = 64 << 20
 	changesMax           = 8 << 20
 	versionMax           = 64 << 10
 )
@@ -139,7 +135,7 @@ func (r *remoteSource) noteVersion(v uint64) {
 		r.haveCached = true
 		r.mu.Unlock()
 		r.persistCachedVersion()
-		go r.loadDataManifest()
+		r.wakeManifest()
 		return
 	}
 	cached := r.cachedVersion
@@ -147,6 +143,7 @@ func (r *remoteSource) noteVersion(v uint64) {
 	if v > cached {
 		r.wakeDelta()
 	}
+	r.considerManifest(v)
 }
 
 func (r *remoteSource) wakeDelta() {
@@ -157,8 +154,19 @@ func (r *remoteSource) wakeDelta() {
 }
 
 func (r *remoteSource) startVersionWorkers() {
-	go r.deltaLoop()
-	go r.pollLoop()
+	r.workers.Add(3)
+	go func() {
+		defer r.workers.Done()
+		r.manifestLoop()
+	}()
+	go func() {
+		defer r.workers.Done()
+		r.deltaLoop()
+	}()
+	go func() {
+		defer r.workers.Done()
+		r.pollLoop()
+	}()
 }
 
 func (r *remoteSource) stop() {
@@ -350,6 +358,9 @@ func (r *remoteSource) pollVersion() error {
 	if json.Unmarshal(body, &v) == nil && v.Version > 0 {
 		r.noteVersion(v.Version)
 	}
+	if r.manifest.Load() == nil || r.seenVersion.Load() > r.acceptedManifestVersion() {
+		r.wakeManifest()
+	}
 	return nil
 }
 
@@ -390,54 +401,6 @@ func (r *remoteSource) getMeta(rel string, limit int64) ([]byte, error) {
 	return body, nil
 }
 
-// loadDataManifest stores a verified manifest. It reports whether one is
-// accepted afterward. A failed fetch leaves a previously accepted manifest
-// in place and returns false so the caller does not treat this attempt as
-// covering a newer unsigned cursor.
-func (r *remoteSource) loadDataManifest() bool {
-	body, err := r.getMeta("data-manifest", dataManifestMax)
-	if err != nil {
-		return false
-	}
-	keys := r.keyRing.Keys()
-	m, err := updater.OpenDataEnvelopeWithKeys(body, keys)
-	if err != nil {
-		r.logOnce("data-manifest", "remote data: signed data manifest rejected: %v", err)
-		return false
-	}
-	r.mu.Lock()
-	accepted := r.acceptedManifest
-	r.mu.Unlock()
-	if err := m.RejectRollback(accepted); err != nil {
-		r.logOnce("data-manifest", "remote data: %v", err)
-		return false
-	}
-	if err := r.keyRing.AcceptNextKeys(m.NextKeys); err != nil {
-		glog.Warnf("remote data: next-keys not persisted: %v", err)
-	}
-	stored := m
-	r.dataManifest.Store(&stored)
-	r.mu.Lock()
-	advanced := m.Version > r.acceptedManifest
-	r.acceptedManifest = m.Version
-	r.mu.Unlock()
-	// A cache filled before this manifest (or under an older one) must be
-	// digest-checked before reuse. The generation bump forces revalidation;
-	// a 304 still goes through useCached.
-	if advanced {
-		r.markAllStale()
-	}
-	return true
-}
-
-func (r *remoteSource) verifyDigest(p string, body []byte) error {
-	m := r.dataManifest.Load()
-	if m == nil {
-		return nil
-	}
-	return m.VerifyFile(p, body)
-}
-
 // StopRemote stops the version poll and delta worker. Tests call it via
 // t.Cleanup; the game process exits instead.
 func (m *Manager) StopRemote() {
@@ -445,6 +408,7 @@ func (m *Manager) StopRemote() {
 		return
 	}
 	m.remote.stop()
+	m.remote.workers.Wait()
 }
 
 // RemoteSeenVersion is the newest X-Data-Version observed.
@@ -473,7 +437,7 @@ func (m *Manager) WaitRemoteManifest(timeout time.Duration) bool {
 	}
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		if m.remote.dataManifest.Load() != nil {
+		if m.remote.manifest.Load() != nil {
 			return true
 		}
 		time.Sleep(5 * time.Millisecond)

@@ -60,6 +60,9 @@ type RemoteOptions struct {
 	// TrustedKeys is the list of public keys that may sign a data manifest.
 	// Empty uses updater.TrustedPublicKeys. Tests pass throwaway keys.
 	TrustedKeys []ed25519.PublicKey
+	// ManifestMode is "report" (log mismatches, do not block) or "enforce"
+	// (fail closed after a manifest has been trusted). Empty means report.
+	ManifestMode string
 	// PollMin and PollMax bound the idle version poll (default 60–120s).
 	PollMin, PollMax time.Duration
 	// DeltaDebounce waits after a newer X-Data-Version before calling changes
@@ -118,17 +121,27 @@ type remoteSource struct {
 	seenVersion      atomic.Uint64
 	cacheGen         atomic.Uint64
 	headerSeen       atomic.Bool
-	dataManifest     atomic.Pointer[updater.DataManifest]
+	manifest         atomic.Pointer[signedRoot]
 	keyRing          *updater.KeyRing
 	cachedVersion    uint64
 	haveCached       bool
 	acceptedManifest uint64
+	manifestMode     string
+	manifestTrusted  bool
+	manifestAttack   bool
+	manifestTried    uint64
+	manifestMu       sync.Mutex
+	manifestWake     chan struct{}
+	shardMu          sync.Mutex
+	shards           map[string]*cachedShard
+	shardFlight      map[string]*shardCall
 	pollMin, pollMax time.Duration
 	deltaDebounce    time.Duration
 	jitter           func() float64
 	deltaWake        chan struct{}
 	stopCh           chan struct{}
 	stopOnce         sync.Once
+	workers          sync.WaitGroup
 }
 
 type remoteIndex struct {
@@ -202,6 +215,10 @@ func newRemoteSource(opts RemoteOptions) (*remoteSource, error) {
 	if len(embedded) == 0 {
 		embedded = updater.TrustedPublicKeys
 	}
+	mode, err := normalizeManifestMode(opts.ManifestMode)
+	if err != nil {
+		return nil, err
+	}
 	src := &remoteSource{
 		base:          base,
 		host:          strings.ToLower(base.Host),
@@ -217,6 +234,10 @@ func newRemoteSource(opts RemoteOptions) (*remoteSource, error) {
 		logged:        make(map[string]struct{}),
 		stale:         make(map[string]struct{}),
 		keyRing:       updater.NewKeyRing(filepath.Join(opts.CacheDir, "trusted-keys.json"), embedded),
+		manifestMode:  mode,
+		manifestWake:  make(chan struct{}, 1),
+		shards:        map[string]*cachedShard{},
+		shardFlight:   map[string]*shardCall{},
 		pollMin:       opts.PollMin,
 		pollMax:       opts.PollMax,
 		deltaDebounce: opts.DeltaDebounce,
@@ -228,6 +249,7 @@ func newRemoteSource(opts RemoteOptions) (*remoteSource, error) {
 		src.deltaDebounce = deltaDebounceDefault
 	}
 	src.loadCachedVersion()
+	src.loadPersistedRoot()
 	return src, nil
 }
 
@@ -251,7 +273,7 @@ func (m *Manager) EnableRemote(opts RemoteOptions) error {
 	m.resourceAliases = nil
 	go source.loadIndex()
 	source.startVersionWorkers()
-	glog.Infof("remote data: streaming from %s (cache %s)", source.base.Redacted(), opts.CacheDir)
+	glog.Infof("remote data: streaming from %s (cache %s, manifest %s)", source.base.Redacted(), opts.CacheDir, source.manifestMode)
 	return nil
 }
 
