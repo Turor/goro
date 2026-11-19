@@ -15,7 +15,7 @@ import (
 // the paperdoll size. Height stays the paperdoll height so a dragged window
 // still fits; the status column scrolls.
 func gearWindowSize() (int, int) {
-	width := equipmentWindowWidth + equipmentWindowPad + int(statsPrimaryColumnWidth)
+	width := equipmentWindowWidth + equipmentWindowPad + int(statsPrimaryColumnWidth) + ROScrollbarGutter
 	return width, equipmentWindowHeight
 }
 
