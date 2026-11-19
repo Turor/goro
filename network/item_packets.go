@@ -1190,18 +1190,43 @@ func ParseShopDealSelection(packet Packet) (ShopDealSelection, bool, error) {
 	return ShopDealSelection{NPCID: binary.LittleEndian.Uint32(packet.Data[2:6])}, true, nil
 }
 
+const (
+	shopBuyClassicEntry = 11
+	shopBuy2025Entry    = 19
+	// shopBuyWideItemDate is PACKETVER_MAIN_NUM >= 20181121: CZ buy entries
+	// are amount uint16 + itemId uint32, and ZC 0x0B77 is the buy list.
+	shopBuyWideItemDate = 20181121
+)
+
 func ParseShopBuyList(packet Packet) ([]ShopBuyItem, bool, error) {
-	if packet.ID != 0x00C6 {
+	switch packet.ID {
+	case 0x00C6:
+		return parseShopBuyList(packet, shopBuyClassicEntry, false)
+	case 0x0B77:
+		return parseShopBuyList(packet, shopBuy2025Entry, true)
+	default:
 		return nil, false, nil
 	}
+}
+
+func parseShopBuyList(packet Packet, entry int, wide bool) ([]ShopBuyItem, bool, error) {
 	if len(packet.Data) < 4 {
 		return nil, false, fmt.Errorf("ZC_PC_PURCHASE_ITEMLIST too short: %d", len(packet.Data))
 	}
-	if (len(packet.Data)-4)%11 != 0 {
+	if (len(packet.Data)-4)%entry != 0 {
 		return nil, false, fmt.Errorf("ZC_PC_PURCHASE_ITEMLIST invalid length: %d", len(packet.Data))
 	}
-	items := make([]ShopBuyItem, 0, (len(packet.Data)-4)/11)
-	for offset := 4; offset+11 <= len(packet.Data); offset += 11 {
+	items := make([]ShopBuyItem, 0, (len(packet.Data)-4)/entry)
+	for offset := 4; offset+entry <= len(packet.Data); offset += entry {
+		if wide {
+			items = append(items, ShopBuyItem{
+				ItemID:        binary.LittleEndian.Uint32(packet.Data[offset : offset+4]),
+				Price:         binary.LittleEndian.Uint32(packet.Data[offset+4 : offset+8]),
+				DiscountPrice: binary.LittleEndian.Uint32(packet.Data[offset+8 : offset+12]),
+				Type:          packet.Data[offset+12],
+			})
+			continue
+		}
 		items = append(items, ShopBuyItem{
 			Price:         binary.LittleEndian.Uint32(packet.Data[offset : offset+4]),
 			DiscountPrice: binary.LittleEndian.Uint32(packet.Data[offset+4 : offset+8]),
@@ -1507,15 +1532,28 @@ func BuildSellItemListPacket(items []SellRequestItem) []byte {
 }
 
 func BuildBuyItemListPacket(items []BuyRequestItem) []byte {
-	size := 4 + len(items)*4
+	return BuildBuyItemListPacketForClientDate(items, 0)
+}
+
+func BuildBuyItemListPacketForClientDate(items []BuyRequestItem, clientDate int) []byte {
+	wide := clientDate >= shopBuyWideItemDate
+	stride := 4
+	if wide {
+		stride = 6
+	}
+	size := 4 + len(items)*stride
 	packet := make([]byte, size)
 	binary.LittleEndian.PutUint16(packet[0:2], PacketCZPCPurchaseItemList)
 	binary.LittleEndian.PutUint16(packet[2:4], uint16(size))
 	offset := 4
 	for _, item := range items {
 		binary.LittleEndian.PutUint16(packet[offset:offset+2], item.Amount)
-		binary.LittleEndian.PutUint16(packet[offset+2:offset+4], uint16(item.ItemID))
-		offset += 4
+		if wide {
+			binary.LittleEndian.PutUint32(packet[offset+2:offset+6], item.ItemID)
+		} else {
+			binary.LittleEndian.PutUint16(packet[offset+2:offset+4], uint16(item.ItemID))
+		}
+		offset += stride
 	}
 	return packet
 }
@@ -1763,7 +1801,7 @@ func (c *Client) SendShopSellItems(items []SellRequestItem) error {
 }
 
 func (c *Client) SendShopBuyItems(items []BuyRequestItem) error {
-	packet := BuildBuyItemListPacket(items)
+	packet := BuildBuyItemListPacketForClientDate(items, c.clientDate)
 	err := c.Send(packet)
 	if err == nil {
 		glog.Debugf("sent CZ_PC_PURCHASE_ITEMLIST opcode=0x%04X count=%d client_date=%d", ID(packet), len(items), c.clientDate)

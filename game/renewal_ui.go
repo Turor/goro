@@ -131,6 +131,13 @@ func (m *WorldMode) handleRenewalUIPacket(ctx client.Context, pkt network.Packet
 		m.ui.barter.OpenList(ctx, items)
 		return true
 	}
+	if items, ok, err := network.ParseExpandedBarterList(pkt); err != nil {
+		glog.Errorf("parse expanded barter 0x%04X: %v", pkt.ID, err)
+		return true
+	} else if ok {
+		m.ui.barter.OpenList(ctx, items)
+		return true
+	}
 	if info, ok, err := network.ParseClanInfo(pkt); err != nil {
 		glog.Errorf("parse clan 0x%04X: %v", pkt.ID, err)
 		return true

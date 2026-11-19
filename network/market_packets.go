@@ -23,7 +23,12 @@ const (
 	PacketZCMarketResult   uint16 = 0x09d7
 	PacketCZMarketClose    uint16 = 0x09d8
 
-	PacketCZBarterPurchase uint16 = 0x0b0f
+	PacketCZBarterPurchase         uint16 = 0x0b0f
+	PacketZCExpandedBarter         uint16 = 0x0b79
+	PacketCZExpandedBarterPurchase uint16 = 0x0b57
+	PacketCZExpandedBarterClose    uint16 = 0x0b58
+	expandedBarterItemHead                = 36
+	expandedBarterCurrency                = 12
 
 	PacketZCClanInfo   uint16 = 0x098a
 	PacketZCClanOnline uint16 = 0x0988
@@ -64,6 +69,8 @@ type BarterItem struct {
 	Currency uint32
 	Cost     uint32
 	Index    uint32
+	Zeny     uint32
+	Expanded bool
 }
 
 type ClanInfo struct {
@@ -160,6 +167,62 @@ func ParseBarterList(p Packet) ([]BarterItem, bool, error) {
 		})
 	}
 	return items, true, nil
+}
+
+func ParseExpandedBarterList(p Packet) ([]BarterItem, bool, error) {
+	if p.ID != PacketZCExpandedBarter {
+		return nil, false, nil
+	}
+	if len(p.Data) < 8 {
+		return nil, false, fmt.Errorf("ZC_NPC_EXPANDED_BARTER_MARKET_ITEMINFO: invalid length %d", len(p.Data))
+	}
+	count := int(binary.LittleEndian.Uint32(p.Data[4:8]))
+	if count < 0 {
+		return nil, false, fmt.Errorf("ZC_NPC_EXPANDED_BARTER_MARKET_ITEMINFO: bad count")
+	}
+	off := 8
+	items := make([]BarterItem, 0, count)
+	for i := 0; i < count; i++ {
+		if off+expandedBarterItemHead > len(p.Data) {
+			return nil, false, fmt.Errorf("ZC_NPC_EXPANDED_BARTER_MARKET_ITEMINFO: truncated item")
+		}
+		e := p.Data[off : off+expandedBarterItemHead]
+		item := BarterItem{
+			ItemID:   binary.LittleEndian.Uint32(e[0:4]),
+			Amount:   binary.LittleEndian.Uint32(e[6:10]),
+			Index:    binary.LittleEndian.Uint32(e[14:18]),
+			Zeny:     binary.LittleEndian.Uint32(e[18:22]),
+			Expanded: true,
+		}
+		ncur := int(binary.LittleEndian.Uint32(e[28:32]))
+		off += expandedBarterItemHead
+		if ncur < 0 || off+ncur*expandedBarterCurrency > len(p.Data) {
+			return nil, false, fmt.Errorf("ZC_NPC_EXPANDED_BARTER_MARKET_ITEMINFO: bad currencies")
+		}
+		if ncur == 0 {
+			item.Cost = item.Zeny
+		} else {
+			c0 := p.Data[off : off+expandedBarterCurrency]
+			item.Currency = binary.LittleEndian.Uint32(c0[0:4])
+			item.Cost = binary.LittleEndian.Uint32(c0[6:10])
+		}
+		off += ncur * expandedBarterCurrency
+		items = append(items, item)
+	}
+	if off != len(p.Data) {
+		return nil, false, fmt.Errorf("ZC_NPC_EXPANDED_BARTER_MARKET_ITEMINFO: trailing %d bytes", len(p.Data)-off)
+	}
+	return items, true, nil
+}
+
+func BuildExpandedBarterPurchasePacket(itemID, shopIndex, amount uint32) []byte {
+	data := make([]byte, 16)
+	binary.LittleEndian.PutUint16(data[0:2], PacketCZExpandedBarterPurchase)
+	binary.LittleEndian.PutUint16(data[2:4], 16)
+	binary.LittleEndian.PutUint32(data[4:8], itemID)
+	binary.LittleEndian.PutUint32(data[8:12], shopIndex)
+	binary.LittleEndian.PutUint32(data[12:16], amount)
+	return data
 }
 
 func ParseClanInfo(p Packet) (ClanInfo, bool, error) {
@@ -263,6 +326,12 @@ func (c *Client) SendSpinRoulette() error  { return c.Send(BuildEmptyPacket(Pack
 func (c *Client) SendClaimRoulette() error { return c.Send(BuildClaimRoulettePacket()) }
 func (c *Client) SendMarketClose() error   { return c.Send(BuildEmptyPacket(PacketCZMarketClose)) }
 func (c *Client) SendBarterClose() error   { return c.Send(BuildEmptyPacket(PacketCZBarterClose)) }
+func (c *Client) SendExpandedBarterClose() error {
+	return c.Send(BuildEmptyPacket(PacketCZExpandedBarterClose))
+}
+func (c *Client) SendExpandedBarterPurchase(itemID, amount, shopIndex uint32) error {
+	return c.Send(BuildExpandedBarterPurchasePacket(itemID, shopIndex, amount))
+}
 func (c *Client) SendMarketPurchase(itemID uint32, qty int32) error {
 	return c.Send(BuildMarketPurchasePacket(itemID, qty))
 }

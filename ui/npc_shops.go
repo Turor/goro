@@ -68,11 +68,13 @@ func (w *MarketWindow) widgetTree(ctx Context) widget.Widget {
 
 type BarterWindow struct {
 	Window
-	items []network.BarterItem
+	items    []network.BarterItem
+	expanded bool
 }
 
 func (w *BarterWindow) OpenList(ctx Context, items []network.BarterItem) {
 	w.items = items
+	w.expanded = len(items) > 0 && items[0].Expanded
 	w.EnsureWindow(marketWindowW, marketWindowH)
 	w.Window.Open(ctx, w.widgetTree(ctx))
 	w.OnLayoutReload(func() {
@@ -97,7 +99,7 @@ func (w *BarterWindow) widgetTree(ctx Context) widget.Widget {
 	for _, item := range w.items {
 		it := item
 		rows = append(rows, primitives.HBox(
-			primitives.Expanded(rotheme.Label(fmt.Sprintf("#%d x%d for #%d x%d", it.ItemID, it.Amount, it.Currency, it.Cost))),
+			primitives.Expanded(rotheme.Label(barterRowLabel(it))),
 			rotheme.Button("Trade", func() {
 				if ctx.Network != nil {
 					inv := uint16(0)
@@ -109,7 +111,11 @@ func (w *BarterWindow) widgetTree(ctx Context) widget.Widget {
 							}
 						}
 					}
-					_ = ctx.Network.SendBarterPurchase(it.ItemID, 1, inv, it.Index)
+					if it.Expanded {
+						_ = ctx.Network.SendExpandedBarterPurchase(it.ItemID, 1, it.Index)
+					} else {
+						_ = ctx.Network.SendBarterPurchase(it.ItemID, 1, inv, it.Index)
+					}
 				}
 			}),
 		).Height(float32(marketRowH)))
@@ -119,7 +125,11 @@ func (w *BarterWindow) widgetTree(ctx Context) widget.Widget {
 		CloseButton(true),
 		OnClose(func() {
 			if ctx.Network != nil {
-				_ = ctx.Network.SendBarterClose()
+				if w.expanded {
+					_ = ctx.Network.SendExpandedBarterClose()
+				} else {
+					_ = ctx.Network.SendBarterClose()
+				}
 			}
 			w.Close()
 			w.Publish(ctx)
@@ -127,6 +137,13 @@ func (w *BarterWindow) widgetTree(ctx Context) widget.Widget {
 		Size(float32(marketWindowW), float32(marketWindowH)),
 		Content(primitives.Box(rows...).Padding(float32(marketPad)).Gap(float32(marketGap))),
 	)
+}
+
+func barterRowLabel(it network.BarterItem) string {
+	if it.Currency == 0 {
+		return fmt.Sprintf("#%d x%d for %d Z", it.ItemID, it.Amount, it.Cost)
+	}
+	return fmt.Sprintf("#%d x%d for #%d x%d", it.ItemID, it.Amount, it.Currency, it.Cost)
 }
 
 type ClanWindow struct {

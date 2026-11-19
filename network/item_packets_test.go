@@ -900,6 +900,36 @@ func TestBuildShopPackets(t *testing.T) {
 	}
 }
 
+func TestParseShopBuyList20250716(t *testing.T) {
+	data := make([]byte, 4+shopBuy2025Entry)
+	binary.LittleEndian.PutUint16(data[0:2], 0x0B77)
+	binary.LittleEndian.PutUint16(data[2:4], uint16(len(data)))
+	binary.LittleEndian.PutUint32(data[4:8], 501)
+	binary.LittleEndian.PutUint32(data[8:12], 50)
+	binary.LittleEndian.PutUint32(data[12:16], 40)
+	data[16] = 0
+	binary.LittleEndian.PutUint16(data[17:19], 0)
+	binary.LittleEndian.PutUint32(data[19:23], 0)
+	items, ok, err := ParseShopBuyList(Packet{ID: 0x0B77, Data: data})
+	if err != nil || !ok || len(items) != 1 {
+		t.Fatalf("parse 0x0B77 ok=%v err=%v items=%v", ok, err, items)
+	}
+	if items[0].ItemID != 501 || items[0].Price != 50 || items[0].DiscountPrice != 40 {
+		t.Fatalf("unexpected item %+v", items[0])
+	}
+	if _, ok, err := ParseShopBuyList(Packet{ID: 0x00C6, Data: data}); err == nil && ok {
+		t.Fatal("0x00C6 parser accepted a 19-byte 0x0B77 body")
+	}
+
+	buy := BuildBuyItemListPacketForClientDate([]BuyRequestItem{{ItemID: 501, Amount: 2}}, ClientDate20250716)
+	if len(buy) != 10 || ID(buy) != 0x00C8 || binary.LittleEndian.Uint16(buy[2:4]) != 10 {
+		t.Fatalf("unexpected wide buy header: % X", buy)
+	}
+	if binary.LittleEndian.Uint16(buy[4:6]) != 2 || binary.LittleEndian.Uint32(buy[6:10]) != 501 {
+		t.Fatalf("unexpected wide buy item: % X", buy)
+	}
+}
+
 func TestParseStoragePackets2008(t *testing.T) {
 	normal := make([]byte, 4+22)
 	binary.LittleEndian.PutUint16(normal[0:2], 0x02EA)
