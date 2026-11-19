@@ -192,6 +192,8 @@ func (b *ShortcutBar) SavedPosition() config.WindowPosition { return b.window.Sa
 
 func (b *ShortcutBar) Dragging() bool { return b.window.dragging }
 
+func (b *ShortcutBar) Resizing() bool { return b.window.Resizing() }
+
 func (b *ShortcutBar) RestorePosition(ctx Context, position config.WindowPosition) {
 	if !position.Set {
 		return

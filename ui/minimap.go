@@ -197,6 +197,8 @@ func (m *Minimap) SavedPosition() config.WindowPosition { return m.window.SavedP
 
 func (m *Minimap) Dragging() bool { return m.window.Dragging() }
 
+func (m *Minimap) Resizing() bool { return m.window.Resizing() }
+
 func (m *Minimap) RestorePosition(ctx Context, position config.WindowPosition) {
 	m.window.RestorePosition(ctx, position)
 }

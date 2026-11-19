@@ -338,30 +338,38 @@ func windowTitleIconButton(kind rotheme.IconButtonKind, onClick func()) widget.W
 }
 
 type Window struct {
-	open         bool
-	x            int
-	y            int
-	width        int
-	height       int
-	titleHeight  int
-	dragBounds   geometry.Rect
-	positioned   bool
-	userMoved    bool
-	dragging     bool
-	dragLayer    bool
-	dragDX       int
-	dragDY       int
-	dragBottom   int
-	titleButtons int
-	heightDelta  int
-	content      widget.Widget
-	placed       widget.Widget
-	published    widget.Widget
-	opacity      float32
-	background   *widget.Color
-	fullRedraw   bool
-	CloseOnEsc   bool
-	ctx          client.Context
+	open          bool
+	x             int
+	y             int
+	width         int
+	height        int
+	titleHeight   int
+	dragBounds    geometry.Rect
+	positioned    bool
+	userMoved     bool
+	userSized     bool
+	userWidth     int
+	userHeight    int
+	dragging      bool
+	resizing      bool
+	resizeStartW  int
+	resizeStartH  int
+	resizeAnchorX int
+	resizeAnchorY int
+	dragLayer     bool
+	dragDX        int
+	dragDY        int
+	dragBottom    int
+	titleButtons  int
+	heightDelta   int
+	content       widget.Widget
+	placed        widget.Widget
+	published     widget.Widget
+	opacity       float32
+	background    *widget.Color
+	fullRedraw    bool
+	CloseOnEsc    bool
+	ctx           client.Context
 	// layoutRebuild rebuilds the content after a layout reload; layoutGen is
 	// the token generation the content was last built with.
 	layoutRebuild func()
@@ -377,6 +385,9 @@ func (w *Window) EnsureWindow(width, height int) bool {
 	if position.Set {
 		w.x, w.y = position.X, position.Y
 		w.userMoved, w.positioned = true, true
+		if position.Width > 0 && position.Height > 0 {
+			w.rememberSize(position.Width, position.Height)
+		}
 	}
 	return true
 }
@@ -431,6 +442,7 @@ func (w *Window) IsOpen() bool {
 func (w *Window) SetContent(content widget.Widget) {
 	w.cancelDragLayer(w.ctx)
 	w.content = content
+	w.applyUserFrame()
 	w.adoptFrameHeight(content)
 	if overlay := w.positionedOverlay(); overlay != nil {
 		damage := overlay.setChild(content, windowWidgetContext(w.ctx))
@@ -577,7 +589,10 @@ func (w *Window) Update(ctx client.Context) bool {
 	// The world updates windows in a stable order, not z-order. While another
 	// window owns the renderer's drag capture, yielding here prevents an
 	// overlapped window from consuming the frame before the owner is updated.
-	if !w.dragging && windowDragActive(ctx) {
+	if w.updateResize(ctx) {
+		return true
+	}
+	if !w.dragging && !w.resizing && windowDragActive(ctx) {
 		return false
 	}
 	w.ensurePosition(ctx)
@@ -613,6 +628,10 @@ func (w *Window) Update(ctx client.Context) bool {
 		return false
 	}
 	w.Raise(ctx)
+	if w.resizeHit(ctx.Input.MouseX, ctx.Input.MouseY) {
+		w.startResize(ctx)
+		return true
+	}
 	dragBounds := w.dragBounds
 	if dragBounds.IsEmpty() {
 		dragBounds = geometry.NewRect(0, 0, float32(w.width), float32(w.titleHeight))
@@ -788,10 +807,14 @@ func (w *Window) keepOnScreen(ctx client.Context) {
 func (w *Window) Dragging() bool { return w.dragging }
 
 func (w *Window) SavedPosition() config.WindowPosition {
-	if !w.userMoved {
+	if !w.userMoved && !w.userSized {
 		return config.WindowPosition{}
 	}
-	return config.WindowPosition{X: w.x, Y: w.y, Set: true}
+	pos := config.WindowPosition{X: w.x, Y: w.y, Set: true}
+	if w.userSized {
+		pos.Width, pos.Height = w.width, w.height
+	}
+	return pos
 }
 
 // RestorePosition also works before a closed window has been initialized.
@@ -799,6 +822,12 @@ func (w *Window) SavedPosition() config.WindowPosition {
 func (w *Window) RestorePosition(ctx client.Context, position config.WindowPosition) {
 	if !position.Set {
 		return
+	}
+	if position.Width > 0 && position.Height > 0 {
+		if w.width == 0 {
+			*w = NewWindow(position.Width, position.Height)
+		}
+		w.rememberSize(position.Width, position.Height)
 	}
 	w.userMoved, w.positioned = true, true
 	w.setPosition(ctx, position.X, position.Y)
@@ -1107,6 +1136,7 @@ func (w *positionedOverlay) Draw(ctx widget.Context, canvas widget.Canvas) {
 		widget.ClearRedrawInTree(w.child)
 	}
 	widget.DrawChild(w.child, ctx, canvas)
+	drawWindowResizeGrip(canvas, w.width, w.height)
 	canvas.PopTransform()
 }
 
