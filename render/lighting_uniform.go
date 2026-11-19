@@ -12,7 +12,9 @@ const LightingUniformBytes = 9600
 
 // EncodeLightingUniform packs the sun, the capped point-light set, and each
 // tile's light list for the shader. enhanced false clears the sun enable flag
-// so the shader adds no sun, point, or shadow term.
+// so the shader keeps the lightmap term (or the unlit sprite). Ambient is
+// packed into existing holes: sun_color.w and shadow_params.zw. Light count
+// stays at byte 112 and tile counts stay at byte 384.
 func EncodeLightingUniform(sun SunLight, points []PointLight, viewProj, shadowVP [16]float32, width, height int, enhanced bool) []byte {
 	buf := make([]byte, LightingUniformBytes)
 	selected := SelectPointLights(points, MaxPointLights)
@@ -28,7 +30,7 @@ func EncodeLightingUniform(sun SunLight, points []PointLight, viewProj, shadowVP
 	putF32(buf, 16, sun.Color[0])
 	putF32(buf, 20, sun.Color[1])
 	putF32(buf, 24, sun.Color[2])
-	putF32(buf, 28, ShadowDarken)
+	putF32(buf, 28, sun.Ambient[2])
 	screenW, screenH := float32(width), float32(height)
 	if screenW < 1 {
 		screenW = 1
@@ -45,6 +47,8 @@ func EncodeLightingUniform(sun SunLight, points []PointLight, viewProj, shadowVP
 	}
 	putF32(buf, 112, float32(len(selected)))
 	putF32(buf, 116, ShadowBias)
+	putF32(buf, 120, sun.Ambient[0])
+	putF32(buf, 124, sun.Ambient[1])
 	for i, light := range selected {
 		base := 128 + i*32
 		putF32(buf, base, light.Position[0])

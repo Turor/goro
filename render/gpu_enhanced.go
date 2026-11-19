@@ -11,11 +11,16 @@ import (
 //go:embed shadow.wgsl
 var shadowShaderWGSL string
 
+//go:embed shadow_sprite.wgsl
+var shadowSpriteShaderWGSL string
+
 const (
-	modelUniformStride = 256
-	modelUniformSize   = 80
-	modelSlotCount     = 64
-	shadowMapSize      = 1024
+	modelUniformStride    = 256
+	modelUniformSize      = 80
+	modelSlotCount        = 64
+	shadowMapSize         = 1024
+	shadowCamUniformBytes = 64
+	shadowUniformBytes    = 80
 	// shadowClearDepth is the depth stored before any shadow draw (far plane).
 	shadowClearDepth float32 = 1
 )
@@ -63,7 +68,7 @@ func (r *gpuRenderer) initEnhancedResources() error {
 	}
 	r.shadowUniform, err = r.dev.CreateBuffer(&wgpu.BufferDescriptor{
 		Label: "goro-shadow-uniform",
-		Size:  64,
+		Size:  shadowUniformBytes,
 		Usage: wgpu.BufferUsageUniform | wgpu.BufferUsageCopyDst,
 	})
 	if err != nil {
@@ -119,7 +124,7 @@ func (r *gpuRenderer) initEnhancedResources() error {
 		Entries: []gputypes.BindGroupLayoutEntry{{
 			Binding:    0,
 			Visibility: wgpu.ShaderStageVertex,
-			Buffer:     &gputypes.BufferBindingLayout{Type: gputypes.BufferBindingTypeUniform, MinBindingSize: 64},
+			Buffer:     &gputypes.BufferBindingLayout{Type: gputypes.BufferBindingTypeUniform, MinBindingSize: shadowCamUniformBytes},
 		}},
 	})
 	if err != nil {
@@ -137,7 +142,7 @@ func (r *gpuRenderer) initEnhancedResources() error {
 		Label:  "goro-shadow-bind",
 		Layout: r.shadowBGL,
 		Entries: []wgpu.BindGroupEntry{{
-			Binding: 0, Buffer: r.shadowUniform, Size: 64,
+			Binding: 0, Buffer: r.shadowUniform, Size: shadowCamUniformBytes,
 		}},
 	})
 	if err != nil {
@@ -180,6 +185,7 @@ func (r *gpuRenderer) initEnhancedResources() error {
 		return nil
 	}
 	r.shadowPipeline = pipeline
+	r.initShadowSpritePipeline()
 	return nil
 }
 
@@ -348,6 +354,17 @@ func (r *gpuRenderer) releaseEnhanced() {
 	}
 	if r.billboardArrayBGL != nil {
 		r.billboardArrayBGL.Release()
+	}
+	r.releaseShadowSpriteGroups()
+	releaseDynamic(&r.shadowSpriteSlot)
+	if r.shadowSpritePipeline != nil {
+		r.shadowSpritePipeline.Release()
+	}
+	if r.shadowSpriteLayout != nil {
+		r.shadowSpriteLayout.Release()
+	}
+	if r.shadowSpriteBGL != nil {
+		r.shadowSpriteBGL.Release()
 	}
 	if r.shadowPipeline != nil {
 		r.shadowPipeline.Release()
@@ -528,14 +545,18 @@ func (r *gpuRenderer) uploadFrameLighting(screen *Frame, width, height int) erro
 	if r.shadowUniform == nil {
 		return nil
 	}
-	raw := make([]byte, 64)
+	raw := make([]byte, shadowUniformBytes)
 	for i, value := range shadow {
 		binary.LittleEndian.PutUint32(raw[i*4:], binaryFloat32(value))
 	}
+	binary.LittleEndian.PutUint32(raw[64:], binaryFloat32(sun.Direction[0]))
+	binary.LittleEndian.PutUint32(raw[68:], binaryFloat32(sun.Direction[1]))
+	binary.LittleEndian.PutUint32(raw[72:], binaryFloat32(sun.Direction[2]))
 	return r.queue.WriteBuffer(r.shadowUniform, 0, raw)
 }
 
 func (r *gpuRenderer) drawDirectionalShadow(enc *wgpu.CommandEncoder, screen *Frame) error {
+	r.releaseShadowSpriteGroups()
 	if r.shadowPipeline == nil || r.shadowTex == nil || screen == nil {
 		return nil
 	}
@@ -572,6 +593,10 @@ func (r *gpuRenderer) drawDirectionalShadow(enc *wgpu.CommandEncoder, screen *Fr
 		pass.SetIndexBuffer(gpuMesh.indexBuf, gputypes.IndexFormatUint32, 0)
 		pass.DrawIndexed(gputypes.DrawIndexedArgs{IndexCount: gpuMesh.indexCount, InstanceCount: 1})
 	}
+	if err := r.drawShadowSprites(pass, screen); err != nil {
+		_ = pass.End()
+		return err
+	}
 	if err := pass.End(); err != nil {
 		return err
 	}
@@ -587,6 +612,8 @@ func (r *gpuRenderer) drawWorldScene(enc *wgpu.CommandEncoder, screen *Frame, wo
 		if err := r.drawDirectionalShadow(enc, screen); err != nil {
 			return err
 		}
+	} else {
+		r.releaseShadowSpriteGroups()
 	}
 	splitAO := ssaoActive && r.sampleCount == 1
 	if _, ok := PassByName(r.framePasses, "ssao-estimate"); ok && r.sampleCount != 1 {
@@ -707,4 +734,180 @@ func (r *gpuRenderer) drawWorldRest(pass *wgpu.RenderPassEncoder, screen *Frame,
 		}
 	}
 	return r.drawWorldBillboards(pass, billboardOverlayPass)
+}
+
+func (r *gpuRenderer) initShadowSpritePipeline() {
+	if r == nil || r.dev == nil || r.shadowUniform == nil {
+		return
+	}
+	bgl, err := r.dev.CreateBindGroupLayout(&wgpu.BindGroupLayoutDescriptor{
+		Label: "goro-shadow-sprite-layout",
+		Entries: []gputypes.BindGroupLayoutEntry{
+			{Binding: 0, Visibility: wgpu.ShaderStageVertex, Buffer: &gputypes.BufferBindingLayout{Type: gputypes.BufferBindingTypeUniform, MinBindingSize: shadowUniformBytes}},
+			{Binding: 1, Visibility: wgpu.ShaderStageFragment, Sampler: &gputypes.SamplerBindingLayout{Type: gputypes.SamplerBindingTypeFiltering}},
+			{Binding: 2, Visibility: wgpu.ShaderStageFragment, Texture: &gputypes.TextureBindingLayout{SampleType: gputypes.TextureSampleTypeFloat, ViewDimension: gputypes.TextureViewDimension2D}},
+		},
+	})
+	if err != nil {
+		return
+	}
+	layout, err := r.dev.CreatePipelineLayout(&wgpu.PipelineLayoutDescriptor{
+		Label:            "goro-shadow-sprite-pipeline-layout",
+		BindGroupLayouts: []*wgpu.BindGroupLayout{bgl},
+	})
+	if err != nil {
+		bgl.Release()
+		return
+	}
+	shader, err := r.dev.CreateShaderModule(&wgpu.ShaderModuleDescriptor{Label: "goro-shadow-sprite", WGSL: shadowSpriteShaderWGSL})
+	if err != nil {
+		layout.Release()
+		bgl.Release()
+		return
+	}
+	defer shader.Release()
+	pipeline, err := r.dev.CreateRenderPipeline(&wgpu.RenderPipelineDescriptor{
+		Label:  "goro-shadow-sprite-pipeline",
+		Layout: layout,
+		Vertex: wgpu.VertexState{
+			Module:     shader,
+			EntryPoint: "vs_main",
+			Buffers: []gputypes.VertexBufferLayout{
+				{
+					ArrayStride: billboardVertexStride,
+					StepMode:    gputypes.VertexStepModeVertex,
+					Attributes: []gputypes.VertexAttribute{
+						{Format: gputypes.VertexFormatFloat32x2, Offset: 0, ShaderLocation: 0},
+						{Format: gputypes.VertexFormatFloat32x2, Offset: 8, ShaderLocation: 1},
+					},
+				},
+				{
+					ArrayStride: billboardInstanceStride,
+					StepMode:    gputypes.VertexStepModeInstance,
+					Attributes: []gputypes.VertexAttribute{
+						{Format: gputypes.VertexFormatFloat32x3, Offset: 0, ShaderLocation: 2},
+						{Format: gputypes.VertexFormatFloat32x3, Offset: 12, ShaderLocation: 3},
+						{Format: gputypes.VertexFormatFloat32x3, Offset: 24, ShaderLocation: 4},
+						{Format: gputypes.VertexFormatFloat32x4, Offset: 48, ShaderLocation: 6},
+					},
+				},
+			},
+		},
+		Primitive: gputypes.PrimitiveState{
+			Topology:  gputypes.PrimitiveTopologyTriangleList,
+			FrontFace: gputypes.FrontFaceCCW,
+			CullMode:  gputypes.CullModeNone,
+		},
+		DepthStencil: &wgpu.DepthStencilState{
+			Format:            depthFormat,
+			DepthWriteEnabled: true,
+			DepthCompare:      gputypes.CompareFunctionLessEqual,
+		},
+		Multisample: gputypes.MultisampleState{Count: 1, Mask: 0xFFFFFFFF},
+		Fragment: &wgpu.FragmentState{
+			Module:     shader,
+			EntryPoint: "fs_main",
+			Targets: []gputypes.ColorTargetState{{
+				Format:    shadowClearColorFormat,
+				WriteMask: gputypes.ColorWriteMaskNone,
+			}},
+		},
+	})
+	if err != nil {
+		layout.Release()
+		bgl.Release()
+		return
+	}
+	r.shadowSpriteBGL = bgl
+	r.shadowSpriteLayout = layout
+	r.shadowSpritePipeline = pipeline
+}
+
+func (r *gpuRenderer) releaseShadowSpriteGroups() {
+	if r == nil {
+		return
+	}
+	for _, bg := range r.shadowSpriteGroups {
+		if bg != nil {
+			bg.Release()
+		}
+	}
+	r.shadowSpriteGroups = r.shadowSpriteGroups[:0]
+}
+
+// shadowCasterBillboards keeps actor body quads. Effect billboards leave CastShadow false.
+func shadowCasterBillboards(commands []WorldBillboardCommand) []WorldBillboardCommand {
+	if len(commands) == 0 {
+		return nil
+	}
+	out := make([]WorldBillboardCommand, 0, len(commands))
+	for _, cmd := range commands {
+		if !cmd.Options.CastShadow || cmd.Texture == nil || cmd.Texture.pix == nil || cmd.Width <= 0 || cmd.Height <= 0 {
+			continue
+		}
+		out = append(out, cmd)
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+type shadowSpriteBatch struct {
+	tex   *Image
+	first uint32
+	count uint32
+}
+
+func (r *gpuRenderer) drawShadowSprites(pass *wgpu.RenderPassEncoder, screen *Frame) error {
+	if r == nil || r.shadowSpritePipeline == nil || r.billboardQuadBuf == nil || r.shadowUniform == nil || screen == nil {
+		return nil
+	}
+	casters := shadowCasterBillboards(screen.worldBillboards)
+	if len(casters) == 0 {
+		return nil
+	}
+	floats := make([]float32, 0, len(casters)*billboardInstanceFloatCount)
+	batches := make([]shadowSpriteBatch, 0, 4)
+	for _, cmd := range casters {
+		if len(batches) == 0 || batches[len(batches)-1].tex != cmd.Texture {
+			batches = append(batches, shadowSpriteBatch{tex: cmd.Texture, first: uint32(len(floats) / billboardInstanceFloatCount)})
+		}
+		floats = appendBillboardInstanceData(floats, cmd)
+		batches[len(batches)-1].count++
+	}
+	raw := floatBytes(floats)
+	buf, err := r.dynamicBuffer(&r.shadowSpriteSlot, "goro-shadow-sprites", len(raw), wgpu.BufferUsageVertex|wgpu.BufferUsageCopyDst, raw)
+	if err != nil {
+		return err
+	}
+	sampler, err := r.sampler(DrawTrianglesOptions{Filter: FilterNearest, Address: AddressClampToEdge}, nil)
+	if err != nil {
+		return err
+	}
+	pass.SetPipeline(r.shadowSpritePipeline)
+	pass.SetVertexBuffer(0, r.billboardQuadBuf, 0)
+	for _, batch := range batches {
+		tex, err := r.ensureTexture(batch.tex)
+		if err != nil {
+			return err
+		}
+		bg, err := r.dev.CreateBindGroup(&wgpu.BindGroupDescriptor{
+			Label:  "goro-shadow-sprite-bind",
+			Layout: r.shadowSpriteBGL,
+			Entries: []wgpu.BindGroupEntry{
+				{Binding: 0, Buffer: r.shadowUniform, Size: shadowUniformBytes},
+				{Binding: 1, Sampler: sampler},
+				{Binding: 2, TextureView: tex.view},
+			},
+		})
+		if err != nil {
+			return err
+		}
+		r.shadowSpriteGroups = append(r.shadowSpriteGroups, bg)
+		pass.SetBindGroup(0, bg, nil)
+		pass.SetVertexBuffer(1, buf, uint64(batch.first)*billboardInstanceStride)
+		pass.Draw(gputypes.DrawArgs{VertexCount: 6, InstanceCount: batch.count})
+	}
+	return nil
 }

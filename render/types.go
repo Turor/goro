@@ -81,6 +81,9 @@ type DrawTrianglesOptions struct {
 	DisableFog bool
 	// Draw translucent world geometry after sprites, testing against their silhouettes.
 	AfterBillboards bool
+	// CastShadow draws this sprite into the directional shadow map.
+	// Spell and effect quads leave it false. Actor bodies set it.
+	CastShadow bool
 }
 
 type DrawImageOptions struct {

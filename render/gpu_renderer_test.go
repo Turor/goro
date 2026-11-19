@@ -25,6 +25,8 @@ func TestRendererShadersParse(t *testing.T) {
 		"fxaa":            fxaaShaderWGSL,
 		"world-array":     worldMeshArrayShaderSource(),
 		"billboard-array": worldBillboardArrayShaderWGSL,
+		"shadow":          shadowShaderWGSL,
+		"shadow-sprite":   shadowSpriteShaderWGSL,
 	} {
 		ast, err := naga.Parse(source)
 		if err != nil {
@@ -48,6 +50,8 @@ func TestRendererShadersGenerateSPIRV(t *testing.T) {
 		"fxaa":            fxaaShaderWGSL,
 		"world-array":     worldMeshArrayShaderSource(),
 		"billboard-array": worldBillboardArrayShaderWGSL,
+		"shadow":          shadowShaderWGSL,
+		"shadow-sprite":   shadowSpriteShaderWGSL,
 	} {
 		ast, err := naga.Parse(source)
 		if err != nil {

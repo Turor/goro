@@ -123,7 +123,7 @@ func TestFXAAPass(t *testing.T) {
 func TestEnhancedShade(t *testing.T) {
 	base := [3]float32{0.2, 0.2, 0.2}
 	lightmap := [4]float32{0.25, 0.1, 0.05, 1}
-	sun := SunLight{Direction: [3]float32{0, 1, 0}, Color: [3]float32{0.8, 0.2, 0.1}}
+	sun := SunLight{Direction: [3]float32{0, -1, 0}, Color: [3]float32{0.8, 0.2, 0.1}, Ambient: [3]float32{0.2, 0.3, 0.4}}
 	facing := Shade(base, lightmap, [3]float32{0, 1, 0}, sun, nil, [3]float32{}, false, true)
 	away := Shade(base, lightmap, [3]float32{0, -1, 0}, sun, nil, [3]float32{}, false, true)
 	if facing[0] <= away[0] {
@@ -178,7 +178,115 @@ func TestEnhancedShade(t *testing.T) {
 	if binary.LittleEndian.Uint32(rawOn[384:388]) != uint32(len(encodedTiles[0])) {
 		t.Fatalf("uniform tile 0 count %d does not match AssignTileLights %d", binary.LittleEndian.Uint32(rawOn[384:388]), len(encodedTiles[0]))
 	}
+	if math.Float32frombits(binary.LittleEndian.Uint32(rawOn[28:32])) != sun.Ambient[2] {
+		t.Fatal("ambient blue is not packed in sun_color.w")
+	}
+	if math.Float32frombits(binary.LittleEndian.Uint32(rawOn[120:124])) != sun.Ambient[0] || math.Float32frombits(binary.LittleEndian.Uint32(rawOn[124:128])) != sun.Ambient[1] {
+		t.Fatal("ambient red/green are not packed in shadow_params.zw")
+	}
+	ignored := Shade([3]float32{1, 1, 1}, [4]float32{1, 0, 0, 0}, [3]float32{0, 1, 0}, SunLight{}, nil, [3]float32{}, false, true)
+	if ignored != ([3]float32{}) {
+		t.Fatalf("enhanced on kept the lightmap: %#v", ignored)
+	}
+	hot := PointLight{Position: [3]float32{0, 0.2, 0}, Color: [3]float32{1, 1, 1}, Range: 8, Intensity: 10}
+	white := Shade([3]float32{1, 1, 1}, lightmap, [3]float32{0, 1, 0}, sun, []PointLight{hot}, [3]float32{}, false, true)
+	for i, channel := range white {
+		if channel > 1 {
+			t.Fatalf("enhanced shade channel %d blew out to %.3f", i, channel)
+		}
+	}
+	dim := Shade(base, lightmap, [3]float32{0, 1, 0}, sun, []PointLight{hot}, [3]float32{}, false, true)
+	for i, channel := range dim {
+		if channel > base[i] {
+			t.Fatalf("enhanced shade channel %d %.3f exceeds base %.3f", i, channel, base[i])
+		}
+	}
+	above := Shade(base, [4]float32{}, [3]float32{0, 1, 0}, SunLight{}, []PointLight{{Position: [3]float32{0, 2, 0}, Color: [3]float32{1, 1, 1}, Range: 10, Intensity: 1}}, [3]float32{}, false, true)
+	below := Shade(base, [4]float32{}, [3]float32{0, 1, 0}, SunLight{}, []PointLight{{Position: [3]float32{0, -2, 0}, Color: [3]float32{1, 1, 1}, Range: 10, Intensity: 1}}, [3]float32{}, false, true)
+	if above[0] <= below[0] || below[0] != 0 {
+		t.Fatalf("point N·L above %.3f below %.3f", above[0], below[0])
+	}
 	t.Logf("facing=%.3f away=%.3f occluded=%.3f selected=%d tile0=%d", facing[0], away[0], occluded[0], len(selected), len(tiles[0]))
+}
+
+func TestLightFacingAxes(t *testing.T) {
+	ray := [3]float32{1, 0, 0}
+	right, up := LightFacingAxes(2, ray)
+	if absDot(right, ray) > 1e-4 || absDot(up, ray) > 1e-4 || absDot(right, up) > 1e-4 {
+		t.Fatalf("light basis is not perpendicular to +X: right %v up %v", right, up)
+	}
+	rightLen := math.Sqrt(float64(dot3(right, right)))
+	upLen := math.Sqrt(float64(dot3(up, up)))
+	if math.Abs(rightLen-2) > 1e-4 || math.Abs(upLen-2) > 1e-4 {
+		t.Fatalf("axis length right %.4f up %.4f, want 2", rightLen, upLen)
+	}
+	assertShadowPixelAxes(t, ray, 2, right, up)
+	noon := [3]float32{0, -1, 0}
+	noonRight, noonUp := LightFacingAxes(2, noon)
+	assertShadowPixelAxes(t, noon, 2, noonRight, noonUp)
+	if zr, zu := LightFacingAxes(2, [3]float32{}); zr != ([3]float32{}) || zu != ([3]float32{}) {
+		t.Fatalf("zero ray returned %v %v", zr, zu)
+	}
+}
+
+func assertShadowPixelAxes(t *testing.T, ray [3]float32, scale float32, right, up [3]float32) {
+	t.Helper()
+	dir := normalize3(ray)
+	hint := [3]float32{0, 1, 0}
+	if math.Abs(float64(dot3(dir, hint))) > 0.95 {
+		hint = [3]float32{0, 0, 1}
+	}
+	view := lookAt([3]float32{}, dir, hint)
+	camRight := [3]float32{view[0], view[4], view[8]}
+	camUp := [3]float32{view[1], view[5], view[9]}
+	wantRight := scale3(camRight, scale)
+	wantUp := scale3(camUp, -scale)
+	if !close3(right, wantRight) || !close3(up, wantUp) {
+		t.Fatalf("pixel axes right %v up %v, want shadow-camera right %v and negated up %v", right, up, wantRight, wantUp)
+	}
+}
+
+func close3(a, b [3]float32) bool {
+	const eps = 1e-4
+	return math.Abs(float64(a[0]-b[0])) < eps && math.Abs(float64(a[1]-b[1])) < eps && math.Abs(float64(a[2]-b[2])) < eps
+}
+
+func absDot(a, b [3]float32) float64 {
+	return math.Abs(float64(dot3(a, b)))
+}
+
+func TestShadowCasterBillboards(t *testing.T) {
+	img := solidImage(2, 2, color.RGBA{R: 255, G: 255, B: 255, A: 255})
+	cmds := []WorldBillboardCommand{
+		{Texture: img, Width: 4, Height: 8, Options: DrawTrianglesOptions{CastShadow: true, DepthWrite: true}},
+		{Texture: img, Width: 4, Height: 8, Options: DrawTrianglesOptions{DepthWrite: true}},
+		{Texture: img, Width: 4, Height: 8, Options: DrawTrianglesOptions{CastShadow: true}},
+		{Width: 4, Height: 8, Options: DrawTrianglesOptions{CastShadow: true}},
+	}
+	got := shadowCasterBillboards(cmds)
+	if len(got) != 2 {
+		t.Fatalf("casters = %d, want the two textured CastShadow quads", len(got))
+	}
+}
+
+func TestEnhancedLightShader(t *testing.T) {
+	wantWorld := "enhanced_light(color.rgb, n, input.world_pos, input.clip.xy, true)"
+	wantSprite := "enhanced_light(color.rgb, input.normal, input.world_pos, input.clip.xy, false)"
+	if !strings.Contains(worldShaderWGSL, wantWorld) {
+		t.Fatal("world shader does not use clamped enhanced light")
+	}
+	if !strings.Contains(worldBillboardShaderWGSL, wantSprite) || !strings.Contains(worldBillboardArrayShaderWGSL, wantSprite) {
+		t.Fatal("sprite shaders still add light or receive billboard shadows")
+	}
+	if strings.Contains(lightingShaderWGSL, "sun_scale(") {
+		t.Fatal("sun_scale is still in the enhanced shader")
+	}
+	if !strings.Contains(lightingShaderWGSL, "lighting.shadow_params.z, lighting.shadow_params.w, lighting.sun_color.w") {
+		t.Fatal("ambient is not read from the packed uniform holes")
+	}
+	if !strings.Contains(shadowSpriteShaderWGSL, "color.a < 0.5") || !strings.Contains(shadowSpriteShaderWGSL, "fn light_facing(") {
+		t.Fatal("sprite shadow shader does not alpha-test a light-facing quad")
+	}
 }
 
 func TestTileRowMatchesShader(t *testing.T) {

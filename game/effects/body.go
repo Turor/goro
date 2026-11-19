@@ -370,8 +370,10 @@ func (m *System) DrawActorSpriteBodyEffects3D(ctx client.Context, screen *render
 		cmd.ColorA *= 150.0 / 255
 	}
 	cmd.Options.DepthWrite = true
+	cmd.Options.CastShadow = true
 	screen.DrawWorldBillboard(cmd)
 	cmd.Options.DepthWrite = false
+	cmd.Options.CastShadow = false
 	if blue > 0 {
 		flash := cmd
 		flash.Options.Blend = render.BlendLighter
@@ -504,6 +506,7 @@ func (m *System) DrawActor(ctx client.Context, screen *render.Frame, projection 
 func (m *System) DrawActorSpriteBillboard(screen *render.Frame, projection scene.Projection, billboard *scene.Billboard, worldX, worldY, worldZ, scale, alpha, shadow float64, tintColor color.RGBA, blend render.Blend) {
 	options := scene.SpriteBillboardTriangleDrawOptions()
 	options.DepthWrite = true
+	options.CastShadow = true
 	options.Filter = render.FilterSprite
 	options.Blend = blend
 	scene.DrawSpriteBillboardTintAlpha3DWithOptions(screen, projection, billboard, m.spriteTexture(billboard.Image), worldX, worldY, scene.ActorSpriteWorldZ(worldZ), scale, alpha, shadow, tintColor, options)

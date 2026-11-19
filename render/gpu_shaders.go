@@ -52,7 +52,10 @@ fn fog_visibility(depth: f32, near: f32, far: f32) -> f32 {
 
 // lightingShaderWGSL is the enhanced-light uniform shared by world and sprite
 // shaders. sun_dir.w is 0 when enhanced lighting is off, and the shade then
-// matches the lightmap-only (or unlit sprite) path.
+// matches the lightmap-only (or unlit sprite) path. When it is on, fragments
+// multiply by saturate(ambient + sun·N·visibility + points) and ignore the
+// baked lightmap. Sprites pass receive_shadow false so they are not darkened
+// by the billboard depth they cast. Ambient is shadow_params.zw and sun_color.w.
 const lightingShaderWGSL = `
 struct PointLightGPU {
 	pos_range: vec4<f32>,
@@ -107,22 +110,27 @@ fn tile_index_at(tile: u32, slot: u32) -> u32 {
 	return packed.w;
 }
 
-fn point_term(light: PointLightGPU, world_pos: vec3<f32>) -> vec3<f32> {
+fn point_term(light: PointLightGPU, world_pos: vec3<f32>, normal: vec3<f32>) -> vec3<f32> {
 	let range = light.pos_range.w;
 	let intensity = light.color_intensity.w;
 	if (range <= 0.0 || intensity <= 0.0) {
 		return vec3<f32>(0.0);
 	}
-	let delta = world_pos - light.pos_range.xyz;
-	let dist = length(delta);
+	let to_light = light.pos_range.xyz - world_pos;
+	let dist = length(to_light);
 	if (dist >= range) {
 		return vec3<f32>(0.0);
 	}
 	let atten = 1.0 - dist / range;
-	return light.color_intensity.xyz * intensity * atten * atten;
+	let nlen = length(normal);
+	var ndotl = 0.0;
+	if (nlen > 0.000001 && dist > 0.000001) {
+		ndotl = max(dot(normal / nlen, to_light / dist), 0.0);
+	}
+	return light.color_intensity.xyz * intensity * atten * atten * ndotl;
 }
 
-fn tile_point_term(world_pos: vec3<f32>, pixel: vec2<f32>) -> vec3<f32> {
+fn tile_point_term(world_pos: vec3<f32>, pixel: vec2<f32>, normal: vec3<f32>) -> vec3<f32> {
 	let tiles = max(lighting.screen_tile.zw, vec2<f32>(1.0));
 	let screen = max(lighting.screen_tile.xy, vec2<f32>(1.0));
 	let tx = min(u32(pixel.x / screen.x * tiles.x), u32(tiles.x) - 1u);
@@ -136,7 +144,7 @@ fn tile_point_term(world_pos: vec3<f32>, pixel: vec2<f32>) -> vec3<f32> {
 		}
 		let index = tile_index_at(tile, slot);
 		if (index < 8u) {
-			sum = sum + point_term(light_at(index), world_pos);
+			sum = sum + point_term(light_at(index), world_pos, normal);
 		}
 	}
 	return sum;
@@ -155,17 +163,27 @@ fn shadow_occluded(world_pos: vec3<f32>) -> bool {
 	return receiver > map_depth + lighting.shadow_params.y;
 }
 
-fn sun_scale(normal: vec3<f32>, world_pos: vec3<f32>) -> f32 {
+fn sun_ndotl(normal: vec3<f32>) -> f32 {
 	let nlen = length(normal);
-	if (nlen < 0.000001) {
+	let ray = lighting.sun_dir.xyz;
+	let rlen = length(ray);
+	if (nlen < 0.000001 || rlen < 0.000001) {
 		return 0.0;
 	}
-	let ndotl = dot(normal / nlen, normalize(lighting.sun_dir.xyz));
-	var scale = max(ndotl, 0.0);
-	if (shadow_occluded(world_pos)) {
-		scale = scale * lighting.sun_color.w;
+	// sun_dir is the downward ray. Face the sun.
+	return max(dot(normal / nlen, -ray / rlen), 0.0);
+}
+
+fn enhanced_light(base: vec3<f32>, normal: vec3<f32>, world_pos: vec3<f32>, pixel: vec2<f32>, receive_shadow: bool) -> vec3<f32> {
+	let ambient = vec3<f32>(lighting.shadow_params.z, lighting.shadow_params.w, lighting.sun_color.w);
+	var visibility = 1.0;
+	if (receive_shadow) {
+		if (shadow_occluded(world_pos)) {
+			visibility = 0.0;
+		}
 	}
-	return scale;
+	let sum = ambient + lighting.sun_color.rgb * sun_ndotl(normal) * visibility + tile_point_term(world_pos, pixel, normal);
+	return base * clamp(sum, vec3<f32>(0.0), vec3<f32>(1.0));
 }
 `
 
@@ -248,12 +266,13 @@ fn vs_main(input: VertexInput) -> VertexOutput {
 @fragment
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
 	var color = textureSample(tex, tex_sampler, input.uv) * input.color;
-	let lightmap = textureSample(light_tex, light_sampler, input.light_uv);
-	var lit = color.rgb * lightmap.a + clamp(lightmap.rgb, vec3<f32>(0.0), vec3<f32>(1.0));
+	var lit: vec3<f32>;
 	if (lighting.sun_dir.w != 0.0) {
 		let n = cross(dpdx(input.world_pos), dpdy(input.world_pos));
-		lit = lit + lighting.sun_color.rgb * sun_scale(n, input.world_pos);
-		lit = lit + tile_point_term(input.world_pos, input.clip.xy);
+		lit = enhanced_light(color.rgb, n, input.world_pos, input.clip.xy, true);
+	} else {
+		let lightmap = textureSample(light_tex, light_sampler, input.light_uv);
+		lit = color.rgb * lightmap.a + clamp(lightmap.rgb, vec3<f32>(0.0), vec3<f32>(1.0));
 	}
 	color = vec4<f32>(lit, color.a);
 	if (color[3] < 0.01) {
@@ -349,7 +368,7 @@ fn vs_depth_main(input: VertexInput) -> VertexOutput {
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
 	var color = textureSample(tex, tex_sampler, input.uv) * input.color;
 	if (lighting.sun_dir.w != 0.0) {
-		color = vec4<f32>(color.rgb + lighting.sun_color.rgb * sun_scale(input.normal, input.world_pos) + tile_point_term(input.world_pos, input.clip.xy), color.a);
+		color = vec4<f32>(enhanced_light(color.rgb, input.normal, input.world_pos, input.clip.xy, false), color.a);
 	}
 	if (color[3] < 0.01) {
 		discard;
@@ -437,7 +456,7 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
 	let uv = input.uv * max(input.layer_uv.yz, vec2<f32>(0.000001));
 	var color = textureSample(tex, tex_sampler, uv, i32(input.layer_uv.x)) * input.color;
 	if (lighting.sun_dir.w != 0.0) {
-		color = vec4<f32>(color.rgb + lighting.sun_color.rgb * sun_scale(input.normal, input.world_pos) + tile_point_term(input.world_pos, input.clip.xy), color.a);
+		color = vec4<f32>(enhanced_light(color.rgb, input.normal, input.world_pos, input.clip.xy, false), color.a);
 	}
 	if (color[3] < 0.01) {
 		discard;
