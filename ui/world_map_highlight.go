@@ -74,10 +74,9 @@ type worldMapHighlight struct {
 	board *worldMapWidget
 }
 
-func (h *worldMapHighlight) Layout(_ widget.Context, constraints geometry.Constraints) geometry.Size {
-	size := constraints.Constrain(geometry.Sz(h.Bounds().Width(), h.Bounds().Height()))
-	h.SetBounds(geometry.FromPointSize(h.Position(), size))
-	return size
+func (h *worldMapHighlight) Layout(widget.Context, geometry.Constraints) geometry.Size {
+	// placeHighlight owns the cell frame. A layout walk must not move it to the origin.
+	return h.Bounds().Size()
 }
 
 func (h *worldMapHighlight) Event(ctx widget.Context, e event.Event) bool {
@@ -104,10 +103,8 @@ type worldMapPreview struct {
 	board *worldMapWidget
 }
 
-func (p *worldMapPreview) Layout(_ widget.Context, constraints geometry.Constraints) geometry.Size {
-	size := constraints.Constrain(geometry.Sz(p.Bounds().Width(), p.Bounds().Height()))
-	p.SetBounds(geometry.FromPointSize(p.Position(), size))
-	return size
+func (p *worldMapPreview) Layout(widget.Context, geometry.Constraints) geometry.Size {
+	return p.Bounds().Size()
 }
 
 func (p *worldMapPreview) Event(ctx widget.Context, e event.Event) bool {

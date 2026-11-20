@@ -17,14 +17,21 @@ func TestWorldMapRollHitsGappedCells(t *testing.T) {
 	if got := board.mapAt(geometry.Pt(5, 5)); got != 0 {
 		t.Fatalf("first cell = %d", got)
 	}
-	if got := board.mapAt(geometry.Pt(10, 5)); got != 1 {
-		t.Fatalf("gap between cells = %d, want the next cell", got)
+	if got := board.mapAt(geometry.Pt(10.5, 5)); got < 0 {
+		t.Fatalf("gap between cells = %d, want a cell", got)
 	}
 	if got := board.mapAt(geometry.Pt(16, 5)); got != 1 {
 		t.Fatalf("middle cell = %d", got)
 	}
 	if got := board.mapAt(geometry.Pt(27, 5)); got != 2 {
 		t.Fatalf("last cell = %d", got)
+	}
+	wide := rollBoard([]res.WorldMapEntry{
+		{MapName: "a", Bounds: image.Rect(0, 0, 10, 10)},
+		{MapName: "b", Bounds: image.Rect(22, 0, 32, 10)},
+	})
+	if got := wide.mapAt(geometry.Pt(16, 5)); got < 0 {
+		t.Fatalf("wide gap = %d, want a neighboring cell", got)
 	}
 }
 

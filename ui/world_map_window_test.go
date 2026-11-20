@@ -74,12 +74,15 @@ func TestWorldMapIdleAndPartySnapshots(t *testing.T) {
 	if board.highlight != nil {
 		board.highlight.SetNeedsRedraw(false)
 	}
+	if board.previewLayer != nil {
+		board.previewLayer.SetNeedsRedraw(false)
+	}
 	ctx.World.Player.X++
 	w.UpdatePresentation(ctx)
 	if board.NeedsRedraw() {
 		t.Fatal("walking redrew the atlas")
 	}
-	if board.highlight == nil || !board.highlight.NeedsRedraw() {
+	if board.previewLayer == nil || !board.previewLayer.NeedsRedraw() {
 		t.Fatal("visible preview did not update")
 	}
 	board.hovered = 1

@@ -428,8 +428,8 @@ func (w *WorldMapWindow) redraw(ctx Context) {
 }
 
 func (w *WorldMapWindow) markHighlight(ctx Context) {
-	if w.board != nil && w.board.highlight != nil {
-		w.board.highlight.SetNeedsRedraw(true)
+	if w.board != nil && w.board.previewLayer != nil {
+		w.board.previewLayer.SetNeedsRedraw(true)
 	}
 	invalidateWindowRect(ctx, windowFrameRect(w.x, w.y, w.width, w.height))
 }
@@ -490,15 +490,34 @@ func (w *worldMapWidget) mapRect(entry res.WorldMapEntry) geometry.Rect {
 }
 
 func (w *worldMapWidget) mapAt(point geometry.Point) int {
-	// Later sections are drawn on top, matching the browser map. Expand by one
-	// pixel so a roll does not fall through the gap between adjacent cells.
+	// Later sections are drawn on top. A point inside two cells uses the later
+	// one. A point in the gap between neighbors stays with the nearer cell.
 	hit := -1
+	best := worldMapHitSlack * worldMapHitSlack
 	for i, entry := range w.entries {
-		if w.mapRect(entry).Expand(1).Contains(point) {
+		dist := worldMapRectDistance(w.mapRect(entry), point)
+		if dist <= best {
 			hit = i
+			best = dist
 		}
 	}
 	return hit
+}
+
+func worldMapRectDistance(r geometry.Rect, p geometry.Point) float32 {
+	x, y := p.X, p.Y
+	if x < r.Min.X {
+		x = r.Min.X
+	} else if x > r.Max.X {
+		x = r.Max.X
+	}
+	if y < r.Min.Y {
+		y = r.Min.Y
+	} else if y > r.Max.Y {
+		y = r.Max.Y
+	}
+	dx, dy := p.X-x, p.Y-y
+	return dx*dx + dy*dy
 }
 
 func (w *worldMapWidget) Event(ctx widget.Context, e event.Event) bool {
