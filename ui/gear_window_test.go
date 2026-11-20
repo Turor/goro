@@ -23,7 +23,7 @@ func TestGearWindowIncludesEquipmentAndStats(t *testing.T) {
 		t.Fatal("gear window is not wider than the paperdoll")
 	}
 	labels := characterLabels(window.widgetTree(ctx, nil, nil))
-	for _, want := range []string{"STR", "ATK 40 + 2", "Composite", "Points 3"} {
+	for _, want := range []string{"STR", "40 + 2", "Composite", "Points 3"} {
 		if !strings.Contains(labels, want) {
 			t.Fatalf("gear labels missing %q: %q", want, labels)
 		}

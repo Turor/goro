@@ -18,6 +18,7 @@ var (
 	statsPrimaryRows               = 6
 	gearStatChromeRows             = 3
 	gearCompositeRows              = 14
+	gearCompositeBandRows          = 4
 	statsPositionGap               = 12
 
 	statsPrimaryColumnWidth float32
@@ -40,7 +41,8 @@ func init() {
 	s.Float("derived_value_width", &statsDerivedValueWidth, 24, 200, "derived stat value width")
 	s.Int("primary_rows", &statsPrimaryRows, 1, 16, "primary stat rows used to size the window")
 	s.Int("gear_chrome_rows", &gearStatChromeRows, 1, 8, "gear tab, points, and composite heading rows")
-	s.Int("gear_composite_rows", &gearCompositeRows, 1, 16, "composite attribute rows under the gear allocation tab")
+	s.Int("gear_composite_rows", &gearCompositeRows, 1, 16, "kept for older layout files; the band no longer uses this count")
+	s.Int("gear_composite_band_rows", &gearCompositeBandRows, 1, 8, "heading plus rows in the full-width composite stat band")
 	s.Int("position_gap", &statsPositionGap, 0, 48, "gap between the character window and the status window")
 	rotheme.OnLayoutApplied(recomputeStatsWindowMetrics)
 	recomputeStatsWindowMetrics()
