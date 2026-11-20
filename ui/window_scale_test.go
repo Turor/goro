@@ -179,3 +179,16 @@ func TestResizedDropHitUsesWindowSize(t *testing.T) {
 		t.Fatal("shrunk bag missed its own corner")
 	}
 }
+
+func TestShopRowHitUsesStoredScale(t *testing.T) {
+	designY := shopTableHeaderH + shopRowH + 1
+	row, ok := tableRowAt(4, designY, 0, 0, 240, 800, 20, shopRowH, 0, 0.5)
+	if ok && row == 1 {
+		t.Fatalf("design row-1 point still hits row 1 at half scale")
+	}
+	scaledY := scaleInt(shopTableHeaderH, 0.5) + 1
+	row, ok = tableRowAt(4, scaledY, 0, 0, 240, 800, 20, shopRowH, 0, 0.5)
+	if !ok || row != 0 {
+		t.Fatalf("scaled first row = %d ok=%v", row, ok)
+	}
+}

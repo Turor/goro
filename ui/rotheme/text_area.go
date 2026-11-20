@@ -178,7 +178,7 @@ func (w *TextAreaWidget) keepCursorVisible() {
 	if len(w.lines) == 0 {
 		return
 	}
-	visible := max(1, int((w.Bounds().Height()-textAreaPadding*2)/w.lineHeight()))
+	visible := max(1, int((w.Bounds().Height()-w.pad()*2)/w.lineHeight()))
 	row := w.cursorLine()
 	if row < w.scroll {
 		w.scroll = row
@@ -190,7 +190,7 @@ func (w *TextAreaWidget) keepCursorVisible() {
 }
 
 func (w *TextAreaWidget) clampScroll() {
-	visible := max(1, int((w.Bounds().Height()-textAreaPadding*2)/w.lineHeight()))
+	visible := max(1, int((w.Bounds().Height()-w.pad()*2)/w.lineHeight()))
 	w.scroll = max(0, min(w.scroll, len(w.lines)-visible))
 }
 
