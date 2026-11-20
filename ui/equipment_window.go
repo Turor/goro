@@ -26,6 +26,7 @@ type EquipmentWindow struct {
 	hasCart       bool
 	hasPeco       bool
 	preview       image.Image
+	deferPreview  bool
 	tooltip       tooltipState
 	statTab       int
 	lastClickItem uint16
@@ -87,6 +88,7 @@ func (w *EquipmentWindow) Toggle(ctx Context) {
 	w.hasCart = inventoryBagHasCart(ctx)
 	w.hasPeco = equipmentHasPeco(ctx)
 	w.preview = nil
+	w.deferPreview = true
 	w.Window.Open(ctx, w.widgetTree(ctx, nil, nil))
 	w.bindLayoutReload()
 	w.Publish(ctx)
@@ -99,7 +101,8 @@ func (w *EquipmentWindow) Update(ctx Context, itemInfo *ItemWindows, cart *CartW
 		return false
 	}
 	snapshot := gearSnapshot(ctx.Session)
-	needsPreview := w.preview == nil && assets != nil
+	needsPreview := w.preview == nil && assets != nil && !w.deferPreview
+	w.deferPreview = false
 	hasCart := inventoryBagHasCart(ctx)
 	hasPeco := equipmentHasPeco(ctx)
 	if snapshot != w.snapshot || itemInfo != w.itemInfo || cart != w.cart || hasCart != w.hasCart || hasPeco != w.hasPeco || needsPreview {
@@ -109,7 +112,10 @@ func (w *EquipmentWindow) Update(ctx Context, itemInfo *ItemWindows, cart *CartW
 		w.cart = cart
 		w.hasCart = hasCart
 		w.hasPeco = hasPeco
-		if assets != nil {
+		// A dirty rebuild is not a portrait load. The first update after
+		// open always receives the live item and cart pointers, and loading
+		// the sprite there is the open hitch.
+		if needsPreview {
 			w.preview = assets.EquipmentPreviewImage(ctx, equipmentCenterColW, equipmentPreviewImageH)
 		}
 		w.SetContent(w.widgetTree(ctx, itemInfo, cart))
@@ -134,7 +140,7 @@ func (w *EquipmentWindow) Rebind(ctx Context, itemInfo *ItemWindows, cart *CartW
 	w.cart = cart
 	w.hasCart = inventoryBagHasCart(ctx)
 	w.hasPeco = equipmentHasPeco(ctx)
-	if assets != nil {
+	if assets != nil && !w.deferPreview {
 		w.preview = assets.EquipmentPreviewImage(ctx, equipmentCenterColW, equipmentPreviewImageH)
 	}
 	w.SetSize(gearWindowSize())
@@ -176,57 +182,62 @@ func (w *EquipmentWindow) widgetTree(ctx Context, itemInfo *ItemWindows, cart *C
 		}),
 		Size(float32(gearW), float32(gearH)),
 		Content(
-			primitives.HBox(
-				primitives.Box(
-					primitives.HBox(
-						primitives.Box(
-							w.slotWidget(ctx, itemInfo, equipmentSlotHeadTop, equipmentLeftColW),
-							w.slotWidget(ctx, itemInfo, equipmentSlotHeadLow, equipmentLeftColW),
-							w.slotWidget(ctx, itemInfo, equipmentSlotWeapon, equipmentLeftColW),
-							w.slotWidget(ctx, itemInfo, equipmentSlotGarment, equipmentLeftColW),
-							w.slotWidget(ctx, itemInfo, equipmentSlotAccessory, equipmentLeftColW),
-						).
-							Width(float32(equipmentLeftColW)).
-							Gap(0),
+			primitives.Box(
+				primitives.HBox(
+					primitives.Box(
+						primitives.HBox(
+							primitives.Box(
+								w.slotWidget(ctx, itemInfo, equipmentSlotHeadTop, equipmentLeftColW),
+								w.slotWidget(ctx, itemInfo, equipmentSlotHeadLow, equipmentLeftColW),
+								w.slotWidget(ctx, itemInfo, equipmentSlotWeapon, equipmentLeftColW),
+								w.slotWidget(ctx, itemInfo, equipmentSlotGarment, equipmentLeftColW),
+								w.slotWidget(ctx, itemInfo, equipmentSlotAccessory, equipmentLeftColW),
+							).
+								Width(float32(equipmentLeftColW)).
+								Gap(0),
 
-						primitives.Box(
-							newStaticImageWidget(w.preview, equipmentCenterColW, equipmentPreviewImageH),
-							w.slotWidget(ctx, itemInfo, equipmentSlotAmmo, equipmentCenterColW),
-						).
-							Width(float32(equipmentCenterColW)).
-							Height(float32(equipmentCenterColH)).
-							Gap(0),
+							primitives.Box(
+								newStaticImageWidget(w.preview, equipmentCenterColW, equipmentPreviewImageH),
+								w.slotWidget(ctx, itemInfo, equipmentSlotAmmo, equipmentCenterColW),
+							).
+								Width(float32(equipmentCenterColW)).
+								Height(float32(equipmentCenterColH)).
+								Gap(0),
 
-						primitives.Box(
-							w.slotWidget(ctx, itemInfo, equipmentSlotHeadMid, equipmentRightColW),
-							w.slotWidget(ctx, itemInfo, equipmentSlotArmor, equipmentRightColW),
-							w.slotWidget(ctx, itemInfo, equipmentSlotShield, equipmentRightColW),
-							w.slotWidget(ctx, itemInfo, equipmentSlotShoes, equipmentRightColW),
-							w.slotWidget(ctx, itemInfo, equipmentSlotAccessory2, equipmentRightColW),
+							primitives.Box(
+								w.slotWidget(ctx, itemInfo, equipmentSlotHeadMid, equipmentRightColW),
+								w.slotWidget(ctx, itemInfo, equipmentSlotArmor, equipmentRightColW),
+								w.slotWidget(ctx, itemInfo, equipmentSlotShield, equipmentRightColW),
+								w.slotWidget(ctx, itemInfo, equipmentSlotShoes, equipmentRightColW),
+								w.slotWidget(ctx, itemInfo, equipmentSlotAccessory2, equipmentRightColW),
+							).
+								Width(float32(equipmentRightColW)).
+								Gap(0),
 						).
-							Width(float32(equipmentRightColW)).
 							Gap(0),
+						primitives.HBox(
+							w.slotWidget(ctx, itemInfo, equipmentSlotCHeadTop, equipmentLeftColW),
+							w.slotWidget(ctx, itemInfo, equipmentSlotCHeadMid, equipmentRightColW),
+							w.slotWidget(ctx, itemInfo, equipmentSlotCHeadLow, equipmentLeftColW),
+							w.slotWidget(ctx, itemInfo, equipmentSlotCRobe, equipmentRightColW),
+						).Height(float32(equipmentRowH)).Gap(0),
+						primitives.HBox(
+							w.slotWidget(ctx, itemInfo, equipmentSlotShadowWep, equipmentLeftColW),
+							w.slotWidget(ctx, itemInfo, equipmentSlotShadowArm, equipmentRightColW),
+							w.slotWidget(ctx, itemInfo, equipmentSlotShadowShd, equipmentLeftColW),
+							w.slotWidget(ctx, itemInfo, equipmentSlotShadowSho, equipmentRightColW),
+						).Height(float32(equipmentRowH)).Gap(0),
 					).
-						Gap(0),
-					primitives.HBox(
-						w.slotWidget(ctx, itemInfo, equipmentSlotCHeadTop, equipmentLeftColW),
-						w.slotWidget(ctx, itemInfo, equipmentSlotCHeadMid, equipmentRightColW),
-						w.slotWidget(ctx, itemInfo, equipmentSlotCHeadLow, equipmentLeftColW),
-						w.slotWidget(ctx, itemInfo, equipmentSlotCRobe, equipmentRightColW),
-					).Height(float32(equipmentRowH)).Gap(0),
-					primitives.HBox(
-						w.slotWidget(ctx, itemInfo, equipmentSlotShadowWep, equipmentLeftColW),
-						w.slotWidget(ctx, itemInfo, equipmentSlotShadowArm, equipmentRightColW),
-						w.slotWidget(ctx, itemInfo, equipmentSlotShadowShd, equipmentLeftColW),
-						w.slotWidget(ctx, itemInfo, equipmentSlotShadowSho, equipmentRightColW),
-					).Height(float32(equipmentRowH)).Gap(0),
+						Width(float32(equipmentWindowWidth)).
+						Padding(float32(equipmentWindowPad)),
+					gearStatsColumn(ctx, w.statTab, w.showStatTab),
 				).
-					Width(float32(equipmentWindowWidth)).
-					Padding(float32(equipmentWindowPad)),
-				gearStatsColumn(ctx, w.statTab, w.showStatTab),
+					Gap(float32(equipmentWindowPad)).
+					CrossAlign(primitives.CrossAxisStart),
+				gearCompositeBand(sessionStats(ctx.Session)),
 			).
 				Gap(float32(equipmentWindowPad)).
-				CrossAlign(primitives.CrossAxisStart),
+				CrossAlign(primitives.CrossAxisStretch),
 		),
 		Footer(w.footerWidgets(ctx, itemInfo, cart)...),
 	)
@@ -350,7 +361,7 @@ func (w *EquipmentWindow) itemIconImage(manager *res.Manager, item session.Inven
 		w.markIconMiss(key)
 		return nil
 	}
-	img, _, err := res.LoadImage(manager, res.ItemIconTextureCandidates(resourceName))
+	img, _, err := res.LoadImageExact(manager, res.ItemIconTextureCandidates(resourceName))
 	if err != nil {
 		w.markIconMiss(key)
 		return nil
