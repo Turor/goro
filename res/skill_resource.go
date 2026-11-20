@@ -183,24 +183,9 @@ func (m *Manager) loadSkillMetadata() {
 	m.skillDisplayNames = make(map[int]string)
 	m.skillDescriptions = make(map[int][]string)
 	nameToID := m.skillNameToID()
-	if _, data, ok := m.ReadFirst(skillDataTableCandidates("skillnametable.txt")); ok {
-		for id, name := range parseSkillNameTable(data, nameToID) {
-			m.skillDisplayNames[id] = name
-		}
-	}
-	if _, data, ok := m.ReadFirst(skillDataTableCandidates("skilldesctable.txt")); ok {
-		names, descriptions := parseSkillDescriptionTable(data, nameToID)
-		for id, name := range names {
-			if m.skillDisplayNames[id] == "" {
-				m.skillDisplayNames[id] = name
-			}
-		}
-		for id, lines := range descriptions {
-			m.skillDescriptions[id] = lines
-		}
-	}
-	// Renewal clients replaced the text tables with SKILL_INFO_LIST and
-	// SKILL_DESCRIPT; when present they are newer, so they win.
+	// Renewal tables win, and they are what the first skill-window open needs.
+	// Probe the classic text tables only when those Lua tables are absent:
+	// a missing name still takes the suffix scan, which froze that open.
 	m.loadSkillInfoList()
 	for id, name := range m.skillInfoNames {
 		m.skillDisplayNames[id] = name
@@ -226,6 +211,26 @@ func (m *Manager) loadSkillMetadata() {
 						m.skillDisplayNames[id] = lines[0]
 					}
 				}
+			}
+		}
+	}
+	if len(m.skillDisplayNames) == 0 {
+		if data, _, err := m.readFileCandidates(skillDataTableCandidates("skillnametable.txt"), true); err == nil {
+			for id, name := range parseSkillNameTable(data, nameToID) {
+				m.skillDisplayNames[id] = name
+			}
+		}
+	}
+	if len(m.skillDescriptions) == 0 {
+		if data, _, err := m.readFileCandidates(skillDataTableCandidates("skilldesctable.txt"), true); err == nil {
+			names, descriptions := parseSkillDescriptionTable(data, nameToID)
+			for id, name := range names {
+				if m.skillDisplayNames[id] == "" {
+					m.skillDisplayNames[id] = name
+				}
+			}
+			for id, lines := range descriptions {
+				m.skillDescriptions[id] = lines
 			}
 		}
 	}
@@ -394,13 +399,15 @@ func (m *Manager) loadSkillMaxLevels() {
 	m.skillMaxLevelsLoaded = true
 	m.loadSkillResourceNames()
 	m.skillMaxLevels = make(map[int]int)
-	nameToID := m.skillNameToID()
-	if _, data, ok := m.ReadFirst(skillSPAmountCandidates); ok {
-		for id, level := range parseSkillSPAmountMaxLevels(data, nameToID) {
-			m.skillMaxLevels[id] = level
+	m.loadSkillInfoList()
+	if len(m.skillInfoMaxLevels) == 0 {
+		nameToID := m.skillNameToID()
+		if data, _, err := m.readFileCandidates(skillSPAmountCandidates, true); err == nil {
+			for id, level := range parseSkillSPAmountMaxLevels(data, nameToID) {
+				m.skillMaxLevels[id] = level
+			}
 		}
 	}
-	m.loadSkillInfoList()
 	for id, level := range m.skillInfoMaxLevels {
 		m.skillMaxLevels[id] = level
 	}
@@ -414,20 +421,22 @@ func (m *Manager) loadSkillTreePositions() {
 	m.skillTreePositions = make(map[int]map[int]int)
 	m.skillTreeViewSource = nil
 	m.loadSkillResourceNames()
-	if _, data, ok := m.ReadFirst(skillDataTableCandidates("skilltreeview.txt")); ok {
-		m.skillTreeTextPositions = parseSkillTreeTextPositions(data, m.skillNameToID())
-	}
-
 	globals := m.skillIDGlobals()
-	if globals["JOBID"].kind != luaTable {
-		return
+	if globals["JOBID"].kind == luaTable {
+		_, treeData, ok := m.ReadFirst(skillTreeViewLuaCandidates)
+		if ok && executeLuaChunkWithSetup(treeData, globals, installJobSkillTab) == nil {
+			m.skillTreePositions = parseSkillTreePositions(globals["SKILL_TREEVIEW_FOR_JOB"])
+			m.skillTreeViewSource = treeData
+		}
 	}
-	_, treeData, ok := m.ReadFirst(skillTreeViewLuaCandidates)
-	if !ok || executeLuaChunkWithSetup(treeData, globals, installJobSkillTab) != nil {
-		return
+	// Classic text layout is the fallback. Do not search for it once the Lua
+	// tree loaded: the suffix scan of a missing skilltreeview.txt froze the
+	// first skill-window open. Exact lookup so a missing fallback stays cheap.
+	if len(m.skillTreePositions) == 0 {
+		if data, _, err := m.readFileCandidates(skillDataTableCandidates("skilltreeview.txt"), true); err == nil {
+			m.skillTreeTextPositions = parseSkillTreeTextPositions(data, m.skillNameToID())
+		}
 	}
-	m.skillTreePositions = parseSkillTreePositions(globals["SKILL_TREEVIEW_FOR_JOB"])
-	m.skillTreeViewSource = treeData
 }
 
 // Text clients use JOB { SKILL#position#prerequisite positions#max level@ ... }.
