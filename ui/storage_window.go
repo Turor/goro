@@ -142,7 +142,8 @@ func (w *StorageWindow) DrawDragGhost(screen *render.Frame, ctx Context, assets 
 
 func (w *StorageWindow) AcceptInventoryDrop(ctx Context, item session.InventoryItem, mx, my int) bool {
 	w.EnsureWindow(storageWindowWidth, storageWindowHeight)
-	if !w.IsOpen() || !pointInRect(mx, my, w.x, w.y, storageWindowWidth, storageWindowHeight) {
+	width, height := w.currentSize(storageWindowWidth, storageWindowHeight)
+	if !w.IsOpen() || !pointInRect(mx, my, w.x, w.y, width, height) {
 		return false
 	}
 	amount := uint32(item.Amount)
@@ -163,7 +164,8 @@ func (w *StorageWindow) AcceptInventoryDrop(ctx Context, item session.InventoryI
 
 func (w *StorageWindow) AcceptCartDrop(ctx Context, item session.InventoryItem, mx, my int) bool {
 	w.EnsureWindow(storageWindowWidth, storageWindowHeight)
-	if !w.IsOpen() || !pointInRect(mx, my, w.x, w.y, storageWindowWidth, storageWindowHeight) {
+	width, height := w.currentSize(storageWindowWidth, storageWindowHeight)
+	if !w.IsOpen() || !pointInRect(mx, my, w.x, w.y, width, height) {
 		return false
 	}
 	amount := uint32(item.Amount)
@@ -362,7 +364,7 @@ func (w *StorageWindow) ClampScroll(s *session.Session) {
 		w.setSelectedRow(-1)
 	}
 	scroll := w.ensureScrollSignal()
-	maxScroll := float32(maxInt(0, itemCount-storageRows) * storageRowH)
+	maxScroll := scaledScrollMax(maxInt(0, itemCount-storageRows)*storageRowH, 0, w.elementScale())
 	switch value := scroll.Get(); {
 	case value < 0:
 		scroll.Set(0)
@@ -555,10 +557,11 @@ func (w *StorageWindow) setSelectedRow(row int) {
 }
 
 func (w *StorageWindow) itemAt(s *session.Session, mx, my int) (session.InventoryItem, int, bool) {
-	tableX := w.x + storageTabRailW + verticalTabDividerW
-	tableY := w.y + storageWindowTitleH
+	scale := w.elementScale()
+	tableX := w.x + scaleInt(storageTabRailW+verticalTabDividerW, scale)
+	tableY := w.y + scaleInt(storageWindowTitleH, scale)
 	items := w.tabItems(s)
-	row, ok := storageTableViewRowAt(mx, my, tableX, tableY, storageTableViewW, int(storageTableViewHeight()), len(items), w.ensureScrollSignal().Get())
+	row, ok := storageTableViewRowAt(mx, my, tableX, tableY, scaleInt(storageTableViewW, scale), scaleInt(int(storageTableViewHeight()), scale), len(items), w.ensureScrollSignal().Get(), scale)
 	if !ok {
 		return session.InventoryItem{}, 0, false
 	}
@@ -584,12 +587,15 @@ func storageTableColumns() []rotheme.TableViewColumn {
 	}
 }
 
-func storageTableViewRowAt(mx, my, tableX, tableY, tableW, tableH, rowCount int, scrollY float32) (int, bool) {
+func storageTableViewRowAt(mx, my, tableX, tableY, tableW, tableH, rowCount int, scrollY, scale float32) (int, bool) {
+	if scale <= 0 {
+		scale = 1
+	}
 	if !pointInRect(mx, my, tableX, tableY, scrollbarSafeIntWidth(tableW), tableH) {
 		return 0, false
 	}
 	localY := float32(my-tableY) + scrollY
-	row := int(localY / float32(storageRowH))
+	row := int(localY / scaleF(float32(storageRowH), scale))
 	if row < 0 || row >= rowCount {
 		return 0, false
 	}

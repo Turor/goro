@@ -320,8 +320,9 @@ func (w *EquipmentWindow) DrawTooltip(ctx Context, screen *render.Frame) {
 }
 
 func (w *EquipmentWindow) AcceptInventoryDrop(ctx Context, item session.InventoryItem, mx, my int) bool {
-	w.EnsureWindow(gearWindowSize())
-	gearW, gearH := gearWindowSize()
+	designW, designH := gearWindowSize()
+	w.EnsureWindow(designW, designH)
+	gearW, gearH := w.currentSize(designW, designH)
 	if !w.IsOpen() || !pointInRect(mx, my, w.x, w.y, gearW, gearH) {
 		return false
 	}
@@ -387,7 +388,7 @@ func newStaticImageWidget(img image.Image, width, height int) *staticImageWidget
 }
 
 func (w *staticImageWidget) Layout(ctx widget.Context, constraints geometry.Constraints) geometry.Size {
-	size := constraints.Constrain(geometry.Sz(float32(w.width), float32(w.height)))
+	size := constraints.Constrain(geometry.Sz(float32(w.width)*rotheme.ContentScale(), float32(w.height)*rotheme.ContentScale()))
 	w.SetBounds(geometry.FromPointSize(w.Position(), size))
 	return size
 }
@@ -396,7 +397,7 @@ func (w *staticImageWidget) Draw(ctx widget.Context, canvas widget.Canvas) {
 	if !w.IsVisible() || w.image == nil {
 		return
 	}
-	canvas.DrawImage(w.image, w.Bounds().Min)
+	drawFittedImage(canvas, w.image, w.Bounds())
 }
 
 func (w *staticImageWidget) Event(ctx widget.Context, e event.Event) bool {
@@ -488,7 +489,7 @@ func newEquipmentSlotWidget(cfg equipmentSlotWidgetConfig) *equipmentSlotWidget 
 }
 
 func (w *equipmentSlotWidget) Layout(ctx widget.Context, constraints geometry.Constraints) geometry.Size {
-	size := constraints.Constrain(geometry.Sz(float32(w.cfg.width), float32(equipmentRowH)))
+	size := constraints.Constrain(geometry.Sz(float32(w.cfg.width)*rotheme.ContentScale(), float32(equipmentRowH)*rotheme.ContentScale()))
 	w.SetBounds(geometry.FromPointSize(w.Position(), size))
 	return size
 }
@@ -533,7 +534,7 @@ func (w *equipmentSlotWidget) Draw(ctx widget.Context, canvas widget.Canvas) {
 	text = trimRunes(text, equipmentSlotTextLimit(w.cfg.slot))
 	textBounds := equipmentSlotTextBounds(bounds, w.cfg.slot, w.cfg.icon)
 	if w.cfg.icon != nil {
-		canvas.DrawImage(w.cfg.icon, equipmentSlotIconPosition(bounds, w.cfg.slot, w.cfg.icon))
+		drawFittedImage(canvas, w.cfg.icon, equipmentSlotIconRect(bounds, w.cfg.slot))
 	}
 	align := equipmentSlotTextAlign(w.cfg.slot)
 	if w.cfg.slot.side == equipmentSlotCenter && w.cfg.icon != nil {
@@ -616,7 +617,7 @@ func equipmentSlotTextBounds(bounds geometry.Rect, slot equipmentSlotDef, icon i
 	if icon == nil {
 		return geometry.NewRect(bounds.Min.X+equipmentTextPad, bounds.Min.Y+equipmentTextPad, bounds.Width()-equipmentTextInset, bounds.Height()-equipmentTextInset)
 	}
-	iconWidth := float32(icon.Bounds().Dx())
+	iconWidth := equipmentSlotIconRect(bounds, slot).Width()
 	switch slot.side {
 	case equipmentSlotRight:
 		return geometry.NewRect(bounds.Min.X+equipmentTextPad, bounds.Min.Y+equipmentTextPad, bounds.Width()-iconWidth-equipmentIconTextTrail, bounds.Height()-equipmentTextInset)

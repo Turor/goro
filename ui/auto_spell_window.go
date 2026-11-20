@@ -193,13 +193,14 @@ func (w *AutoSpellWindow) updateDoubleClick(ctx Context) {
 }
 
 func (w *AutoSpellWindow) rowAtMouse(mouseX, mouseY int) (int, bool) {
+	scale := w.elementScale()
 	tableX := w.x
-	tableY := w.y + ROWindowTitleHeight
-	rowY := tableY + autoSpellTableHeaderH
-	if !pointInRect(mouseX, mouseY, tableX, rowY, scrollbarSafeIntWidth(autoSpellWindowWidth), autoSpellRows*autoSpellRowH) {
+	tableY := w.y + scaleInt(ROWindowTitleHeight, scale)
+	rowY := tableY + scaleInt(autoSpellTableHeaderH, scale)
+	if !pointInRect(mouseX, mouseY, tableX, rowY, scaleInt(scrollbarSafeIntWidth(autoSpellWindowWidth), scale), scaleInt(autoSpellRows*autoSpellRowH, scale)) {
 		return 0, false
 	}
-	row := int((float32(mouseY-rowY) + w.ensureScrollSignal().Get()) / float32(autoSpellRowH))
+	row := int((float32(mouseY-rowY) + w.ensureScrollSignal().Get()) / scaleF(float32(autoSpellRowH), scale))
 	if row < 0 || row >= len(w.choices) {
 		return 0, false
 	}

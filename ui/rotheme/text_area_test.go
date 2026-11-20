@@ -174,3 +174,14 @@ func TestTextAreaInvalidatesScreenCoordinates(t *testing.T) {
 		t.Fatalf("redraw damage = %v, want screen bounds %v", damage, w.ScreenBounds())
 	}
 }
+
+func TestTextAreaHitUsesLayoutScale(t *testing.T) {
+	area := TextArea("one\ntwo\nthree", 0, nil)
+	SetContentScale(0.5)
+	area.Layout(widget.NewContext(), geometry.Loose(geometry.Sz(200, 80)))
+	SetContentScale(1)
+	area.SetBounds(geometry.NewRect(0, 0, 200, 80))
+	if got := area.lineHeight(); got != textAreaLineHeight*0.5 {
+		t.Fatalf("line height after scale reset = %.1f, want %.1f", got, textAreaLineHeight*0.5)
+	}
+}

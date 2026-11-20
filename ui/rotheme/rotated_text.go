@@ -59,6 +59,7 @@ func DrawRotatedText(canvas widget.Canvas, text string, bounds geometry.Rect, si
 	if text == "" {
 		return
 	}
+	size *= ContentScale()
 	img := rotatedTextImage(text, size, textColor, bold, rotation)
 	if img == nil {
 		return

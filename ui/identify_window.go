@@ -124,7 +124,7 @@ func (w *IdentifyWindow) ClampScroll(s *session.Session) {
 		w.selected = session.InventoryItem{}
 	}
 	scroll := w.ensureScrollSignal()
-	maxScroll := float32(maxInt(0, len(items)-identifyRows) * identifyRowH)
+	maxScroll := scaledScrollMax(maxInt(0, len(items)-identifyRows)*identifyRowH, 0, w.elementScale())
 	switch value := scroll.Get(); {
 	case value < 0:
 		scroll.Set(0)

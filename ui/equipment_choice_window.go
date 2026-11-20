@@ -185,13 +185,14 @@ func (w *equipmentChoiceWindow) updateDoubleClick(ctx Context) {
 }
 
 func (w *equipmentChoiceWindow) rowAtMouse(mouseX, mouseY int) (int, bool) {
+	scale := w.elementScale()
 	tableX := w.x
-	tableY := w.y + ROWindowTitleHeight
-	rowY := tableY + equipmentChoiceTableHeaderH
-	if !pointInRect(mouseX, mouseY, tableX, rowY, scrollbarSafeIntWidth(equipmentChoiceWindowWidth), equipmentChoiceRows*equipmentChoiceRowH) {
+	tableY := w.y + scaleInt(ROWindowTitleHeight, scale)
+	rowY := tableY + scaleInt(equipmentChoiceTableHeaderH, scale)
+	if !pointInRect(mouseX, mouseY, tableX, rowY, scaleInt(scrollbarSafeIntWidth(equipmentChoiceWindowWidth), scale), scaleInt(equipmentChoiceRows*equipmentChoiceRowH, scale)) {
 		return 0, false
 	}
-	row := int((float32(mouseY-rowY) + w.ensureScrollSignal().Get()) / float32(equipmentChoiceRowH))
+	row := int((float32(mouseY-rowY) + w.ensureScrollSignal().Get()) / scaleF(float32(equipmentChoiceRowH), scale))
 	if row < 0 || row >= len(w.items) {
 		return 0, false
 	}
@@ -226,7 +227,7 @@ func (w *equipmentChoiceWindow) clampScroll() {
 		w.selectedRow = -1
 	}
 	scroll := w.ensureScrollSignal()
-	maxScroll := float32(maxInt(0, len(w.items)-equipmentChoiceRows) * equipmentChoiceRowH)
+	maxScroll := scaledScrollMax(maxInt(0, len(w.items)-equipmentChoiceRows)*equipmentChoiceRowH, 0, w.elementScale())
 	switch value := scroll.Get(); {
 	case value < 0:
 		scroll.Set(0)

@@ -46,7 +46,7 @@ func verticalTabFrame(tabs, content widget.Widget) widget.Widget {
 }
 
 func (w *tabWidget) Layout(ctx widget.Context, constraints geometry.Constraints) geometry.Size {
-	size := constraints.Constrain(geometry.Sz(float32(w.cfg.width), float32(w.cfg.height)))
+	size := constraints.Constrain(geometry.Sz(float32(w.cfg.width)*rotheme.ContentScale(), float32(w.cfg.height)*rotheme.ContentScale()))
 	w.SetBounds(geometry.FromPointSize(w.Position(), size))
 	return size
 }

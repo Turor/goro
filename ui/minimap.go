@@ -650,6 +650,9 @@ func minimapMapRect(x, y, w, h int) minimapRect {
 	if size < minimapMapMin {
 		size = minimapMapMin
 	}
+	if limit := minInt(w, h); limit > 0 && size > limit {
+		size = limit
+	}
 	return minimapRect{
 		x: x + (w-size)/2,
 		y: y + ROWindowTitleHeight + minimapMapTop,
@@ -703,7 +706,7 @@ func newMinimapWidget() *minimapWidget {
 }
 
 func (w *minimapWidget) Layout(_ widget.Context, constraints geometry.Constraints) geometry.Size {
-	size := constraints.Constrain(geometry.Size{Width: float32(minimapWidth), Height: float32(minimapHeight - ROWindowTitleHeight)})
+	size := constraints.Constrain(geometry.Size{Width: float32(minimapWidth) * rotheme.ContentScale(), Height: float32(minimapHeight-ROWindowTitleHeight) * rotheme.ContentScale()})
 	w.SetBounds(geometry.FromPointSize(w.Position(), size))
 	return size
 }
@@ -715,7 +718,7 @@ func (w *minimapWidget) Draw(_ widget.Context, canvas widget.Canvas) {
 	}
 	rect := minimapContentMapRect(bounds)
 	if w.image != nil {
-		canvas.DrawImage(w.image, geometry.Pt(float32(rect.x), float32(rect.y)))
+		drawFittedImage(canvas, w.image, geometry.NewRect(float32(rect.x), float32(rect.y), float32(rect.w), float32(rect.h)))
 	}
 	if w.ctx.World != nil {
 		mapW, mapH := minimapWorldSize(w.ctx.World)
@@ -731,9 +734,15 @@ func (w *minimapWidget) Draw(_ widget.Context, canvas widget.Canvas) {
 		}
 		label := minimapDisplayName(w.ctx.Resources, w.ctx.World.MapName)
 		footerY := bounds.Min.Y + bounds.Height() - float32(minimapFooterOff)
-		canvas.DrawText(trimRunes(label, 13), geometry.NewRect(bounds.Min.X+float32(minimapPad), footerY, bounds.Width()/2, float32(minimapLabelH)), float32(rotheme.Default.Typography.TextSize), Color(minimapTextColor), false, widget.TextAlignLeft)
+		footerScale := bounds.Height() / float32(minimapHeight-ROWindowTitleHeight)
+		if footerScale <= 0 {
+			footerScale = 1
+		}
+		labelH := float32(minimapLabelH) * footerScale
+		footerY = bounds.Max.Y - labelH
+		canvas.DrawText(trimRunes(label, 13), geometry.NewRect(bounds.Min.X+float32(minimapPad)*footerScale, footerY, bounds.Width()/2, labelH), float32(rotheme.Default.Typography.TextSize)*footerScale, Color(minimapTextColor), false, widget.TextAlignLeft)
 		coords := fmt.Sprintf("X:%d Y:%d", w.ctx.World.Player.X, w.ctx.World.Player.Y)
-		canvas.DrawText(coords, geometry.NewRect(bounds.Min.X+bounds.Width()/2, footerY, bounds.Width()/2-float32(minimapPad), float32(minimapLabelH)), float32(rotheme.Default.Typography.TextSize), Color(minimapMutedColor), false, widget.TextAlignRight)
+		canvas.DrawText(coords, geometry.NewRect(bounds.Min.X+bounds.Width()/2, footerY, bounds.Width()/2-float32(minimapPad)*footerScale, labelH), float32(rotheme.Default.Typography.TextSize)*footerScale, Color(minimapMutedColor), false, widget.TextAlignRight)
 	}
 }
 
@@ -785,8 +794,15 @@ func (w *minimapWidget) markPlayerDirty(old, current minimapPlayerMarkerState) b
 func minimapContentMapRect(bounds geometry.Rect) minimapRect {
 	available := int(bounds.Height()) - minimapInfoBandH - minimapPad
 	size := minInt(int(bounds.Width())-minimapPad-minimapPad, available)
-	if size < minimapMapMin {
+	limit := minInt(int(bounds.Width()), int(bounds.Height()))
+	if size < minimapMapMin && (limit <= 0 || minimapMapMin <= limit) {
 		size = minimapMapMin
+	}
+	if limit > 0 && size > limit {
+		size = limit
+	}
+	if size < 1 {
+		size = 1
 	}
 	return minimapRect{
 		x: int(bounds.Min.X) + (int(bounds.Width())-size)/2,
@@ -805,8 +821,16 @@ func drawMinimapPlayerMarker(canvas widget.Canvas, rect minimapRect, mapW, mapH,
 		drawMinimapMarkerAt(canvas, x, y, minimapPlayerColor, minimapPlayerRadius)
 		return
 	}
-	bounds := arrow.Bounds()
-	canvas.DrawImage(arrow, geometry.Pt(float32(x-bounds.Dx()/2), float32(y-bounds.Dy()/2)))
+	design := minimapMapRect(0, 0, minimapWidth, minimapHeight).w
+	scale := float32(1)
+	if design > 0 {
+		scale = float32(rect.w) / float32(design)
+	}
+	side := float32(arrow.Bounds().Dx()) * scale
+	if side < 1 {
+		side = 1
+	}
+	drawFittedImage(canvas, arrow, geometry.NewRect(float32(x)-side/2, float32(y)-side/2, side, side))
 }
 
 func minimapPlayerMarkerDirtyRect(rect minimapRect, mapW, mapH int, marker minimapPlayerMarkerState) geometry.Rect {

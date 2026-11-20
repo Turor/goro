@@ -60,6 +60,7 @@ type TableViewWidget struct {
 
 	width               float32
 	bodyHeight          float32
+	laidScale           float32
 	colWidths           []float32
 	contentW            float32
 	hoveredRow          int
@@ -188,6 +189,7 @@ func (w *TableViewWidget) syncLayoutTokens() {
 
 func (w *TableViewWidget) Layout(ctx widget.Context, constraints geometry.Constraints) geometry.Size {
 	w.syncLayoutTokens()
+	w.laidScale = ContentScale()
 	size := constraints.Biggest()
 	if size.Width >= geometry.Infinity {
 		size.Width = constraints.Constrain(geometry.Sz(tableViewFallbackW, 0)).Width
@@ -318,15 +320,26 @@ func (w *TableViewWidget) updateHoverFromEvent(ctx widget.Context, e event.Event
 	}
 }
 
+func (w *TableViewWidget) layoutScale() float32 {
+	if w.laidScale > 0 {
+		return w.laidScale
+	}
+	return 1
+}
+
 func (w *TableViewWidget) headerHeight() float32 {
 	if w.cfg.showHeader {
-		return w.cfg.headerHeight
+		return w.cfg.headerHeight * w.layoutScale()
 	}
 	return 0
 }
 
+func (w *TableViewWidget) scaledRowHeight() float32 {
+	return w.cfg.rowHeight * w.layoutScale()
+}
+
 func (w *TableViewWidget) contentHeight() float32 {
-	return w.headerHeight() + float32(w.cfg.rowCount)*w.cfg.rowHeight
+	return w.headerHeight() + float32(w.cfg.rowCount)*w.scaledRowHeight()
 }
 
 func (w *TableViewWidget) safeBodyWidth() float32 {
@@ -352,8 +365,8 @@ func (w *TableViewWidget) resolveColumns(width float32) []float32 {
 	var flex float32
 	for i, col := range w.cfg.columns {
 		if col.Width > 0 {
-			widths[i] = col.Width
-			fixed += col.Width
+			widths[i] = col.Width * w.layoutScale()
+			fixed += widths[i]
 			continue
 		}
 		value := col.Flex
@@ -379,7 +392,7 @@ func (w *TableViewWidget) resolveColumns(width float32) []float32 {
 			colWidth = remaining * value / flex
 		}
 		if col.MinWidth > 0 {
-			colWidth = float32(math.Max(float64(colWidth), float64(col.MinWidth)))
+			colWidth = float32(math.Max(float64(colWidth), float64(col.MinWidth*w.layoutScale())))
 		}
 		widths[i] = colWidth
 	}
@@ -476,7 +489,7 @@ func (b *tableViewBody) Layout(_ widget.Context, constraints geometry.Constraint
 	if width < constraints.MinWidth {
 		width = constraints.MinWidth
 	}
-	return geometry.Sz(width, float32(b.table.cfg.rowCount)*b.table.cfg.rowHeight)
+	return geometry.Sz(width, float32(b.table.cfg.rowCount)*b.table.scaledRowHeight())
 }
 
 func (b *tableViewBody) Draw(ctx widget.Context, canvas widget.Canvas) {
@@ -616,7 +629,7 @@ func (b *tableViewBody) Children() []widget.Widget {
 func (b *tableViewBody) visibleRange() (int, int) {
 	table := b.table
 	_, scrollY := table.scroll.ScrollOffset()
-	rowHeight := table.cfg.rowHeight
+	rowHeight := table.scaledRowHeight()
 	if rowHeight <= 0 {
 		return 0, 0
 	}
@@ -683,17 +696,17 @@ func (b *tableViewBody) layoutSimpleRow(row int) *tableViewSimpleRowWidget {
 		return nil
 	}
 	table := b.table
-	y := float32(row) * table.cfg.rowHeight
-	child.SetBounds(geometry.NewRect(0, y, table.contentW, table.cfg.rowHeight))
+	y := float32(row) * table.scaledRowHeight()
+	child.SetBounds(geometry.NewRect(0, y, table.contentW, table.scaledRowHeight()))
 	return child
 }
 
 func (b *tableViewBody) rowAt(y float32) int {
 	table := b.table
-	if y < 0 || table.cfg.rowHeight <= 0 {
+	if y < 0 || table.scaledRowHeight() <= 0 {
 		return -1
 	}
-	row := int(y / table.cfg.rowHeight)
+	row := int(y / table.scaledRowHeight())
 	if row < 0 || row >= table.cfg.rowCount {
 		return -1
 	}
@@ -731,8 +744,8 @@ func (b *tableViewBody) layoutRow(ctx widget.Context, row int) *tableViewRowWidg
 		return nil
 	}
 	table := b.table
-	y := float32(row) * table.cfg.rowHeight
-	size := child.ensureLayout(ctx, table.contentW, table.cfg.rowHeight)
+	y := float32(row) * table.scaledRowHeight()
+	size := child.ensureLayout(ctx, table.contentW, table.scaledRowHeight())
 	child.SetBounds(geometry.NewRect(0, y, size.Width, size.Height))
 	return child
 }
@@ -846,7 +859,7 @@ func (b *tableViewBody) shouldDrawBackground(canvas widget.Canvas, bounds geomet
 	}
 
 	table := b.table
-	rowsHeight := float32(table.cfg.rowCount) * table.cfg.rowHeight
+	rowsHeight := float32(table.cfg.rowCount) * table.scaledRowHeight()
 	rowArea := geometry.NewRect(0, 0, table.contentW, rowsHeight).Intersection(bounds)
 	return !rowArea.ContainsRect(localClip)
 }
@@ -857,7 +870,7 @@ type tableViewSimpleRowWidget struct {
 }
 
 func (r *tableViewSimpleRowWidget) Layout(_ widget.Context, constraints geometry.Constraints) geometry.Size {
-	size := constraints.Constrain(geometry.Sz(r.table.contentW, r.table.cfg.rowHeight))
+	size := constraints.Constrain(geometry.Sz(r.table.contentW, r.table.scaledRowHeight()))
 	r.SetBounds(geometry.FromPointSize(r.Position(), size))
 	return size
 }
@@ -884,7 +897,7 @@ type tableViewRowWidget struct {
 }
 
 func (r *tableViewRowWidget) Layout(ctx widget.Context, constraints geometry.Constraints) geometry.Size {
-	size := constraints.Constrain(geometry.Sz(r.table.contentW, r.table.cfg.rowHeight))
+	size := constraints.Constrain(geometry.Sz(r.table.contentW, r.table.scaledRowHeight()))
 	r.ensureLayout(ctx, size.Width, size.Height)
 	r.SetBounds(geometry.FromPointSize(r.Position(), size))
 	return size
@@ -977,7 +990,7 @@ func (w *TableViewWidget) buildRow(row int) widget.Widget {
 		)
 	}
 	return primitives.HBox(cells...).
-		Height(w.cfg.rowHeight).
+		Height(w.scaledRowHeight()).
 		CrossAlign(primitives.CrossAxisStretch)
 }
 
@@ -989,7 +1002,7 @@ func (w *TableViewWidget) buildCell(row, columnIndex int, col TableViewColumn, w
 			ColumnIndex: columnIndex,
 			Column:      col,
 			Width:       width,
-			Height:      w.cfg.rowHeight,
+			Height:      w.scaledRowHeight(),
 		})
 	}
 	if child == nil {
@@ -1007,7 +1020,7 @@ func (w *TableViewWidget) buildSimpleCell(row, columnIndex int, col TableViewCol
 		ColumnIndex: columnIndex,
 		Column:      col,
 		Width:       width,
-		Height:      w.cfg.rowHeight,
+		Height:      w.scaledRowHeight(),
 	}).simpleCell()
 }
 

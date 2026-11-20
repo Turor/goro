@@ -50,6 +50,9 @@ type skillGridWidget struct {
 	hoveredPart     skillGridPart
 	requiredLevels  map[uint16]int
 	rows            int
+	laidW           float32
+	laidH           float32
+	scale           float32
 }
 
 func newSkillGridWidget(cfg skillGridConfig) *skillGridWidget {
@@ -72,7 +75,20 @@ func newSkillGridWidget(cfg skillGridConfig) *skillGridWidget {
 }
 
 func (w *skillGridWidget) Layout(_ widget.Context, constraints geometry.Constraints) geometry.Size {
-	size := constraints.Constrain(geometry.Sz(float32(skillGridViewW), float32(w.totalRows()*skillGridCellH)))
+	w.scale = rotheme.ContentScale()
+	cellW := float32(skillGridCellW) * w.scale
+	cellH := float32(skillGridCellH) * w.scale
+	pref := geometry.Sz(float32(skillGridViewW)*w.scale, float32(w.totalRows())*cellH)
+	size := constraints.Constrain(pref)
+	if skillGridColumns > 0 && size.Width > 0 {
+		fitted := size.Width / float32(skillGridColumns)
+		if fitted > 0 && fitted < cellW {
+			cellW = fitted
+			cellH = fitted * float32(skillGridCellH) / float32(skillGridCellW)
+		}
+	}
+	w.laidW, w.laidH = cellW, cellH
+	size = constraints.Constrain(geometry.Sz(float32(skillGridColumns)*cellW, float32(w.totalRows())*cellH))
 	w.SetBounds(geometry.FromPointSize(w.Position(), size))
 	return size
 }
@@ -116,20 +132,24 @@ func (w *skillGridWidget) drawCell(canvas widget.Canvas, cell geometry.Rect, ent
 	rotheme.DrawText(
 		canvas,
 		trimRunes(entry.name, 10),
-		geometry.NewRect(cell.Min.X+1, cell.Min.Y, cell.Width()-skillGridNameInsetX*2, skillGridNameH),
+		geometry.NewRect(cell.Min.X+1, cell.Min.Y, cell.Width()-skillGridNameInsetX*2, cell.Height()*skillGridNameH/float32(skillGridCellH)),
 		rotheme.Default.Typography.TextSize,
 		textColor,
 		false,
 		widget.TextAlignCenter,
 	)
 	if entry.icon != nil {
-		iconBounds := geometry.NewRect(slot.Min.X+skillGridIconInset, slot.Min.Y+skillGridIconInset, float32(skillIconSize), float32(skillIconSize))
-		canvas.DrawImage(entry.icon, iconBounds.Min)
+		inset := slot.Width() * skillGridIconInset / skillGridSlotSize
+		iconBounds := geometry.NewRect(slot.Min.X+inset, slot.Min.Y+inset, slot.Width()-inset*2, slot.Height()-inset*2)
+		drawFittedImage(canvas, entry.icon, iconBounds)
 	}
 
 	w.drawLevel(canvas, cell, entry, textColor, hovered)
 	if requiredLevel > 0 {
-		badge := geometry.NewRect(slot.Max.X, slot.Max.Y-skillGridBadgeInsetY, skillGridBadgeW, skillGridBadgeH)
+		badgeW := slot.Width() * skillGridBadgeW / skillGridSlotSize
+		badgeH := slot.Height() * skillGridBadgeH / skillGridSlotSize
+		badgeY := slot.Height() * skillGridBadgeInsetY / skillGridSlotSize
+		badge := geometry.NewRect(slot.Max.X, slot.Max.Y-badgeY, badgeW, badgeH)
 		rotheme.DrawText(canvas, fmt.Sprint(requiredLevel), badge,
 			rotheme.Default.Typography.TextSize, rotheme.Default.Colors.Text, true, widget.TextAlignCenter)
 	}
@@ -141,7 +161,7 @@ func (w *skillGridWidget) drawLevel(canvas widget.Canvas, cell geometry.Rect, en
 		rotheme.DrawText(
 			canvas,
 			fmt.Sprintf("Lv %d", entry.display.Level),
-			geometry.NewRect(cell.Min.X+1, cell.Max.Y-skillGridLevelInsetY, cell.Width()-skillGridNameInsetX*2, skillGridLevelH),
+			geometry.NewRect(cell.Min.X+float32(skillGridNameInsetX), cell.Max.Y-cell.Height()*skillGridLevelInsetY/float32(skillGridCellH), cell.Width()-float32(skillGridNameInsetX)*2, cell.Height()*skillGridLevelH/float32(skillGridCellH)),
 			rotheme.Default.Typography.TextSize,
 			color,
 			false,
@@ -160,7 +180,7 @@ func (w *skillGridWidget) drawLevel(canvas widget.Canvas, cell geometry.Rect, en
 	rotheme.DrawText(
 		canvas,
 		fmt.Sprintf("%d/%d", level, entry.skill.Level),
-		geometry.NewRect(down.Max.X, cell.Max.Y-skillGridLevelInsetY, up.Min.X-down.Max.X, skillGridLevelH),
+		geometry.NewRect(down.Max.X, cell.Max.Y-cell.Height()*skillGridLevelInsetY/float32(skillGridCellH), up.Min.X-down.Max.X, cell.Height()*skillGridLevelH/float32(skillGridCellH)),
 		rotheme.Default.Typography.TextSize,
 		color,
 		false,
@@ -297,20 +317,30 @@ func skillGridHitPart(entry skillGridEntry, cell geometry.Rect, point geometry.P
 }
 
 func skillGridSlotBounds(cell geometry.Rect) geometry.Rect {
+	slot := cell.Width() * skillGridSlotSize / float32(skillGridCellW)
+	if slot > cell.Width() {
+		slot = cell.Width()
+	}
+	if slot < 1 {
+		slot = 1
+	}
+	top := cell.Height() * skillGridSlotTop / float32(skillGridCellH)
 	return geometry.NewRect(
-		cell.Min.X+(cell.Width()-skillGridSlotSize)/2,
-		cell.Min.Y+skillGridSlotTop,
-		skillGridSlotSize,
-		skillGridSlotSize,
+		cell.Min.X+(cell.Width()-slot)/2,
+		cell.Min.Y+top,
+		slot,
+		slot,
 	)
 }
 
 func skillGridPartBounds(cell geometry.Rect, part skillGridPart) geometry.Rect {
 	switch part {
 	case skillGridPartLevelDown:
-		return geometry.NewRect(cell.Min.X+1, cell.Max.Y-rotheme.IconButtonSize, rotheme.IconButtonSize, rotheme.IconButtonSize)
+		size := cell.Height() * float32(rotheme.IconButtonSize) / float32(skillGridCellH)
+		return geometry.NewRect(cell.Min.X+1, cell.Max.Y-size, size, size)
 	case skillGridPartLevelUp:
-		return geometry.NewRect(cell.Max.X-rotheme.IconButtonSize-1, cell.Max.Y-rotheme.IconButtonSize, rotheme.IconButtonSize, rotheme.IconButtonSize)
+		size := cell.Height() * float32(rotheme.IconButtonSize) / float32(skillGridCellH)
+		return geometry.NewRect(cell.Max.X-size-1, cell.Max.Y-size, size, size)
 	default:
 		return cell
 	}
@@ -320,20 +350,34 @@ func (w *skillGridWidget) cellBounds(position int) geometry.Rect {
 	bounds := w.Bounds()
 	col := position % skillGridColumns
 	row := position / skillGridColumns
+	cellW, cellH := w.laidW, w.laidH
+	if cellW <= 0 {
+		cellW = float32(skillGridCellW)
+	}
+	if cellH <= 0 {
+		cellH = float32(skillGridCellH)
+	}
 	return geometry.NewRect(
-		bounds.Min.X+float32(col*skillGridCellW),
-		bounds.Min.Y+float32(row*skillGridCellH),
-		float32(skillGridCellW),
-		float32(skillGridCellH),
+		bounds.Min.X+float32(col)*cellW,
+		bounds.Min.Y+float32(row)*cellH,
+		cellW,
+		cellH,
 	)
 }
 
 func (w *skillGridWidget) positionAt(point geometry.Point) int {
 	local := point.Sub(w.Bounds().Min)
-	if local.X < 0 || local.Y < 0 || local.X >= float32(skillGridColumns*skillGridCellW) || local.Y >= float32(w.totalRows()*skillGridCellH) {
+	cellW, cellH := w.laidW, w.laidH
+	if cellW <= 0 {
+		cellW = float32(skillGridCellW)
+	}
+	if cellH <= 0 {
+		cellH = float32(skillGridCellH)
+	}
+	if local.X < 0 || local.Y < 0 || local.X >= float32(skillGridColumns)*cellW || local.Y >= float32(w.totalRows())*cellH {
 		return -1
 	}
-	return int(local.Y)/skillGridCellH*skillGridColumns + int(local.X)/skillGridCellW
+	return int(local.Y/cellH)*skillGridColumns + int(local.X/cellW)
 }
 
 func (w *skillGridWidget) entryAtPosition(position int) (skillGridEntry, bool) {
@@ -356,11 +400,15 @@ func (w *skillGridWidget) visibleRows(canvas widget.Canvas) (int, int) {
 	offset := canvas.TransformOffset()
 	localTop := clip.Min.Y - offset.Y
 	localBottom := clip.Max.Y - offset.Y
-	if localBottom <= 0 || localTop >= float32(w.totalRows()*skillGridCellH) {
+	cellH := w.laidH
+	if cellH <= 0 {
+		cellH = float32(skillGridCellH)
+	}
+	if localBottom <= 0 || localTop >= float32(w.totalRows())*cellH {
 		return 0, 0
 	}
-	start := maxInt(0, int(localTop)/skillGridCellH)
-	end := minInt(w.totalRows(), int(localBottom)/skillGridCellH+1)
+	start := maxInt(0, int(localTop/cellH))
+	end := minInt(w.totalRows(), int(localBottom/cellH)+1)
 	return start, maxInt(start, end)
 }
 
@@ -436,13 +484,18 @@ func (w *SkillWindow) skillGridAtMouse(mouseX, mouseY int) (session.Skill, bool)
 	if w.grid == nil {
 		return session.Skill{}, false
 	}
-	x := w.x + skillTabRailW + verticalTabDividerW
-	y := w.y + ROWindowTitleHeight
-	if !pointInRect(mouseX, mouseY, x, y, skillGridColumns*skillGridCellW, skillGridViewH) {
+	scale := w.elementScale()
+	x := w.x + scaleInt(skillTabRailW+verticalTabDividerW, scale)
+	y := w.y + scaleInt(ROWindowTitleHeight, scale)
+	cellW := scaleInt(skillGridCellW, scale)
+	if cellW < 1 {
+		cellW = 1
+	}
+	if !pointInRect(mouseX, mouseY, x, y, scaleInt(skillGridColumns*skillGridCellW, scale), scaleInt(skillGridViewH, scale)) {
 		return session.Skill{}, false
 	}
-	col := (mouseX - x) / skillGridCellW
-	row := int((float32(mouseY-y) + w.ensureScrollSignal().Get()) / float32(skillGridCellH))
+	col := (mouseX - x) / cellW
+	row := int((float32(mouseY-y) + w.ensureScrollSignal().Get()) / scaleF(float32(skillGridCellH), scale))
 	entry, ok := w.grid.entryAtPosition(row*skillGridColumns + col)
 	return entry.skill, ok
 }

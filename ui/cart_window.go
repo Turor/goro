@@ -141,7 +141,8 @@ func (w *CartWindow) DrawDragGhost(screen *render.Frame, ctx Context, assets Ass
 
 func (w *CartWindow) AcceptInventoryDrop(ctx Context, item session.InventoryItem, mx, my int) bool {
 	w.EnsureWindow(cartWindowWidth, cartWindowHeight)
-	if !w.IsOpen() || !pointInRect(mx, my, w.x, w.y, cartWindowWidth, cartWindowHeight) {
+	width, height := w.currentSize(cartWindowWidth, cartWindowHeight)
+	if !w.IsOpen() || !pointInRect(mx, my, w.x, w.y, width, height) {
 		return false
 	}
 	amount := uint32(item.Amount)
@@ -162,7 +163,8 @@ func (w *CartWindow) AcceptInventoryDrop(ctx Context, item session.InventoryItem
 
 func (w *CartWindow) AcceptStorageDrop(ctx Context, item session.InventoryItem, mx, my int) bool {
 	w.EnsureWindow(cartWindowWidth, cartWindowHeight)
-	if !w.IsOpen() || !pointInRect(mx, my, w.x, w.y, cartWindowWidth, cartWindowHeight) {
+	width, height := w.currentSize(cartWindowWidth, cartWindowHeight)
+	if !w.IsOpen() || !pointInRect(mx, my, w.x, w.y, width, height) {
 		return false
 	}
 	amount := uint32(item.Amount)
@@ -316,7 +318,7 @@ func (w *CartWindow) ClampScroll(s *session.Session) {
 	}
 	scroll := w.ensureScrollSignal()
 	contentHeight := inventoryGridTotalRows(itemCount, cartGridCols, cartGridRows) * cartGridCell
-	maxScroll := float32(maxInt(0, contentHeight-cartGridViewH))
+	maxScroll := scaledScrollMax(contentHeight, cartGridViewH, w.elementScale())
 	switch value := scroll.Get(); {
 	case value < 0:
 		scroll.Set(0)

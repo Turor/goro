@@ -2,6 +2,7 @@ package ui
 
 import (
 	"github.com/gogpu/ui/geometry"
+	"github.com/gogpu/ui/primitives"
 	"github.com/gogpu/ui/widget"
 	"github.com/kivutar/goro/client"
 	"github.com/kivutar/goro/input"
@@ -74,15 +75,50 @@ func (w *Window) applyUserFrame() {
 	if !w.userSized {
 		return
 	}
+	if overlay := w.positionedOverlay(); overlay != nil {
+		overlay.contentScale = 1
+	}
 	frame, ok := w.content.(*windowFrame)
 	if !ok {
+		w.scaleLooseContent()
 		return
 	}
 	w.width, w.height = w.userWidth, w.userHeight
+	if frame.designW <= 0 || frame.designH <= 0 {
+		frame.designW = frame.Style().ExplicitWidth
+		frame.designH = frame.Style().ExplicitHeight
+	}
 	frame.Width(float32(w.userWidth))
 	frame.Height(float32(w.userHeight))
 	frame.fillUserSize = true
 	w.heightDelta = frame.heightDelta
+	if overlay := w.positionedOverlay(); overlay != nil {
+		overlay.contentScale = frameScale(frame.designW, frame.designH, float32(w.userWidth), float32(w.userHeight))
+	}
+}
+
+func (w *Window) scaleLooseContent() {
+	box, ok := w.content.(*primitives.BoxWidget)
+	if !ok || w.userWidth <= 0 || w.userHeight <= 0 {
+		return
+	}
+	if w.looseDesignW <= 0 || w.looseDesignH <= 0 {
+		w.looseDesignW = box.Style().ExplicitWidth
+		w.looseDesignH = box.Style().ExplicitHeight
+	}
+	scale := frameScale(w.looseDesignW, w.looseDesignH, float32(w.userWidth), float32(w.userHeight))
+	if w.looseTokens == nil {
+		w.looseTokens = make(map[widget.Widget]*scaleToken)
+	}
+	frame := &windowFrame{contentScale: scale, scaleTokens: w.looseTokens}
+	for _, child := range box.Children() {
+		frame.scaleWidgetTree(child)
+	}
+	box.Width(float32(w.userWidth))
+	box.Height(float32(w.userHeight))
+	if overlay := w.positionedOverlay(); overlay != nil {
+		overlay.contentScale = scale
+	}
 }
 
 func (w *Window) startResize(ctx client.Context) {
@@ -117,4 +153,18 @@ func drawWindowResizeGrip(canvas widget.Canvas, width, height int) {
 		geometry.NewRect(float32(width)-grip, float32(height)-grip, grip, grip),
 		rotheme.Default.Colors.ButtonBorder,
 	)
+}
+
+func frameScale(designW, designH, userW, userH float32) float32 {
+	if designW <= 0 || designH <= 0 || userW <= 0 || userH <= 0 {
+		return 1
+	}
+	scale := userW / designW
+	if heightScale := userH / designH; heightScale < scale {
+		scale = heightScale
+	}
+	if scale <= 0 {
+		return 1
+	}
+	return scale
 }

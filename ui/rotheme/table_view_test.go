@@ -1188,3 +1188,26 @@ func TestTableViewRowEventWithContextCanSetCursor(t *testing.T) {
 		t.Fatalf("cursor = %v, want %v", ctx.Cursor(), widget.CursorPointer)
 	}
 }
+
+func TestTableViewKeepsLayoutScaleAfterContentScaleResets(t *testing.T) {
+	table := TableView(
+		TableViewColumns([]TableViewColumn{{Key: "name", Width: 100}}),
+		TableViewRowCount(4),
+		TableViewRowHeight(20),
+		TableViewHeaderHeight(16),
+	)
+	SetContentScale(0.5)
+	table.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(120, 80)))
+	table.SetBounds(geometry.NewRect(0, 0, 120, 80))
+	SetContentScale(1)
+	if got := table.scaledRowHeight(); got != 10 {
+		t.Fatalf("row height after scale reset = %.1f, want 10", got)
+	}
+	table.updateScrollBounds()
+	if got := table.scroll.Bounds().Min.Y; got != 8 {
+		t.Fatalf("scroll starts at %.1f after scale reset, want 8", got)
+	}
+	if row := table.body.rowAt(15); row != 1 {
+		t.Fatalf("row at y=15 = %d, want 1", row)
+	}
+}

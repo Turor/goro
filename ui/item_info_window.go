@@ -663,7 +663,7 @@ func newItemInfoCardSlotWidget(img image.Image, width, height int, cardID uint32
 }
 
 func (w *itemInfoCardSlotWidget) Layout(ctx widget.Context, constraints geometry.Constraints) geometry.Size {
-	size := constraints.Constrain(geometry.Sz(float32(w.width), float32(w.height)))
+	size := constraints.Constrain(geometry.Sz(float32(w.width)*rotheme.ContentScale(), float32(w.height)*rotheme.ContentScale()))
 	w.SetBounds(geometry.FromPointSize(w.Position(), size))
 	return size
 }
@@ -672,7 +672,7 @@ func (w *itemInfoCardSlotWidget) Draw(ctx widget.Context, canvas widget.Canvas) 
 	if !w.IsVisible() || w.image == nil {
 		return
 	}
-	canvas.DrawImage(w.image, w.Bounds().Min)
+	drawFittedImage(canvas, w.image, w.Bounds())
 }
 
 func (w *itemInfoCardSlotWidget) Event(ctx widget.Context, e event.Event) bool {

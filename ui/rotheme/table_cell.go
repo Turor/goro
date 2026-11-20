@@ -77,12 +77,13 @@ func (c tableViewSimpleCell) draw(canvas widget.Canvas, bounds geometry.Rect) {
 	}
 	textBounds := bounds
 	if c.icon != nil {
-		iconBounds := c.icon.Bounds()
-		iconW := float32(iconBounds.Dx())
-		iconH := float32(iconBounds.Dy())
-		iconY := bounds.Min.Y + (bounds.Height()-iconH)/2
-		canvas.DrawImage(c.icon, geometry.Pt(bounds.Min.X+tableIconInset, iconY))
-		textBounds.Min.X += iconW + tableIconTextGap
+		iconSize := bounds.Height() - tableIconInset*2
+		if iconSize < 1 {
+			iconSize = bounds.Height()
+		}
+		iconY := bounds.Min.Y + (bounds.Height()-iconSize)/2
+		DrawFittedImage(canvas, c.icon, geometry.NewRect(bounds.Min.X+tableIconInset, iconY, iconSize, iconSize))
+		textBounds.Min.X += iconSize + tableIconTextGap
 	}
 	textBounds.Min.X += TableCellPadX
 	textBounds.Max.X -= TableCellPadX

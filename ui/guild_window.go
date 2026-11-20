@@ -1145,7 +1145,7 @@ func (w *GuildWindow) handleGuildSkillTableRowEvent(widgetCtx widget.Context, ct
 		if mouse.Button != event.ButtonLeft {
 			return false
 		}
-		if guildSkillLevelUpButtonBounds(row).Contains(mouse.Position) {
+		if guildSkillLevelUpButtonBoundsScaled(row, w.elementScale()).Contains(mouse.Position) {
 			if !w.canStageGuildSkill(display, guild) {
 				return true
 			}
@@ -1190,18 +1190,27 @@ func (w *GuildWindow) pressGuildSkill(ctx Context, skill session.Skill) {
 }
 
 func guildSkillLevelUpButtonBounds(row int) geometry.Rect {
+	return guildSkillLevelUpButtonBoundsScaled(row, 1)
+}
+
+func guildSkillLevelUpButtonBoundsScaled(row int, scale float32) geometry.Rect {
+	if scale <= 0 {
+		scale = 1
+	}
+	button := rotheme.IconButtonSize * scale
 	x := float32(0)
 	for _, col := range guildSkillTableColumns() {
+		width := col.Width * scale
 		if col.Key == "levelup" {
-			rowH := float32(guildTableRowH)
+			rowH := float32(guildTableRowH) * scale
 			return geometry.NewRect(
-				x+(col.Width-rotheme.IconButtonSize)/2,
-				float32(row)*rowH+(rowH-rotheme.IconButtonSize)/2,
-				rotheme.IconButtonSize,
-				rotheme.IconButtonSize,
+				x+(width-button)/2,
+				float32(row)*rowH+(rowH-button)/2,
+				button,
+				button,
 			)
 		}
-		x += col.Width
+		x += width
 	}
 	return geometry.Rect{}
 }
@@ -1310,31 +1319,34 @@ func (w *GuildWindow) updateTooltipHover(ctx Context) {
 		return
 	}
 	x, y, width, height := w.guildTableBounds(ctx)
-	y += guildTableHeaderH
-	height -= guildTableHeaderH
+	header := scaleInt(guildTableHeaderH, w.elementScale())
+	y += header
+	height -= header
 	if ctx.Input == nil || !pointInRect(ctx.Input.MouseX, ctx.Input.MouseY, x, y, scrollbarSafeIntWidth(width), height) {
 		w.hideTooltip()
 		return
 	}
 	if w.tab != guildWindowTabSkills {
 		scroll := w.tableScrollSignal()
-		if scroll == nil || scroll.Get() != w.tooltipScroll || int((float32(ctx.Input.MouseY-y)+scroll.Get())/float32(guildTableRowH)) != w.tooltipRow {
+		if scroll == nil || scroll.Get() != w.tooltipScroll || int((float32(ctx.Input.MouseY-y)+scroll.Get())/scaleF(float32(guildTableRowH), w.elementScale())) != w.tooltipRow {
 			w.hideTooltip()
 		}
 	}
 }
 
 func (w *GuildWindow) guildTableBounds(ctx Context) (int, int, int, int) {
+	scale := w.elementScale()
 	x := w.x
-	y := w.y + ROWindowTitleHeight + guildWindowTabHeight + guildContentGap
+	y := w.y + scaleInt(ROWindowTitleHeight+guildWindowTabHeight+guildContentGap, scale)
 	height := w.height - (y - w.y)
 	if w.tab == guildWindowTabSkills || guildSessionInfo(ctx.Session).IsMaster && (w.tab == guildWindowTabMembers || w.tab == guildWindowTabPositions) {
-		height -= ROWindowFooterHeight
+		height -= scaleInt(ROWindowFooterHeight, scale)
 	}
 	if height < 0 {
 		height = 0
 	}
-	return x, y, guildWindowWidth, height
+	width, _ := w.currentSize(guildWindowWidth, guildWindowHeight)
+	return x, y, width, height
 }
 
 func (w *GuildWindow) ensureGuildSkillScrollSignal() state.Signal[float32] {
@@ -1712,7 +1724,7 @@ type guildRelationRowWidget struct {
 }
 
 func (w *guildRelationRowWidget) Layout(_ widget.Context, constraints geometry.Constraints) geometry.Size {
-	size := constraints.Constrain(geometry.Sz(float32(guildRelationRowW), float32(guildRelationRowH)))
+	size := constraints.Constrain(geometry.Sz(float32(guildRelationRowW)*rotheme.ContentScale(), float32(guildRelationRowH)*rotheme.ContentScale()))
 	w.SetBounds(geometry.FromPointSize(w.Position(), size))
 	return size
 }

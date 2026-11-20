@@ -28,6 +28,7 @@ type TextAreaWidget struct {
 	lineText     string
 	lineWidth    float32
 	revealCursor bool
+	laidScale    float32
 }
 
 type textAreaLine struct {
@@ -49,8 +50,25 @@ func (w *TextAreaWidget) Text() string              { return w.text }
 func (w *TextAreaWidget) SetReadOnly(readOnly bool) { w.readOnly = readOnly }
 func (w *TextAreaWidget) IsFocusable() bool         { return w.IsEnabled() }
 
+func (w *TextAreaWidget) layoutScale() float32 {
+	if w.laidScale > 0 {
+		return w.laidScale
+	}
+	return 1
+}
+
+func (w *TextAreaWidget) lineHeight() float32 {
+	return textAreaLineHeight * w.layoutScale()
+}
+
+func (w *TextAreaWidget) pad() float32 {
+	return textAreaPadding * w.layoutScale()
+}
+
 func (w *TextAreaWidget) Layout(_ widget.Context, constraints geometry.Constraints) geometry.Size {
-	size := constraints.Constrain(geometry.Sz(textAreaWidth, textAreaHeight))
+	w.laidScale = ContentScale()
+	scale := w.layoutScale()
+	size := constraints.Constrain(geometry.Sz(textAreaWidth*scale, textAreaHeight*scale))
 	w.SetBounds(geometry.FromPointSize(w.Position(), size))
 	return size
 }
@@ -66,7 +84,7 @@ func (w *TextAreaWidget) Draw(_ widget.Context, canvas widget.Canvas) {
 		drawTextFieldInsetShadow(canvas, bounds)
 	}
 	canvas.StrokeRect(bounds, border, 1)
-	content := bounds.Inset(geometry.UniformInsets(textAreaPadding))
+	content := bounds.Inset(geometry.UniformInsets(w.pad()))
 	w.wrap(canvas, content.Width())
 	w.clampScroll()
 	if w.revealCursor {
@@ -79,24 +97,24 @@ func (w *TextAreaWidget) Draw(_ widget.Context, canvas widget.Canvas) {
 	start, end := w.selection()
 	for i := w.scroll; i < len(w.lines); i++ {
 		line := w.lines[i]
-		y := content.Min.Y + float32(i-w.scroll)*textAreaLineHeight
+		y := content.Min.Y + float32(i-w.scroll)*w.lineHeight()
 		if y >= content.Max.Y {
 			break
 		}
 		if w.IsFocused() && start != end {
 			a, b := max(start, line.start), min(end, line.end)
 			if a < b {
-				canvas.DrawRect(geometry.NewRect(content.Min.X+line.stops[a-line.start], y, line.stops[b-line.start]-line.stops[a-line.start], textAreaLineHeight), textAreaSelection)
+				canvas.DrawRect(geometry.NewRect(content.Min.X+line.stops[a-line.start], y, line.stops[b-line.start]-line.stops[a-line.start], w.lineHeight()), textAreaSelection)
 			}
 		}
-		DrawText(canvas, string(runes[line.start:line.end]), geometry.NewRect(content.Min.X, y, content.Width(), textAreaLineHeight), Default.Typography.TextSize, Default.Colors.Text, false, widget.TextAlignLeft)
+		DrawText(canvas, string(runes[line.start:line.end]), geometry.NewRect(content.Min.X, y, content.Width(), w.lineHeight()), Default.Typography.TextSize, Default.Colors.Text, false, widget.TextAlignLeft)
 	}
 	if w.IsFocused() && w.IsEnabled() && start == end {
 		row := w.cursorLine()
 		line := w.lines[row]
 		x := content.Min.X + line.stops[min(w.cursor-line.start, len(line.stops)-1)]
-		y := content.Min.Y + float32(row-w.scroll)*textAreaLineHeight
-		canvas.DrawLine(geometry.Pt(x, y+textAreaCaretInset), geometry.Pt(x, y+textAreaLineHeight-textAreaCaretInset), Default.Colors.Text, 1)
+		y := content.Min.Y + float32(row-w.scroll)*w.lineHeight()
+		canvas.DrawLine(geometry.Pt(x, y+textAreaCaretInset*w.layoutScale()), geometry.Pt(x, y+w.lineHeight()-textAreaCaretInset*w.layoutScale()), Default.Colors.Text, 1)
 	}
 }
 
@@ -160,7 +178,7 @@ func (w *TextAreaWidget) keepCursorVisible() {
 	if len(w.lines) == 0 {
 		return
 	}
-	visible := max(1, int((w.Bounds().Height()-textAreaPadding*2)/textAreaLineHeight))
+	visible := max(1, int((w.Bounds().Height()-textAreaPadding*2)/w.lineHeight()))
 	row := w.cursorLine()
 	if row < w.scroll {
 		w.scroll = row
@@ -172,7 +190,7 @@ func (w *TextAreaWidget) keepCursorVisible() {
 }
 
 func (w *TextAreaWidget) clampScroll() {
-	visible := max(1, int((w.Bounds().Height()-textAreaPadding*2)/textAreaLineHeight))
+	visible := max(1, int((w.Bounds().Height()-textAreaPadding*2)/w.lineHeight()))
 	w.scroll = max(0, min(w.scroll, len(w.lines)-visible))
 }
 
@@ -180,8 +198,8 @@ func (w *TextAreaWidget) cursorAt(p geometry.Point) (pos, row int) {
 	if len(w.lines) == 0 {
 		return 0, -1
 	}
-	content := w.Bounds().Inset(geometry.UniformInsets(textAreaPadding))
-	row = max(0, min(w.scroll+int((p.Y-content.Min.Y)/textAreaLineHeight), len(w.lines)-1))
+	content := w.Bounds().Inset(geometry.UniformInsets(w.pad()))
+	row = max(0, min(w.scroll+int((p.Y-content.Min.Y)/w.lineHeight()), len(w.lines)-1))
 	line := w.lines[row]
 	x := p.X - content.Min.X
 	for i := 1; i < len(line.stops); i++ {

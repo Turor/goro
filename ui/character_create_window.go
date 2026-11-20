@@ -306,7 +306,7 @@ func (w *characterCreatePreview) Height(height float32) *characterCreatePreview 
 }
 
 func (w *characterCreatePreview) Layout(_ widget.Context, constraints geometry.Constraints) geometry.Size {
-	size := constraints.Constrain(geometry.Sz(w.width, w.height))
+	size := constraints.Constrain(geometry.Sz(w.width*rotheme.ContentScale(), w.height*rotheme.ContentScale()))
 	w.SetBounds(geometry.FromPointSize(w.Position(), size))
 	return size
 }
@@ -317,10 +317,14 @@ func (w *characterCreatePreview) Draw(_ widget.Context, canvas widget.Canvas) {
 	}
 	bounds := w.Bounds()
 	if w.image != nil {
+		scale := bounds.Height() / float32(characterCreatePanelH)
+		if scale <= 0 {
+			scale = 1
+		}
 		imgBounds := w.image.Bounds()
-		x := bounds.Min.X + (bounds.Width()-float32(imgBounds.Dx()))/2
-		y := bounds.Min.Y + (bounds.Height()-float32(imgBounds.Dy()))/2
-		canvas.DrawImage(w.image, geometry.Pt(x, y))
+		imgW := float32(imgBounds.Dx()) * scale
+		imgH := float32(imgBounds.Dy()) * scale
+		drawFittedImage(canvas, w.image, geometry.NewRect(bounds.Min.X+(bounds.Width()-imgW)/2, bounds.Min.Y+(bounds.Height()-imgH)/2, imgW, imgH))
 	}
 	for i, kind := range [...]rotheme.IconButtonKind{rotheme.IconButtonLeft, rotheme.IconButtonUp, rotheme.IconButtonRight} {
 		rect := characterCreatePreviewButtonRect(bounds, i)
@@ -389,13 +393,17 @@ func characterCreatePreviewButtonAt(bounds geometry.Rect, point geometry.Point) 
 }
 
 func characterCreatePreviewButtonRect(bounds geometry.Rect, index int) geometry.Rect {
-	size := rotheme.IconButtonSize
-	inset := float32(characterCreatePreviewButtonInset)
+	scale := bounds.Height() / float32(characterCreatePanelH)
+	if scale <= 0 {
+		scale = 1
+	}
+	size := rotheme.IconButtonSize * scale
+	inset := float32(characterCreatePreviewButtonInset) * scale
 	xs := [...]float32{bounds.Min.X + inset, bounds.Min.X + bounds.Width()/2 - size/2, bounds.Max.X - inset - size}
 	ys := [...]float32{
-		bounds.Min.Y + float32(characterCreateHairStyleButtonY),
-		bounds.Min.Y + float32(characterCreateHairColorButtonY),
-		bounds.Min.Y + float32(characterCreateHairStyleButtonY),
+		bounds.Min.Y + float32(characterCreateHairStyleButtonY)*scale,
+		bounds.Min.Y + float32(characterCreateHairColorButtonY)*scale,
+		bounds.Min.Y + float32(characterCreateHairStyleButtonY)*scale,
 	}
 	if index < 0 || index >= len(xs) {
 		index = 0
@@ -427,7 +435,7 @@ func (w *characterCreateStatGraph) Height(height float32) *characterCreateStatGr
 }
 
 func (w *characterCreateStatGraph) Layout(_ widget.Context, constraints geometry.Constraints) geometry.Size {
-	size := constraints.Constrain(geometry.Sz(w.width, w.height))
+	size := constraints.Constrain(geometry.Sz(w.width*rotheme.ContentScale(), w.height*rotheme.ContentScale()))
 	w.SetBounds(geometry.FromPointSize(w.Position(), size))
 	return size
 }
@@ -440,8 +448,9 @@ func (w *characterCreateStatGraph) Draw(_ widget.Context, canvas widget.Canvas) 
 
 	cx := bounds.Min.X + bounds.Width()/2
 	cy := bounds.Min.Y + bounds.Height()/2
-	outer := float32(characterCreateGraphOuterRadius)
-	inner := float32(characterCreateGraphInnerRadius)
+	scale := characterCreateBoundsScale(bounds)
+	outer := float32(characterCreateGraphOuterRadius) * scale
+	inner := float32(characterCreateGraphInnerRadius) * scale
 	points := characterCreateWidgetGraphPoints(cx, cy, outer)
 	mid := characterCreateWidgetGraphPoints(cx, cy, inner)
 	order := CharacterCreateGraphDrawOrder()
@@ -550,11 +559,26 @@ func characterCreateStatButtonRect(bounds geometry.Rect, stat int) geometry.Rect
 	}
 	cx := bounds.Min.X + bounds.Width()/2
 	cy := bounds.Min.Y + bounds.Height()/2
-	centers := characterCreateWidgetGraphPoints(cx, cy, float32(characterCreateStatButtonRadius))
+	scale := characterCreateBoundsScale(bounds)
+	centers := characterCreateWidgetGraphPoints(cx, cy, float32(characterCreateStatButtonRadius)*scale)
 	center := centers[stat]
-	x := float32(math.Round(float64(center.X - float32(characterCreateStatButtonW/2))))
-	y := float32(math.Round(float64(center.Y - float32(characterCreateStatButtonH/2))))
-	return geometry.NewRect(x, y, float32(characterCreateStatButtonW), float32(characterCreateStatButtonH))
+	buttonW := float32(characterCreateStatButtonW) * scale
+	buttonH := float32(characterCreateStatButtonH) * scale
+	x := float32(math.Round(float64(center.X - buttonW/2)))
+	y := float32(math.Round(float64(center.Y - buttonH/2)))
+	return geometry.NewRect(x, y, buttonW, buttonH)
+}
+
+func characterCreateBoundsScale(bounds geometry.Rect) float32 {
+	sx := bounds.Width() / float32(characterCreateGraphW)
+	sy := bounds.Height() / float32(characterCreatePanelH)
+	if sx <= 0 || sy <= 0 {
+		return 1
+	}
+	if sx < sy {
+		return sx
+	}
+	return sy
 }
 
 func characterCreateStatFillBounds(cx, cy, radius float32) geometry.Rect {

@@ -728,16 +728,20 @@ func (w *VendingWindow) rightRowAt(mx, my int) (int, bool) {
 }
 
 func (w *VendingWindow) leftDropTarget(mx, my int) bool {
-	return pointInRect(mx, my, w.leftWindow.x, w.leftWindow.y, vendingWindowW, w.leftHeight())
+	width, height := w.leftWindow.currentSize(vendingWindowW, w.leftHeight())
+	return pointInRect(mx, my, w.leftWindow.x, w.leftWindow.y, width, height)
 }
 
 func (w *VendingWindow) rightDropTarget(mx, my int) bool {
-	return pointInRect(mx, my, w.rightWindow.x, w.rightWindow.y, vendingWindowW, w.rightHeight())
+	width, height := w.rightWindow.currentSize(vendingWindowW, w.rightHeight())
+	return pointInRect(mx, my, w.rightWindow.x, w.rightWindow.y, width, height)
 }
 
 func (w *VendingWindow) inside(mx, my int) bool {
-	return pointInRect(mx, my, w.leftWindow.x, w.leftWindow.y, vendingWindowW, w.leftHeight()) ||
-		pointInRect(mx, my, w.rightWindow.x, w.rightWindow.y, vendingWindowW, w.rightHeight())
+	leftW, leftH := w.leftWindow.currentSize(vendingWindowW, w.leftHeight())
+	rightW, rightH := w.rightWindow.currentSize(vendingWindowW, w.rightHeight())
+	return pointInRect(mx, my, w.leftWindow.x, w.leftWindow.y, leftW, leftH) ||
+		pointInRect(mx, my, w.rightWindow.x, w.rightWindow.y, rightW, rightH)
 }
 
 func (w *VendingWindow) leftTableBounds() (int, int, int, int) {

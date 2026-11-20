@@ -774,7 +774,7 @@ type npcDialogTextLineWidget struct {
 
 func (w *npcDialogTextLineWidget) Layout(_ widget.Context, constraints geometry.Constraints) geometry.Size {
 	width := npcDialogEstimatedTextWidth(npcDialogRunsPlainText(w.runs))
-	size := constraints.Constrain(geometry.Sz(width, float32(npcDialogLineH)))
+	size := constraints.Constrain(geometry.Sz(width*rotheme.ContentScale(), float32(npcDialogLineH)*rotheme.ContentScale()))
 	w.SetBounds(geometry.FromPointSize(w.Position(), size))
 	return size
 }

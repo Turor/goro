@@ -148,13 +148,14 @@ func (w *MakingArrowWindow) updateDoubleClick(ctx Context) {
 }
 
 func (w *MakingArrowWindow) rowAtMouse(mouseX, mouseY int) (int, bool) {
+	scale := w.elementScale()
 	tableX := w.x
-	tableY := w.y + ROWindowTitleHeight
-	rowY := tableY + makingArrowTableHeaderH
-	if !pointInRect(mouseX, mouseY, tableX, rowY, scrollbarSafeIntWidth(makingArrowWindowWidth), makingArrowRows*makingArrowRowH) {
+	tableY := w.y + scaleInt(ROWindowTitleHeight, scale)
+	rowY := tableY + scaleInt(makingArrowTableHeaderH, scale)
+	if !pointInRect(mouseX, mouseY, tableX, rowY, scaleInt(scrollbarSafeIntWidth(makingArrowWindowWidth), scale), scaleInt(makingArrowRows*makingArrowRowH, scale)) {
 		return 0, false
 	}
-	row := int((float32(mouseY-rowY) + w.ensureScrollSignal().Get()) / float32(makingArrowRowH))
+	row := int((float32(mouseY-rowY) + w.ensureScrollSignal().Get()) / scaleF(float32(makingArrowRowH), scale))
 	if row < 0 || row >= len(w.itemIDs) {
 		return 0, false
 	}
@@ -203,7 +204,7 @@ func (w *MakingArrowWindow) clampScroll() {
 		w.selectedRow = -1
 	}
 	scroll := w.ensureScrollSignal()
-	maxScroll := float32(maxInt(0, len(w.itemIDs)-makingArrowRows) * makingArrowRowH)
+	maxScroll := scaledScrollMax(maxInt(0, len(w.itemIDs)-makingArrowRows)*makingArrowRowH, 0, w.elementScale())
 	switch value := scroll.Get(); {
 	case value < 0:
 		scroll.Set(0)
