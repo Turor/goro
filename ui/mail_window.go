@@ -522,10 +522,12 @@ func (w *MailWindow) AcceptInventoryDrop(ctx Context, item session.InventoryItem
 			return false
 		}
 	}
-	if w.readWindow.IsOpen() && pointInRect(mx, my, w.readWindow.x, w.readWindow.y, mailReadW, mailReadH) {
+	readW, readH := w.readWindow.currentSize(mailReadW, mailReadH)
+	if w.readWindow.IsOpen() && pointInRect(mx, my, w.readWindow.x, w.readWindow.y, readW, readH) {
 		return true
 	}
-	if !pointInRect(mx, my, w.x, w.y, mailWindowW, mailWindowH) {
+	mailW, mailH := w.currentSize(mailWindowW, mailWindowH)
+	if !pointInRect(mx, my, w.x, w.y, mailW, mailH) {
 		return false
 	}
 	// Dropping on the inbox, footer or a busy composer is still a UI drop,
@@ -596,7 +598,7 @@ func (s *mailAttachmentSlot) Draw(_ widget.Context, canvas widget.Canvas) {
 		drawFittedImage(canvas, s.icon, geometry.NewRect(b.Min.X+pad, b.Min.Y+pad, b.Width()-pad*2, b.Height()-pad*2))
 	}
 	if s.item.Amount > 1 {
-		rotheme.DrawText(canvas, strconv.Itoa(s.item.Amount), geometry.NewRect(b.Min.X, b.Max.Y-mailAmountLabelH, b.Width()-mailAmountInset, mailAmountLabelH), rotheme.Default.Typography.TextSize, rotheme.Default.Colors.Text, false, widget.TextAlignRight)
+		rotheme.DrawText(canvas, strconv.Itoa(s.item.Amount), geometry.NewRect(b.Min.X, b.Max.Y-b.Height()*mailAmountLabelH/mailSlot, b.Width()-b.Width()*mailAmountInset/mailSlot, b.Height()*mailAmountLabelH/mailSlot), rotheme.Default.Typography.TextSize, rotheme.Default.Colors.Text, false, widget.TextAlignRight)
 	}
 }
 func (s *mailAttachmentSlot) Event(_ widget.Context, e event.Event) bool {

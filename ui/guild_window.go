@@ -1319,31 +1319,34 @@ func (w *GuildWindow) updateTooltipHover(ctx Context) {
 		return
 	}
 	x, y, width, height := w.guildTableBounds(ctx)
-	y += guildTableHeaderH
-	height -= guildTableHeaderH
+	header := scaleInt(guildTableHeaderH, w.elementScale())
+	y += header
+	height -= header
 	if ctx.Input == nil || !pointInRect(ctx.Input.MouseX, ctx.Input.MouseY, x, y, scrollbarSafeIntWidth(width), height) {
 		w.hideTooltip()
 		return
 	}
 	if w.tab != guildWindowTabSkills {
 		scroll := w.tableScrollSignal()
-		if scroll == nil || scroll.Get() != w.tooltipScroll || int((float32(ctx.Input.MouseY-y)+scroll.Get())/float32(guildTableRowH)) != w.tooltipRow {
+		if scroll == nil || scroll.Get() != w.tooltipScroll || int((float32(ctx.Input.MouseY-y)+scroll.Get())/scaleF(float32(guildTableRowH), w.elementScale())) != w.tooltipRow {
 			w.hideTooltip()
 		}
 	}
 }
 
 func (w *GuildWindow) guildTableBounds(ctx Context) (int, int, int, int) {
+	scale := w.elementScale()
 	x := w.x
-	y := w.y + ROWindowTitleHeight + guildWindowTabHeight + guildContentGap
+	y := w.y + scaleInt(ROWindowTitleHeight+guildWindowTabHeight+guildContentGap, scale)
 	height := w.height - (y - w.y)
 	if w.tab == guildWindowTabSkills || guildSessionInfo(ctx.Session).IsMaster && (w.tab == guildWindowTabMembers || w.tab == guildWindowTabPositions) {
-		height -= ROWindowFooterHeight
+		height -= scaleInt(ROWindowFooterHeight, scale)
 	}
 	if height < 0 {
 		height = 0
 	}
-	return x, y, guildWindowWidth, height
+	width, _ := w.currentSize(guildWindowWidth, guildWindowHeight)
+	return x, y, width, height
 }
 
 func (w *GuildWindow) ensureGuildSkillScrollSignal() state.Signal[float32] {

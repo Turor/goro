@@ -141,7 +141,8 @@ func (w *CartWindow) DrawDragGhost(screen *render.Frame, ctx Context, assets Ass
 
 func (w *CartWindow) AcceptInventoryDrop(ctx Context, item session.InventoryItem, mx, my int) bool {
 	w.EnsureWindow(cartWindowWidth, cartWindowHeight)
-	if !w.IsOpen() || !pointInRect(mx, my, w.x, w.y, cartWindowWidth, cartWindowHeight) {
+	width, height := w.currentSize(cartWindowWidth, cartWindowHeight)
+	if !w.IsOpen() || !pointInRect(mx, my, w.x, w.y, width, height) {
 		return false
 	}
 	amount := uint32(item.Amount)
@@ -162,7 +163,8 @@ func (w *CartWindow) AcceptInventoryDrop(ctx Context, item session.InventoryItem
 
 func (w *CartWindow) AcceptStorageDrop(ctx Context, item session.InventoryItem, mx, my int) bool {
 	w.EnsureWindow(cartWindowWidth, cartWindowHeight)
-	if !w.IsOpen() || !pointInRect(mx, my, w.x, w.y, cartWindowWidth, cartWindowHeight) {
+	width, height := w.currentSize(cartWindowWidth, cartWindowHeight)
+	if !w.IsOpen() || !pointInRect(mx, my, w.x, w.y, width, height) {
 		return false
 	}
 	amount := uint32(item.Amount)

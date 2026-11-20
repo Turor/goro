@@ -358,7 +358,7 @@ func (w *friendRowWidget) Draw(_ widget.Context, canvas widget.Canvas) {
 	textH := bounds.Height() * float32(friendsRowTextH) / float32(friendsRowHeight)
 	textY := bounds.Min.Y + (bounds.Height()-textH)/2
 	rotheme.DrawText(canvas, trimRunes(w.name, 24), geometry.NewRect(bounds.Min.X+float32(friendsRowTextX), textY, bounds.Width()-float32(friendsRowTextRight), textH), rotheme.Default.Typography.TextSize, rotheme.Default.Colors.Text, false, widget.TextAlignLeft)
-	rotheme.DrawText(canvas, w.state, geometry.NewRect(bounds.Max.X-float32(friendsRowStateRight), textY, float32(friendsRowStateW), textH), rotheme.Default.Typography.TextSize, w.stateColor, false, widget.TextAlignRight)
+	rotheme.DrawText(canvas, w.state, geometry.NewRect(bounds.Max.X-bounds.Width()*float32(friendsRowStateRight)/float32(friendsWindowWidth), textY, bounds.Width()*float32(friendsRowStateW)/float32(friendsWindowWidth), textH), rotheme.Default.Typography.TextSize, w.stateColor, false, widget.TextAlignRight)
 }
 
 func (w *friendRowWidget) Event(ctx widget.Context, e event.Event) bool {
@@ -490,12 +490,13 @@ func (w *partyRowWidget) Draw(_ widget.Context, canvas widget.Canvas) {
 		bg = rotheme.Default.Colors.ButtonHover
 	}
 	canvas.DrawRect(bounds, bg)
-	textY := bounds.Min.Y + float32(friendsPartyTextY)
-	textH := float32(friendsPartyTextH)
+	textY := bounds.Min.Y + bounds.Height()*float32(friendsPartyTextY)/float32(friendsRowHeight)
+	textH := bounds.Height() * float32(friendsPartyTextH) / float32(friendsRowHeight)
 	rotheme.DrawText(canvas, trimRunes(w.name, 20), geometry.NewRect(bounds.Min.X+float32(friendsRowTextX), textY, bounds.Width()-float32(friendsRowTextRight), textH), rotheme.Default.Typography.TextSize, rotheme.Default.Colors.Text, false, widget.TextAlignLeft)
-	rotheme.DrawText(canvas, w.state, geometry.NewRect(bounds.Max.X-float32(friendsRowStateRight), textY, float32(friendsRowStateW), textH), rotheme.Default.Typography.TextSize, w.stateColor, false, widget.TextAlignRight)
-	barInset := float32(friendsPartyBarInset)
-	bar := geometry.NewRect(bounds.Min.X+barInset, bounds.Max.Y-barInset, bounds.Width()-barInset*2, float32(friendsPartyBarH))
+	rotheme.DrawText(canvas, w.state, geometry.NewRect(bounds.Max.X-bounds.Width()*float32(friendsRowStateRight)/float32(friendsWindowWidth), textY, bounds.Width()*float32(friendsRowStateW)/float32(friendsWindowWidth), textH), rotheme.Default.Typography.TextSize, w.stateColor, false, widget.TextAlignRight)
+	barInset := bounds.Width() * float32(friendsPartyBarInset) / float32(friendsWindowWidth)
+	barH := bounds.Height() * float32(friendsPartyBarH) / float32(friendsRowHeight)
+	bar := geometry.NewRect(bounds.Min.X+barInset, bounds.Max.Y-barInset-barH, bounds.Width()-barInset*2, barH)
 	canvas.DrawRect(bar, friendsPartyBarTrack)
 	fillW := float32(0)
 	if w.maxHP > 0 && w.hp > 0 {

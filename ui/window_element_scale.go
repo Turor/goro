@@ -4,11 +4,21 @@ func (w *Window) elementScale() float32 {
 	if w == nil {
 		return 1
 	}
-	frame, ok := w.content.(*windowFrame)
-	if !ok || frame == nil || frame.contentScale <= 0 {
-		return 1
+	if overlay := w.positionedOverlay(); overlay != nil && overlay.contentScale > 0 {
+		return overlay.contentScale
 	}
-	return frame.contentScale
+	frame, ok := w.content.(*windowFrame)
+	if ok && frame != nil && frame.contentScale > 0 {
+		return frame.contentScale
+	}
+	return 1
+}
+
+func (w *Window) currentSize(designW, designH int) (int, int) {
+	if w != nil && w.width > 0 && w.height > 0 {
+		return w.width, w.height
+	}
+	return designW, designH
 }
 
 func scaleInt(v int, scale float32) int {

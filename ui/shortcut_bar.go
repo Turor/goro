@@ -400,7 +400,8 @@ func (b *ShortcutBar) slotAt(ctx Context, mx, my int) (int, bool) {
 			continue
 		}
 		x, y := b.slotBounds(ctx, slot)
-		if pointInRect(mx, my, x, y, shortcutSlot, shortcutSlot) {
+		slotSize := scaleInt(shortcutSlot, b.window.elementScale())
+		if pointInRect(mx, my, x, y, slotSize, slotSize) {
 			return slot, true
 		}
 	}
@@ -417,9 +418,10 @@ func (b *ShortcutBar) bounds(ctx Context) (int, int) {
 
 func (b *ShortcutBar) slotBounds(ctx Context, slot int) (int, int) {
 	x, y := b.bounds(ctx)
+	scale := b.window.elementScale()
 	row := (slot/shortcutCols - b.activeRow + shortcutMaxRows) % shortcutMaxRows
 	col := slot % shortcutCols
-	return x + shortcutGripWidth + shortcutPad + col*(shortcutSlot+shortcutGap), y + shortcutPad + row*(shortcutSlot+shortcutRowGap)
+	return x + scaleInt(shortcutGripWidth+shortcutPad+col*(shortcutSlot+shortcutGap), scale), y + scaleInt(shortcutPad+row*(shortcutSlot+shortcutRowGap), scale)
 }
 
 func shortcutBarWidth() int {

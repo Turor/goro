@@ -320,8 +320,9 @@ func (w *EquipmentWindow) DrawTooltip(ctx Context, screen *render.Frame) {
 }
 
 func (w *EquipmentWindow) AcceptInventoryDrop(ctx Context, item session.InventoryItem, mx, my int) bool {
-	w.EnsureWindow(gearWindowSize())
-	gearW, gearH := gearWindowSize()
+	designW, designH := gearWindowSize()
+	w.EnsureWindow(designW, designH)
+	gearW, gearH := w.currentSize(designW, designH)
 	if !w.IsOpen() || !pointInRect(mx, my, w.x, w.y, gearW, gearH) {
 		return false
 	}

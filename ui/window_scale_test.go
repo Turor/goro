@@ -167,3 +167,15 @@ func TestWindowElementScaleComesFromTheFrame(t *testing.T) {
 		t.Fatalf("scaled level button width %.1f, design %.1f", scaled.Width(), design.Width())
 	}
 }
+
+func TestResizedDropHitUsesWindowSize(t *testing.T) {
+	bag := &InventoryBagWindow{}
+	bag.x, bag.y = 10, 20
+	bag.width, bag.height = inventoryBagWidth/2, inventoryBagHeight/2
+	if bag.pointInside(10+inventoryBagWidth-2, 21) {
+		t.Fatal("design-width point still hits a shrunk bag")
+	}
+	if !bag.pointInside(10+bag.width-1, 20+bag.height-1) {
+		t.Fatal("shrunk bag missed its own corner")
+	}
+}

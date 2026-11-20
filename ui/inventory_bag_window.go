@@ -378,7 +378,8 @@ func (w *InventoryBagWindow) hideTooltip() {
 }
 
 func (w *InventoryBagWindow) pointInside(x, y int) bool {
-	return pointInRect(x, y, w.x, w.y, inventoryBagWidth, inventoryBagHeight)
+	width, height := w.currentSize(inventoryBagWidth, inventoryBagHeight)
+	return pointInRect(x, y, w.x, w.y, width, height)
 }
 
 func (w *InventoryBagWindow) AcceptStorageDrop(ctx Context, item session.InventoryItem, mx, my int) bool {

@@ -78,7 +78,8 @@ func (w *TradeWindow) Close(ctx Context) {
 
 func (w *TradeWindow) AcceptInventoryDrop(ctx Context, item session.InventoryItem, mx, my int) bool {
 	w.EnsureWindow(tradeWindowW, tradeWindowH)
-	if !w.IsOpen() || w.selfOK || item.Index == 0 || !pointInRect(mx, my, w.sendPanelX(), w.sendPanelY(), tradePanelW, tradePanelH) {
+	scale := w.elementScale()
+	if !w.IsOpen() || w.selfOK || item.Index == 0 || !pointInRect(mx, my, w.x+scaleInt(tradePanelPad, scale), w.y+scaleInt(ROWindowTitleHeight+tradePanelPad, scale), scaleInt(tradePanelW, scale), scaleInt(tradePanelH, scale)) {
 		return false
 	}
 	amount := uint32(item.Amount)

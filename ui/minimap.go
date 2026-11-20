@@ -734,7 +734,7 @@ func (w *minimapWidget) Draw(_ widget.Context, canvas widget.Canvas) {
 		}
 		label := minimapDisplayName(w.ctx.Resources, w.ctx.World.MapName)
 		footerY := bounds.Min.Y + bounds.Height() - float32(minimapFooterOff)
-		footerScale := bounds.Height() / float32(minimapHeight)
+		footerScale := bounds.Height() / float32(minimapHeight-ROWindowTitleHeight)
 		if footerScale <= 0 {
 			footerScale = 1
 		}
