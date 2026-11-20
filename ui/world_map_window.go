@@ -175,15 +175,17 @@ func (w *WorldMapWindow) Close() {
 }
 
 func (w *WorldMapWindow) widgetTree(ctx Context) widget.Widget {
+	imageLayer := newWorldMapImage(w.scaled)
 	w.board = &worldMapWidget{
 		resources: ctx.Resources, entries: w.activeEntries(ctx),
-		image: w.scaled, sourceSize: w.art.Bounds().Size(), previews: w.previews,
+		image: w.scaled, imageLayer: imageLayer, sourceSize: w.art.Bounds().Size(), previews: w.previews,
 		hovered: -1, showNames: w.showNames, marks: w.marks,
 		onClick: func(index int) { w.clickEntry(ctx, index) },
 	}
 	w.board.SetVisible(true)
 	w.board.SetEnabled(true)
 	w.board.SetRepaintBoundary(true)
+	imageLayer.SetParent(w.board)
 	content := widget.Widget(w.board)
 	if rail := w.regionRail(ctx); rail != nil {
 		content = primitives.HBox(rail, w.board).Gap(worldMapPreviewEdge)
@@ -426,16 +428,58 @@ func worldMapSize(source image.Point, screenW, screenH int) image.Point {
 }
 
 func scaleWorldMapImage(img image.Image, size image.Point) image.Image {
+	return scaleWorldMap(img, size, xdraw.ApproxBiLinear)
+}
+
+func scaleWorldMapPreview(img image.Image, size image.Point) image.Image {
+	return scaleWorldMap(img, size, xdraw.NearestNeighbor)
+}
+
+func scaleWorldMap(img image.Image, size image.Point, scaler xdraw.Scaler) image.Image {
 	dst := image.NewRGBA(image.Rectangle{Max: size})
-	xdraw.ApproxBiLinear.Scale(dst, dst.Bounds(), img, img.Bounds(), xdraw.Src, nil)
+	scaler.Scale(dst, dst.Bounds(), img, img.Bounds(), xdraw.Src, nil)
 	return dst
 }
+
+type worldMapImage struct {
+	widget.WidgetBase
+	image image.Image
+}
+
+func newWorldMapImage(img image.Image) *worldMapImage {
+	w := &worldMapImage{image: img}
+	w.SetVisible(true)
+	w.SetEnabled(false)
+	// The bitmap is uploaded once. Hover and labels redraw the overlay, not this.
+	w.SetRepaintBoundary(true)
+	return w
+}
+
+func (w *worldMapImage) Layout(_ widget.Context, constraints geometry.Constraints) geometry.Size {
+	if w.image == nil {
+		return geometry.Size{}
+	}
+	size := w.image.Bounds().Size()
+	result := constraints.Constrain(geometry.Sz(float32(size.X), float32(size.Y)))
+	w.SetBounds(geometry.FromPointSize(w.Position(), result))
+	return result
+}
+
+func (w *worldMapImage) Draw(_ widget.Context, canvas widget.Canvas) {
+	if w.image == nil {
+		return
+	}
+	canvas.DrawImage(w.image, w.Bounds().Min)
+}
+
+func (w *worldMapImage) Event(widget.Context, event.Event) bool { return false }
 
 type worldMapWidget struct {
 	widget.WidgetBase
 	resources  *res.Manager
 	entries    []res.WorldMapEntry
 	image      image.Image
+	imageLayer *worldMapImage
 	sourceSize image.Point
 	previews   map[string]image.Image
 	hovered    int
@@ -448,11 +492,22 @@ type worldMapWidget struct {
 	mapW, mapH int
 }
 
-func (w *worldMapWidget) Layout(_ widget.Context, constraints geometry.Constraints) geometry.Size {
+func (w *worldMapWidget) Layout(ctx widget.Context, constraints geometry.Constraints) geometry.Size {
 	size := w.image.Bounds().Size()
 	result := constraints.Constrain(geometry.Sz(float32(size.X), float32(size.Y)))
 	w.SetBounds(geometry.FromPointSize(w.Position(), result))
+	if w.imageLayer != nil {
+		widget.LayoutChild(w.imageLayer, ctx, constraints)
+		w.imageLayer.SetBounds(w.Bounds())
+	}
 	return result
+}
+
+func (w *worldMapWidget) Children() []widget.Widget {
+	if w.imageLayer == nil {
+		return nil
+	}
+	return []widget.Widget{w.imageLayer}
 }
 
 func (w *worldMapWidget) mapRect(entry res.WorldMapEntry) geometry.Rect {
@@ -510,17 +565,21 @@ func (w *worldMapWidget) loadPreview(name string) {
 		if img, _, err := res.LoadImage(w.resources, minimapImageCandidates(name)); err == nil {
 			size := img.Bounds().Size()
 			scale := float64(worldMapPreviewMax) / float64(max(size.X, size.Y))
-			preview = scaleWorldMapImage(img, image.Pt(max(1, int(float64(size.X)*scale)), max(1, int(float64(size.Y)*scale))))
+			preview = scaleWorldMapPreview(img, image.Pt(max(1, int(float64(size.X)*scale)), max(1, int(float64(size.Y)*scale))))
 		}
 	}
 	w.previews[name] = preview // Missing minimaps are normal, and cached too.
 }
 
-func (w *worldMapWidget) Draw(_ widget.Context, canvas widget.Canvas) {
+func (w *worldMapWidget) Draw(ctx widget.Context, canvas widget.Canvas) {
 	bounds := w.Bounds()
 	canvas.PushClip(bounds)
 	defer canvas.PopClip()
-	canvas.DrawImage(w.image, bounds.Min)
+	// The image is its own repaint boundary. DrawChild blits the cache, so a
+	// hover redraw does not upload the bitmap again.
+	if w.imageLayer != nil {
+		widget.DrawChild(w.imageLayer, ctx, canvas)
+	}
 	for i, entry := range w.entries {
 		r := w.mapRect(entry)
 		if i == w.hovered {
