@@ -71,9 +71,15 @@ func TestWorldMapIdleAndPartySnapshots(t *testing.T) {
 		t.Fatalf("current-map dots = %+v", board.dots)
 	}
 	board.ClearRedraw()
+	if board.highlight != nil {
+		board.highlight.SetNeedsRedraw(false)
+	}
 	ctx.World.Player.X++
 	w.UpdatePresentation(ctx)
-	if !board.NeedsRedraw() {
+	if board.NeedsRedraw() {
+		t.Fatal("walking redrew the atlas")
+	}
+	if board.highlight == nil || !board.highlight.NeedsRedraw() {
 		t.Fatal("visible preview did not update")
 	}
 	board.hovered = 1
