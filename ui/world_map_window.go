@@ -463,6 +463,8 @@ type worldMapWidget struct {
 	previews     map[string]image.Image
 	hovered      int
 	showNames    bool
+	named        *image.RGBA
+	namedFor     image.Image
 	currentMap   string
 	members      []worldMapMember
 	memberByMap  map[string]uint32
@@ -603,21 +605,11 @@ func (w *worldMapWidget) Draw(_ widget.Context, canvas widget.Canvas) {
 	bounds := w.Bounds()
 	canvas.PushClip(bounds)
 	defer canvas.PopClip()
-	canvas.DrawImage(w.image, bounds.Min)
+	canvas.DrawImage(w.atlasImage(), bounds.Min)
 	for i, entry := range w.entries {
 		r := w.mapRect(entry)
 		if id, ok := w.memberByMap[entry.MapName]; ok {
 			canvas.StrokeRect(r, Color(minimapMemberColor(id)), worldMapMemberStroke)
-		}
-		if w.showNames {
-			size := worldMapNameSize
-			width := rotheme.MeasureText(canvas, worldMapEntryLabel(entry), size, false)
-			if width > r.Width() && width > 0 {
-				size *= r.Width() / width
-			}
-			label := geometry.NewRect(r.Min.X, r.Min.Y+(r.Height()-worldMapNameH)/2, r.Width(), worldMapNameH)
-			canvas.DrawRect(label, worldMapLabelFill)
-			rotheme.DrawText(canvas, worldMapEntryLabel(entry), label, size, rotheme.Default.Colors.Text, false, widget.TextAlignCenter)
 		}
 		if entry.MapName == w.currentMap {
 			drawWorldMapStar(canvas, geometry.Pt(r.Min.X+r.Width()/2, r.Min.Y+r.Height()/2))
