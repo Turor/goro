@@ -60,6 +60,7 @@ type TableViewWidget struct {
 
 	width               float32
 	bodyHeight          float32
+	laidScale           float32
 	colWidths           []float32
 	contentW            float32
 	hoveredRow          int
@@ -188,6 +189,7 @@ func (w *TableViewWidget) syncLayoutTokens() {
 
 func (w *TableViewWidget) Layout(ctx widget.Context, constraints geometry.Constraints) geometry.Size {
 	w.syncLayoutTokens()
+	w.laidScale = ContentScale()
 	size := constraints.Biggest()
 	if size.Width >= geometry.Infinity {
 		size.Width = constraints.Constrain(geometry.Sz(tableViewFallbackW, 0)).Width
@@ -318,15 +320,22 @@ func (w *TableViewWidget) updateHoverFromEvent(ctx widget.Context, e event.Event
 	}
 }
 
+func (w *TableViewWidget) layoutScale() float32 {
+	if w.laidScale > 0 {
+		return w.laidScale
+	}
+	return 1
+}
+
 func (w *TableViewWidget) headerHeight() float32 {
 	if w.cfg.showHeader {
-		return w.cfg.headerHeight * ContentScale()
+		return w.cfg.headerHeight * w.layoutScale()
 	}
 	return 0
 }
 
 func (w *TableViewWidget) scaledRowHeight() float32 {
-	return w.cfg.rowHeight * ContentScale()
+	return w.cfg.rowHeight * w.layoutScale()
 }
 
 func (w *TableViewWidget) contentHeight() float32 {
@@ -356,7 +365,7 @@ func (w *TableViewWidget) resolveColumns(width float32) []float32 {
 	var flex float32
 	for i, col := range w.cfg.columns {
 		if col.Width > 0 {
-			widths[i] = col.Width * ContentScale()
+			widths[i] = col.Width * w.layoutScale()
 			fixed += widths[i]
 			continue
 		}
@@ -383,7 +392,7 @@ func (w *TableViewWidget) resolveColumns(width float32) []float32 {
 			colWidth = remaining * value / flex
 		}
 		if col.MinWidth > 0 {
-			colWidth = float32(math.Max(float64(colWidth), float64(col.MinWidth*ContentScale())))
+			colWidth = float32(math.Max(float64(colWidth), float64(col.MinWidth*w.layoutScale())))
 		}
 		widths[i] = colWidth
 	}

@@ -284,10 +284,8 @@ func (w *emoteCellWidget) Draw(_ widget.Context, canvas widget.Canvas) {
 		canvas.StrokeRoundRect(bounds, rotheme.Default.Colors.FooterLine, emoteHoverRadius, emoteHoverBorder)
 	}
 	if w.icon != nil {
-		imgBounds := w.icon.Bounds()
-		x := bounds.Min.X + (bounds.Width()-float32(imgBounds.Dx()))/2
-		y := bounds.Min.Y + (bounds.Height()-float32(imgBounds.Dy()))/2
-		canvas.DrawImage(w.icon, geometry.Pt(x, y))
+		pad := bounds.Width() * 0.12
+		drawFittedImage(canvas, w.icon, geometry.NewRect(bounds.Min.X+pad, bounds.Min.Y+pad, bounds.Width()-pad*2, bounds.Height()-pad*2))
 		return
 	}
 	rotheme.DrawText(

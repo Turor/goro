@@ -592,8 +592,8 @@ func (s *mailAttachmentSlot) Draw(_ widget.Context, canvas widget.Canvas) {
 	b := s.Bounds()
 	drawInventoryGridCellShadow(canvas, b, false)
 	if s.icon != nil {
-		ib := s.icon.Bounds()
-		canvas.DrawImage(s.icon, geometry.Pt(b.Min.X+(b.Width()-float32(ib.Dx()))/2, b.Min.Y+(b.Height()-float32(ib.Dy()))/2))
+		pad := b.Width() * 0.08
+		drawFittedImage(canvas, s.icon, geometry.NewRect(b.Min.X+pad, b.Min.Y+pad, b.Width()-pad*2, b.Height()-pad*2))
 	}
 	if s.item.Amount > 1 {
 		rotheme.DrawText(canvas, strconv.Itoa(s.item.Amount), geometry.NewRect(b.Min.X, b.Max.Y-mailAmountLabelH, b.Width()-mailAmountInset, mailAmountLabelH), rotheme.Default.Typography.TextSize, rotheme.Default.Colors.Text, false, widget.TextAlignRight)

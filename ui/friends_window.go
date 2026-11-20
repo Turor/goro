@@ -355,7 +355,7 @@ func (w *friendRowWidget) Draw(_ widget.Context, canvas widget.Canvas) {
 		bg = rotheme.Default.Colors.ButtonHover
 	}
 	canvas.DrawRect(bounds, bg)
-	textH := float32(friendsRowTextH)
+	textH := bounds.Height() * float32(friendsRowTextH) / float32(friendsRowHeight)
 	textY := bounds.Min.Y + (bounds.Height()-textH)/2
 	rotheme.DrawText(canvas, trimRunes(w.name, 24), geometry.NewRect(bounds.Min.X+float32(friendsRowTextX), textY, bounds.Width()-float32(friendsRowTextRight), textH), rotheme.Default.Typography.TextSize, rotheme.Default.Colors.Text, false, widget.TextAlignLeft)
 	rotheme.DrawText(canvas, w.state, geometry.NewRect(bounds.Max.X-float32(friendsRowStateRight), textY, float32(friendsRowStateW), textH), rotheme.Default.Typography.TextSize, w.stateColor, false, widget.TextAlignRight)

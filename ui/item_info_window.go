@@ -672,7 +672,7 @@ func (w *itemInfoCardSlotWidget) Draw(ctx widget.Context, canvas widget.Canvas) 
 	if !w.IsVisible() || w.image == nil {
 		return
 	}
-	canvas.DrawImage(w.image, w.Bounds().Min)
+	drawFittedImage(canvas, w.image, w.Bounds())
 }
 
 func (w *itemInfoCardSlotWidget) Event(ctx widget.Context, e event.Event) bool {

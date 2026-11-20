@@ -132,15 +132,16 @@ func (w *skillGridWidget) drawCell(canvas widget.Canvas, cell geometry.Rect, ent
 	rotheme.DrawText(
 		canvas,
 		trimRunes(entry.name, 10),
-		geometry.NewRect(cell.Min.X+1, cell.Min.Y, cell.Width()-skillGridNameInsetX*2, skillGridNameH),
+		geometry.NewRect(cell.Min.X+1, cell.Min.Y, cell.Width()-skillGridNameInsetX*2, cell.Height()*skillGridNameH/float32(skillGridCellH)),
 		rotheme.Default.Typography.TextSize,
 		textColor,
 		false,
 		widget.TextAlignCenter,
 	)
 	if entry.icon != nil {
-		iconBounds := geometry.NewRect(slot.Min.X+skillGridIconInset, slot.Min.Y+skillGridIconInset, float32(skillIconSize), float32(skillIconSize))
-		canvas.DrawImage(entry.icon, iconBounds.Min)
+		inset := slot.Width() * skillGridIconInset / skillGridSlotSize
+		iconBounds := geometry.NewRect(slot.Min.X+inset, slot.Min.Y+inset, slot.Width()-inset*2, slot.Height()-inset*2)
+		drawFittedImage(canvas, entry.icon, iconBounds)
 	}
 
 	w.drawLevel(canvas, cell, entry, textColor, hovered)
@@ -313,20 +314,30 @@ func skillGridHitPart(entry skillGridEntry, cell geometry.Rect, point geometry.P
 }
 
 func skillGridSlotBounds(cell geometry.Rect) geometry.Rect {
+	slot := cell.Width() * skillGridSlotSize / float32(skillGridCellW)
+	if slot > cell.Width() {
+		slot = cell.Width()
+	}
+	if slot < 1 {
+		slot = 1
+	}
+	top := cell.Height() * skillGridSlotTop / float32(skillGridCellH)
 	return geometry.NewRect(
-		cell.Min.X+(cell.Width()-skillGridSlotSize)/2,
-		cell.Min.Y+skillGridSlotTop,
-		skillGridSlotSize,
-		skillGridSlotSize,
+		cell.Min.X+(cell.Width()-slot)/2,
+		cell.Min.Y+top,
+		slot,
+		slot,
 	)
 }
 
 func skillGridPartBounds(cell geometry.Rect, part skillGridPart) geometry.Rect {
 	switch part {
 	case skillGridPartLevelDown:
-		return geometry.NewRect(cell.Min.X+1, cell.Max.Y-rotheme.IconButtonSize, rotheme.IconButtonSize, rotheme.IconButtonSize)
+		size := cell.Height() * float32(rotheme.IconButtonSize) / float32(skillGridCellH)
+		return geometry.NewRect(cell.Min.X+1, cell.Max.Y-size, size, size)
 	case skillGridPartLevelUp:
-		return geometry.NewRect(cell.Max.X-rotheme.IconButtonSize-1, cell.Max.Y-rotheme.IconButtonSize, rotheme.IconButtonSize, rotheme.IconButtonSize)
+		size := cell.Height() * float32(rotheme.IconButtonSize) / float32(skillGridCellH)
+		return geometry.NewRect(cell.Max.X-size-1, cell.Max.Y-size, size, size)
 	default:
 		return cell
 	}

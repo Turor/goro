@@ -396,7 +396,7 @@ func (w *staticImageWidget) Draw(ctx widget.Context, canvas widget.Canvas) {
 	if !w.IsVisible() || w.image == nil {
 		return
 	}
-	canvas.DrawImage(w.image, w.Bounds().Min)
+	drawFittedImage(canvas, w.image, w.Bounds())
 }
 
 func (w *staticImageWidget) Event(ctx widget.Context, e event.Event) bool {
@@ -533,7 +533,7 @@ func (w *equipmentSlotWidget) Draw(ctx widget.Context, canvas widget.Canvas) {
 	text = trimRunes(text, equipmentSlotTextLimit(w.cfg.slot))
 	textBounds := equipmentSlotTextBounds(bounds, w.cfg.slot, w.cfg.icon)
 	if w.cfg.icon != nil {
-		canvas.DrawImage(w.cfg.icon, equipmentSlotIconPosition(bounds, w.cfg.slot, w.cfg.icon))
+		drawFittedImage(canvas, w.cfg.icon, equipmentSlotIconRect(bounds, w.cfg.slot))
 	}
 	align := equipmentSlotTextAlign(w.cfg.slot)
 	if w.cfg.slot.side == equipmentSlotCenter && w.cfg.icon != nil {

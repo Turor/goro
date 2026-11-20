@@ -541,13 +541,15 @@ func (w *shortcutSlotButton) drawContent(canvas widget.Canvas, bounds geometry.R
 			item = live
 		}
 		if icon := w.bar.itemIconImage(w.bar.ctx.Resources, item); icon != nil {
-			canvas.DrawImage(icon, geometry.Pt(bounds.Min.X+float32(shortcutIconInset), bounds.Min.Y+float32(shortcutIconInset)))
+			padX := bounds.Width() * float32(shortcutIconInset) / float32(shortcutSlot)
+			padY := bounds.Height() * float32(shortcutIconInset) / float32(shortcutSlot)
+			drawFittedImage(canvas, icon, geometry.NewRect(bounds.Min.X+padX, bounds.Min.Y+padY, bounds.Width()-padX*2, bounds.Height()-padY*2))
 		}
 		if item.Amount > 1 {
 			rotheme.DrawText(
 				canvas,
 				fmt.Sprintf("%d", item.Amount),
-				geometry.NewRect(bounds.Min.X+1, bounds.Max.Y-float32(shortcutAmountBottom), float32(shortcutSlot-shortcutAmountInset), float32(shortcutLabelH)),
+				geometry.NewRect(bounds.Min.X+float32(shortcutAmountInset), bounds.Max.Y-bounds.Height()*float32(shortcutAmountBottom)/float32(shortcutSlot), bounds.Width()-float32(shortcutAmountInset)*2, bounds.Height()*float32(shortcutLabelH)/float32(shortcutSlot)),
 				rotheme.Default.Typography.TextSize,
 				rotheme.Default.Colors.Text,
 				false,
@@ -561,14 +563,16 @@ func (w *shortcutSlotButton) drawContent(canvas widget.Canvas, bounds geometry.R
 		}
 		if w.bar.assets != nil {
 			if icon := w.bar.assets.SkillIconImage(w.bar.ctx.Resources, skill); icon != nil {
-				canvas.DrawImage(icon, geometry.Pt(bounds.Min.X+float32(shortcutIconInset), bounds.Min.Y+float32(shortcutIconInset)))
+				padX := bounds.Width() * float32(shortcutIconInset) / float32(shortcutSlot)
+				padY := bounds.Height() * float32(shortcutIconInset) / float32(shortcutSlot)
+				drawFittedImage(canvas, icon, geometry.NewRect(bounds.Min.X+padX, bounds.Min.Y+padY, bounds.Width()-padX*2, bounds.Height()-padY*2))
 			}
 		}
 		if skill.Level > 0 {
 			rotheme.DrawText(
 				canvas,
 				fmt.Sprintf("Lv%d", maxInt(1, skill.Level)),
-				geometry.NewRect(bounds.Min.X+float32(shortcutSkillLabelX), bounds.Min.Y+1, float32(shortcutSlot-shortcutSkillLabelInset), float32(shortcutLabelH)),
+				geometry.NewRect(bounds.Min.X+float32(shortcutSkillLabelX), bounds.Min.Y, bounds.Width()-float32(shortcutSkillLabelInset), bounds.Height()*float32(shortcutLabelH)/float32(shortcutSlot)),
 				rotheme.Default.Typography.TextSize,
 				Color(TitleTextColor),
 				false,
