@@ -604,7 +604,7 @@ func (w *ShopWindow) buyShopRowAt(ctx Context, mx, my int) (int, bool) {
 	if w.mode == shopModeSell {
 		rowCount = len(w.sellAvailableItems(ctx))
 	}
-	return tableRowAt(mx, my, tableX, tableY, tableW, tableH, rowCount, shopRowH, w.ensureBuyScrollSignal().Get())
+	return tableRowAt(mx, my, tableX, tableY, tableW, tableH, rowCount, shopRowH, w.ensureBuyScrollSignal().Get(), w.buyWindow.elementScale())
 }
 
 func (w *ShopWindow) buyCartRowAt(mx, my int) (int, bool) {
@@ -613,23 +613,29 @@ func (w *ShopWindow) buyCartRowAt(mx, my int) (int, bool) {
 	if w.mode == shopModeSell {
 		rowCount = len(w.cart)
 	}
-	return tableRowAt(mx, my, tableX, tableY, tableW, tableH, rowCount, shopRowH, w.ensureBuyCartScrollSignal().Get())
+	return tableRowAt(mx, my, tableX, tableY, tableW, tableH, rowCount, shopRowH, w.ensureBuyCartScrollSignal().Get(), w.buyCartWindow.elementScale())
 }
 
 func (w *ShopWindow) buyCartDropTarget(mx, my int) bool {
-	return pointInRect(mx, my, w.buyCartWindow.x, w.buyCartWindow.y, shopBuyCartWindowW, w.cartWindowHeight())
+	width, height := w.buyCartWindow.currentSize(shopBuyCartWindowW, w.cartWindowHeight())
+	return pointInRect(mx, my, w.buyCartWindow.x, w.buyCartWindow.y, width, height)
 }
 
 func (w *ShopWindow) buyShopDropTarget(mx, my int) bool {
-	return pointInRect(mx, my, w.buyWindow.x, w.buyWindow.y, shopBuyListWindowW, shopListWindowHeight())
+	width, height := w.buyWindow.currentSize(shopBuyListWindowW, shopListWindowHeight())
+	return pointInRect(mx, my, w.buyWindow.x, w.buyWindow.y, width, height)
 }
 
 func (w *ShopWindow) buyShopTableBounds() (int, int, int, int) {
-	return w.buyWindow.x, w.buyWindow.y + ROWindowTitleHeight, shopBuyListWindowW, shopTableHeight(shopListRows)
+	scale := w.buyWindow.elementScale()
+	width, _ := w.buyWindow.currentSize(shopBuyListWindowW, shopListWindowHeight())
+	return w.buyWindow.x, w.buyWindow.y + scaleInt(ROWindowTitleHeight, scale), width, scaleInt(shopTableHeight(shopListRows), scale)
 }
 
 func (w *ShopWindow) buyCartTableBounds() (int, int, int, int) {
-	return w.buyCartWindow.x, w.buyCartWindow.y + ROWindowTitleHeight, shopBuyCartWindowW, w.cartTableHeight()
+	scale := w.buyCartWindow.elementScale()
+	width, _ := w.buyCartWindow.currentSize(shopBuyCartWindowW, w.cartWindowHeight())
+	return w.buyCartWindow.x, w.buyCartWindow.y + scaleInt(ROWindowTitleHeight, scale), width, scaleInt(w.cartTableHeight(), scale)
 }
 
 func (w *ShopWindow) shopItemAt(ctx Context, mx, my int) (session.InventoryItem, bool) {
@@ -780,12 +786,16 @@ func shopTableCell(row shopTableRow, cell rotheme.TableViewCellContext) rotheme.
 	}
 }
 
-func tableRowAt(mx, my, tableX, tableY, tableW, tableH, rowCount, rowHeight int, scrollY float32) (int, bool) {
-	if !pointInRect(mx, my, tableX, tableY+shopTableHeaderH, scrollbarSafeIntWidth(tableW), tableH-shopTableHeaderH) {
+func tableRowAt(mx, my, tableX, tableY, tableW, tableH, rowCount, rowHeight int, scrollY, scale float32) (int, bool) {
+	if scale <= 0 {
+		scale = 1
+	}
+	header := scaleInt(shopTableHeaderH, scale)
+	if !pointInRect(mx, my, tableX, tableY+header, scrollbarSafeIntWidth(tableW), tableH-header) {
 		return 0, false
 	}
-	localY := float32(my-tableY) - float32(shopTableHeaderH) + scrollY
-	row := int(localY / float32(rowHeight))
+	localY := float32(my-tableY) - float32(header) + scrollY
+	row := int(localY / scaleF(float32(rowHeight), scale))
 	if row < 0 || row >= rowCount {
 		return 0, false
 	}

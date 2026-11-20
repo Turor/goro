@@ -614,17 +614,22 @@ func equipmentSlotIconPosition(bounds geometry.Rect, slot equipmentSlotDef, icon
 }
 
 func equipmentSlotTextBounds(bounds geometry.Rect, slot equipmentSlotDef, icon image.Image) geometry.Rect {
+	scale := equipmentSlotScale(bounds, slot)
+	pad := equipmentTextPad * scale
+	inset := equipmentTextInset * scale
 	if icon == nil {
-		return geometry.NewRect(bounds.Min.X+equipmentTextPad, bounds.Min.Y+equipmentTextPad, bounds.Width()-equipmentTextInset, bounds.Height()-equipmentTextInset)
+		return geometry.NewRect(bounds.Min.X+pad, bounds.Min.Y+pad, bounds.Width()-inset, bounds.Height()-inset)
 	}
 	iconWidth := equipmentSlotIconRect(bounds, slot).Width()
+	lead := equipmentIconTextLead * scale
+	trail := equipmentIconTextTrail * scale
 	switch slot.side {
 	case equipmentSlotRight:
-		return geometry.NewRect(bounds.Min.X+equipmentTextPad, bounds.Min.Y+equipmentTextPad, bounds.Width()-iconWidth-equipmentIconTextTrail, bounds.Height()-equipmentTextInset)
+		return geometry.NewRect(bounds.Min.X+pad, bounds.Min.Y+pad, bounds.Width()-iconWidth-trail, bounds.Height()-inset)
 	case equipmentSlotCenter:
-		return geometry.NewRect(bounds.Min.X+equipmentTextPad, bounds.Min.Y+equipmentCenterTextTop, bounds.Width()-equipmentTextInset, bounds.Height()-equipmentTextInset)
+		return geometry.NewRect(bounds.Min.X+pad, bounds.Min.Y+equipmentCenterTextTop*scale, bounds.Width()-inset, bounds.Height()-inset)
 	default:
-		return geometry.NewRect(bounds.Min.X+iconWidth+equipmentIconTextLead, bounds.Min.Y+equipmentTextPad, bounds.Width()-iconWidth-equipmentIconTextTrail, bounds.Height()-equipmentTextInset)
+		return geometry.NewRect(bounds.Min.X+iconWidth+lead, bounds.Min.Y+pad, bounds.Width()-iconWidth-trail, bounds.Height()-inset)
 	}
 }
 

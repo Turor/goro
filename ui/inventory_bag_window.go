@@ -630,7 +630,8 @@ func (w *inventoryGridWidget) Draw(ctx widget.Context, canvas widget.Canvas) {
 		item := w.cfg.items[i]
 		cell := w.cellBounds(i)
 		if i < len(w.cfg.icons) && w.cfg.icons[i] != nil {
-			drawFittedImage(canvas, w.cfg.icons[i], geometry.NewRect(cell.Min.X+inventoryBagIconPad, cell.Min.Y+inventoryBagIconPad, cell.Width()-inventoryBagIconPad*2, cell.Height()-inventoryBagIconPad*2))
+			pad := cell.Width() * inventoryBagIconPad / float32(inventoryBagCell)
+			drawFittedImage(canvas, w.cfg.icons[i], geometry.NewRect(cell.Min.X+pad, cell.Min.Y+pad, cell.Width()-pad*2, cell.Height()-pad*2))
 		}
 		if item.Amount > 1 {
 			amount := ""

@@ -715,7 +715,7 @@ func (w *VendingWindow) leftRowAt(ctx Context, mx, my int) (int, bool) {
 	case vendingModeOwn:
 		rows = len(w.ownItems)
 	}
-	return tableRowAt(mx, my, tableX, tableY, tableW, tableH, rows, shopRowH, w.ensureLeftScroll().Get())
+	return tableRowAt(mx, my, tableX, tableY, tableW, tableH, rows, shopRowH, w.ensureLeftScroll().Get(), w.leftWindow.elementScale())
 }
 
 func (w *VendingWindow) rightRowAt(mx, my int) (int, bool) {
@@ -724,7 +724,7 @@ func (w *VendingWindow) rightRowAt(mx, my int) (int, bool) {
 	if w.mode == vendingModeBuy {
 		rowCount = len(w.buyCart)
 	}
-	return tableRowAt(mx, my, tableX, tableY, tableW, tableH, rowCount, shopRowH, w.ensureRightScroll().Get())
+	return tableRowAt(mx, my, tableX, tableY, tableW, tableH, rowCount, shopRowH, w.ensureRightScroll().Get(), w.rightWindow.elementScale())
 }
 
 func (w *VendingWindow) leftDropTarget(mx, my int) bool {
@@ -745,16 +745,20 @@ func (w *VendingWindow) inside(mx, my int) bool {
 }
 
 func (w *VendingWindow) leftTableBounds() (int, int, int, int) {
-	return w.leftWindow.x, w.leftWindow.y + ROWindowTitleHeight, vendingWindowW, shopTableHeight(vendingSetupRows)
+	scale := w.leftWindow.elementScale()
+	width, _ := w.leftWindow.currentSize(vendingWindowW, w.leftHeight())
+	return w.leftWindow.x, w.leftWindow.y + scaleInt(ROWindowTitleHeight, scale), width, scaleInt(shopTableHeight(vendingSetupRows), scale)
 }
 
 func (w *VendingWindow) rightTableBounds() (int, int, int, int) {
-	y := w.rightWindow.y + ROWindowTitleHeight
-	h := shopTableHeight(w.setupRows())
+	scale := w.rightWindow.elementScale()
+	y := w.rightWindow.y + scaleInt(ROWindowTitleHeight, scale)
+	h := scaleInt(shopTableHeight(w.setupRows()), scale)
 	if w.mode == vendingModeSetup {
-		y += vendingNameH + vendingNameGap
+		y += scaleInt(vendingNameH+vendingNameGap, scale)
 	}
-	return w.rightWindow.x, y, vendingWindowW, h
+	width, _ := w.rightWindow.currentSize(vendingWindowW, w.rightHeight())
+	return w.rightWindow.x, y, width, h
 }
 
 func (w *VendingWindow) leftHeight() int {

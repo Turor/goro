@@ -129,10 +129,11 @@ func (w *skillGridWidget) drawCell(canvas widget.Canvas, cell geometry.Rect, ent
 	if entry.display.Level <= 0 {
 		textColor = rotheme.Default.Colors.MutedText
 	}
+	nameInset := cell.Width() * skillGridNameInsetX / float32(skillGridCellW)
 	rotheme.DrawText(
 		canvas,
 		trimRunes(entry.name, 10),
-		geometry.NewRect(cell.Min.X+1, cell.Min.Y, cell.Width()-skillGridNameInsetX*2, cell.Height()*skillGridNameH/float32(skillGridCellH)),
+		geometry.NewRect(cell.Min.X+nameInset, cell.Min.Y, cell.Width()-nameInset*2, cell.Height()*skillGridNameH/float32(skillGridCellH)),
 		rotheme.Default.Typography.TextSize,
 		textColor,
 		false,
@@ -158,10 +159,11 @@ func (w *skillGridWidget) drawCell(canvas widget.Canvas, cell geometry.Rect, ent
 func (w *skillGridWidget) drawLevel(canvas widget.Canvas, cell geometry.Rect, entry skillGridEntry, color widget.Color, hovered bool) {
 	selectable, known := db.SkillLevelSelectable(entry.skill.ID)
 	if !known || !selectable || entry.skill.Level <= 0 {
+		levelInset := cell.Width() * skillGridNameInsetX / float32(skillGridCellW)
 		rotheme.DrawText(
 			canvas,
 			fmt.Sprintf("Lv %d", entry.display.Level),
-			geometry.NewRect(cell.Min.X+float32(skillGridNameInsetX), cell.Max.Y-cell.Height()*skillGridLevelInsetY/float32(skillGridCellH), cell.Width()-float32(skillGridNameInsetX)*2, cell.Height()*skillGridLevelH/float32(skillGridCellH)),
+			geometry.NewRect(cell.Min.X+levelInset, cell.Max.Y-cell.Height()*skillGridLevelInsetY/float32(skillGridCellH), cell.Width()-levelInset*2, cell.Height()*skillGridLevelH/float32(skillGridCellH)),
 			rotheme.Default.Typography.TextSize,
 			color,
 			false,

@@ -644,18 +644,33 @@ func MinimapBounds(width, height int) (int, int, int, int) {
 	return minimapBounds(width, height)
 }
 
+func minimapLayoutScale(width float32) float32 {
+	if minimapWidth <= 0 || width <= 0 {
+		return 1
+	}
+	return width / float32(minimapWidth)
+}
 func minimapMapRect(x, y, w, h int) minimapRect {
-	available := h - ROWindowTitleHeight - minimapInfoBandH - minimapPad
-	size := minInt(w-minimapPad-minimapPad, available)
-	if size < minimapMapMin {
-		size = minimapMapMin
+	scale := minimapLayoutScale(float32(w))
+	pad := scaleInt(minimapPad, scale)
+	top := scaleInt(minimapMapTop, scale)
+	title := scaleInt(ROWindowTitleHeight, scale)
+	band := scaleInt(minimapInfoBandH, scale)
+	mapMin := scaleInt(minimapMapMin, scale)
+	available := h - title - band - pad
+	size := minInt(w-pad-pad, available)
+	if size < mapMin && (minInt(w, h) <= 0 || mapMin <= minInt(w, h)) {
+		size = mapMin
 	}
 	if limit := minInt(w, h); limit > 0 && size > limit {
 		size = limit
 	}
+	if size < 1 {
+		size = 1
+	}
 	return minimapRect{
 		x: x + (w-size)/2,
-		y: y + ROWindowTitleHeight + minimapMapTop,
+		y: y + title + top,
 		w: size,
 		h: size,
 	}
@@ -792,11 +807,16 @@ func (w *minimapWidget) markPlayerDirty(old, current minimapPlayerMarkerState) b
 }
 
 func minimapContentMapRect(bounds geometry.Rect) minimapRect {
-	available := int(bounds.Height()) - minimapInfoBandH - minimapPad
-	size := minInt(int(bounds.Width())-minimapPad-minimapPad, available)
+	scale := minimapLayoutScale(bounds.Width())
+	pad := scaleInt(minimapPad, scale)
+	top := scaleInt(minimapMapTop, scale)
+	band := scaleInt(minimapInfoBandH, scale)
+	mapMin := scaleInt(minimapMapMin, scale)
+	available := int(bounds.Height()) - band - pad
+	size := minInt(int(bounds.Width())-pad-pad, available)
 	limit := minInt(int(bounds.Width()), int(bounds.Height()))
-	if size < minimapMapMin && (limit <= 0 || minimapMapMin <= limit) {
-		size = minimapMapMin
+	if size < mapMin && (limit <= 0 || mapMin <= limit) {
+		size = mapMin
 	}
 	if limit > 0 && size > limit {
 		size = limit
@@ -806,7 +826,7 @@ func minimapContentMapRect(bounds geometry.Rect) minimapRect {
 	}
 	return minimapRect{
 		x: int(bounds.Min.X) + (int(bounds.Width())-size)/2,
-		y: int(bounds.Min.Y) + minimapMapTop,
+		y: int(bounds.Min.Y) + top,
 		w: size,
 		h: size,
 	}
@@ -848,8 +868,15 @@ func minimapPlayerMarkerDirtyRect(rect minimapRect, mapW, mapH int, marker minim
 }
 
 func minimapCoordsDirtyRect(bounds geometry.Rect) geometry.Rect {
-	footerY := bounds.Min.Y + bounds.Height() - float32(minimapFooterOff)
-	return geometry.NewRect(bounds.Min.X+bounds.Width()/2-float32(minimapCoordsPad), footerY-float32(minimapCoordsPad), bounds.Width()/2-float32(minimapPad)+float32(minimapCoordsExtra), float32(minimapCoordsH))
+	scale := minimapLayoutScale(bounds.Width())
+	footerScale := bounds.Height() / float32(minimapHeight-ROWindowTitleHeight)
+	if footerScale <= 0 {
+		footerScale = 1
+	}
+	footerY := bounds.Max.Y - float32(minimapFooterOff)*footerScale
+	pad := float32(minimapPad) * scale
+	coordsPad := float32(minimapCoordsPad) * scale
+	return geometry.NewRect(bounds.Min.X+bounds.Width()/2-coordsPad, footerY-coordsPad, bounds.Width()/2-pad+float32(minimapCoordsExtra)*scale, float32(minimapCoordsH)*footerScale)
 }
 
 func drawMinimapMarkerAt(canvas widget.Canvas, x, y int, fill color.RGBA, radius int) {

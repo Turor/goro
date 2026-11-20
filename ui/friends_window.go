@@ -357,7 +357,7 @@ func (w *friendRowWidget) Draw(_ widget.Context, canvas widget.Canvas) {
 	canvas.DrawRect(bounds, bg)
 	textH := bounds.Height() * float32(friendsRowTextH) / float32(friendsRowHeight)
 	textY := bounds.Min.Y + (bounds.Height()-textH)/2
-	rotheme.DrawText(canvas, trimRunes(w.name, 24), geometry.NewRect(bounds.Min.X+float32(friendsRowTextX), textY, bounds.Width()-float32(friendsRowTextRight), textH), rotheme.Default.Typography.TextSize, rotheme.Default.Colors.Text, false, widget.TextAlignLeft)
+	rotheme.DrawText(canvas, trimRunes(w.name, 24), geometry.NewRect(bounds.Min.X+bounds.Width()*float32(friendsRowTextX)/float32(friendsWindowWidth), textY, bounds.Width()-bounds.Width()*float32(friendsRowTextRight)/float32(friendsWindowWidth), textH), rotheme.Default.Typography.TextSize, rotheme.Default.Colors.Text, false, widget.TextAlignLeft)
 	rotheme.DrawText(canvas, w.state, geometry.NewRect(bounds.Max.X-bounds.Width()*float32(friendsRowStateRight)/float32(friendsWindowWidth), textY, bounds.Width()*float32(friendsRowStateW)/float32(friendsWindowWidth), textH), rotheme.Default.Typography.TextSize, w.stateColor, false, widget.TextAlignRight)
 }
 
@@ -492,7 +492,7 @@ func (w *partyRowWidget) Draw(_ widget.Context, canvas widget.Canvas) {
 	canvas.DrawRect(bounds, bg)
 	textY := bounds.Min.Y + bounds.Height()*float32(friendsPartyTextY)/float32(friendsRowHeight)
 	textH := bounds.Height() * float32(friendsPartyTextH) / float32(friendsRowHeight)
-	rotheme.DrawText(canvas, trimRunes(w.name, 20), geometry.NewRect(bounds.Min.X+float32(friendsRowTextX), textY, bounds.Width()-float32(friendsRowTextRight), textH), rotheme.Default.Typography.TextSize, rotheme.Default.Colors.Text, false, widget.TextAlignLeft)
+	rotheme.DrawText(canvas, trimRunes(w.name, 20), geometry.NewRect(bounds.Min.X+bounds.Width()*float32(friendsRowTextX)/float32(friendsWindowWidth), textY, bounds.Width()-bounds.Width()*float32(friendsRowTextRight)/float32(friendsWindowWidth), textH), rotheme.Default.Typography.TextSize, rotheme.Default.Colors.Text, false, widget.TextAlignLeft)
 	rotheme.DrawText(canvas, w.state, geometry.NewRect(bounds.Max.X-bounds.Width()*float32(friendsRowStateRight)/float32(friendsWindowWidth), textY, bounds.Width()*float32(friendsRowStateW)/float32(friendsWindowWidth), textH), rotheme.Default.Typography.TextSize, w.stateColor, false, widget.TextAlignRight)
 	barInset := bounds.Width() * float32(friendsPartyBarInset) / float32(friendsWindowWidth)
 	barH := bounds.Height() * float32(friendsPartyBarH) / float32(friendsRowHeight)
