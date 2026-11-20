@@ -146,7 +146,10 @@ func (w *skillGridWidget) drawCell(canvas widget.Canvas, cell geometry.Rect, ent
 
 	w.drawLevel(canvas, cell, entry, textColor, hovered)
 	if requiredLevel > 0 {
-		badge := geometry.NewRect(slot.Max.X, slot.Max.Y-skillGridBadgeInsetY, skillGridBadgeW, skillGridBadgeH)
+		badgeW := slot.Width() * skillGridBadgeW / skillGridSlotSize
+		badgeH := slot.Height() * skillGridBadgeH / skillGridSlotSize
+		badgeY := slot.Height() * skillGridBadgeInsetY / skillGridSlotSize
+		badge := geometry.NewRect(slot.Max.X, slot.Max.Y-badgeY, badgeW, badgeH)
 		rotheme.DrawText(canvas, fmt.Sprint(requiredLevel), badge,
 			rotheme.Default.Typography.TextSize, rotheme.Default.Colors.Text, true, widget.TextAlignCenter)
 	}
@@ -158,7 +161,7 @@ func (w *skillGridWidget) drawLevel(canvas widget.Canvas, cell geometry.Rect, en
 		rotheme.DrawText(
 			canvas,
 			fmt.Sprintf("Lv %d", entry.display.Level),
-			geometry.NewRect(cell.Min.X+1, cell.Max.Y-skillGridLevelInsetY, cell.Width()-skillGridNameInsetX*2, skillGridLevelH),
+			geometry.NewRect(cell.Min.X+float32(skillGridNameInsetX), cell.Max.Y-cell.Height()*skillGridLevelInsetY/float32(skillGridCellH), cell.Width()-float32(skillGridNameInsetX)*2, cell.Height()*skillGridLevelH/float32(skillGridCellH)),
 			rotheme.Default.Typography.TextSize,
 			color,
 			false,
@@ -177,7 +180,7 @@ func (w *skillGridWidget) drawLevel(canvas widget.Canvas, cell geometry.Rect, en
 	rotheme.DrawText(
 		canvas,
 		fmt.Sprintf("%d/%d", level, entry.skill.Level),
-		geometry.NewRect(down.Max.X, cell.Max.Y-skillGridLevelInsetY, up.Min.X-down.Max.X, skillGridLevelH),
+		geometry.NewRect(down.Max.X, cell.Max.Y-cell.Height()*skillGridLevelInsetY/float32(skillGridCellH), up.Min.X-down.Max.X, cell.Height()*skillGridLevelH/float32(skillGridCellH)),
 		rotheme.Default.Typography.TextSize,
 		color,
 		false,
@@ -481,13 +484,18 @@ func (w *SkillWindow) skillGridAtMouse(mouseX, mouseY int) (session.Skill, bool)
 	if w.grid == nil {
 		return session.Skill{}, false
 	}
-	x := w.x + skillTabRailW + verticalTabDividerW
-	y := w.y + ROWindowTitleHeight
-	if !pointInRect(mouseX, mouseY, x, y, skillGridColumns*skillGridCellW, skillGridViewH) {
+	scale := w.elementScale()
+	x := w.x + scaleInt(skillTabRailW+verticalTabDividerW, scale)
+	y := w.y + scaleInt(ROWindowTitleHeight, scale)
+	cellW := scaleInt(skillGridCellW, scale)
+	if cellW < 1 {
+		cellW = 1
+	}
+	if !pointInRect(mouseX, mouseY, x, y, scaleInt(skillGridColumns*skillGridCellW, scale), scaleInt(skillGridViewH, scale)) {
 		return session.Skill{}, false
 	}
-	col := (mouseX - x) / skillGridCellW
-	row := int((float32(mouseY-y) + w.ensureScrollSignal().Get()) / float32(skillGridCellH))
+	col := (mouseX - x) / cellW
+	row := int((float32(mouseY-y) + w.ensureScrollSignal().Get()) / scaleF(float32(skillGridCellH), scale))
 	entry, ok := w.grid.entryAtPosition(row*skillGridColumns + col)
 	return entry.skill, ok
 }

@@ -377,7 +377,7 @@ func (w *HomunculusSkillWindow) handleSkillTableRowEvent(widgetCtx widget.Contex
 		if mouse.Button != event.ButtonLeft {
 			return false
 		}
-		if companionSkillTableLevelUpButtonBounds(row).Contains(mouse.Position) {
+		if skillTableButtonBoundsForColumns(companionSkillTableColumns(), row, "levelup", w.elementScale()).Contains(mouse.Position) {
 			if !w.canStageSkill(ctx.Session, skill) {
 				glog.Debugf("%s skill level up ignored id=%d: no points or maxed", w.kindLabelLower(), skill.ID)
 				return true
@@ -532,11 +532,12 @@ func (w *HomunculusSkillWindow) updateTooltipHover(ctx Context) {
 }
 
 func (w *HomunculusSkillWindow) skillAtMouse(ctx Context, mouseX, mouseY int) (session.Skill, bool) {
+	scale := w.elementScale()
 	x, y := w.skillTableBodyOrigin()
-	if !pointInRect(mouseX, mouseY, x, y, scrollbarSafeIntWidth(homunculusSkillWindowWidth), homunculusSkillTableBodyH()) {
+	if !pointInRect(mouseX, mouseY, x, y, scaleInt(scrollbarSafeIntWidth(homunculusSkillWindowWidth), scale), scaleInt(homunculusSkillTableBodyH(), scale)) {
 		return session.Skill{}, false
 	}
-	row := int((float32(mouseY-y) + w.ensureScrollSignal().Get()) / float32(skillRowH))
+	row := int((float32(mouseY-y) + w.ensureScrollSignal().Get()) / scaleF(float32(skillRowH), scale))
 	skills := w.visibleSkills(ctx)
 	if row < 0 || row >= len(skills) {
 		return session.Skill{}, false
@@ -545,7 +546,7 @@ func (w *HomunculusSkillWindow) skillAtMouse(ctx Context, mouseX, mouseY int) (s
 }
 
 func (w *HomunculusSkillWindow) skillTableBodyOrigin() (int, int) {
-	return w.x, w.y + ROWindowTitleHeight + skillHeaderH
+	return w.x, w.y + scaleInt(ROWindowTitleHeight+skillHeaderH, w.elementScale())
 }
 
 func (w *HomunculusSkillWindow) hideTooltip() {
@@ -657,7 +658,7 @@ func (w *HomunculusSkillWindow) companionSkillPoints(s *session.Session) int {
 }
 
 func companionSkillTableLevelUpButtonBounds(row int) geometry.Rect {
-	return skillTableButtonBoundsForColumns(companionSkillTableColumns(), row, "levelup")
+	return skillTableButtonBoundsForColumns(companionSkillTableColumns(), row, "levelup", 1)
 }
 
 func companionSkillByID(companion session.Companion, skillID uint16) (session.Skill, bool) {

@@ -616,7 +616,7 @@ func equipmentSlotTextBounds(bounds geometry.Rect, slot equipmentSlotDef, icon i
 	if icon == nil {
 		return geometry.NewRect(bounds.Min.X+equipmentTextPad, bounds.Min.Y+equipmentTextPad, bounds.Width()-equipmentTextInset, bounds.Height()-equipmentTextInset)
 	}
-	iconWidth := float32(icon.Bounds().Dx())
+	iconWidth := equipmentSlotIconRect(bounds, slot).Width()
 	switch slot.side {
 	case equipmentSlotRight:
 		return geometry.NewRect(bounds.Min.X+equipmentTextPad, bounds.Min.Y+equipmentTextPad, bounds.Width()-iconWidth-equipmentIconTextTrail, bounds.Height()-equipmentTextInset)

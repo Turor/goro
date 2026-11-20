@@ -466,16 +466,16 @@ func (w *SkillWindow) handleSkillTableRowEvent(widgetCtx widget.Context, ctx Con
 			return false
 		}
 		if selectable, known := db.SkillLevelSelectable(skill.ID); known && selectable && skill.Level > 0 {
-			if skillTableButtonBounds(row, "leveldown").Contains(mouse.Position) {
+			if skillTableButtonBoundsForColumns(skillTableColumns, row, "leveldown", w.elementScale()).Contains(mouse.Position) {
 				w.adjustSelectedSkillLevel(widgetCtx, skill, row, -1)
 				return true
 			}
-			if skillTableButtonBounds(row, "levelupselect").Contains(mouse.Position) {
+			if skillTableButtonBoundsForColumns(skillTableColumns, row, "levelupselect", w.elementScale()).Contains(mouse.Position) {
 				w.adjustSelectedSkillLevel(widgetCtx, skill, row, 1)
 				return true
 			}
 		}
-		if skillTableButtonBounds(row, "levelup").Contains(mouse.Position) {
+		if skillTableButtonBoundsForColumns(skillTableColumns, row, "levelup", w.elementScale()).Contains(mouse.Position) {
 			if !w.canStageSkill(ctx.Session, skill) {
 				glog.Debugf("skill level up ignored id=%d: no points or maxed", skill.ID)
 				return true
@@ -589,11 +589,12 @@ func (w *SkillWindow) skillAtMouse(ctx Context, mouseX, mouseY int) (session.Ski
 	if w.gridMode {
 		return w.skillGridAtMouse(mouseX, mouseY)
 	}
+	scale := w.elementScale()
 	x, y := w.skillTableBodyOrigin()
-	if !pointInRect(mouseX, mouseY, x, y, scrollbarSafeIntWidth(skillTableViewW), skillTableBodyH) {
+	if !pointInRect(mouseX, mouseY, x, y, scaleInt(scrollbarSafeIntWidth(skillTableViewW), scale), scaleInt(skillTableBodyH, scale)) {
 		return session.Skill{}, false
 	}
-	row := int((float32(mouseY-y) + w.ensureScrollSignal().Get()) / float32(skillRowH))
+	row := int((float32(mouseY-y) + w.ensureScrollSignal().Get()) / scaleF(float32(skillRowH), scale))
 	w.ensureSkillView(ctx)
 	skills := w.activeSkills()
 	if row < 0 || row >= len(skills) {
@@ -603,7 +604,8 @@ func (w *SkillWindow) skillAtMouse(ctx Context, mouseX, mouseY int) (session.Ski
 }
 
 func (w *SkillWindow) skillTableBodyOrigin() (int, int) {
-	return w.x + skillTabRailW + verticalTabDividerW, w.y + ROWindowTitleHeight + skillHeaderH
+	scale := w.elementScale()
+	return w.x + scaleInt(skillTabRailW+verticalTabDividerW, scale), w.y + scaleInt(ROWindowTitleHeight+skillHeaderH, scale)
 }
 
 func (w *SkillWindow) hideTooltip() {
@@ -969,21 +971,27 @@ func (w *SkillWindow) contentHeight() int {
 }
 
 func skillTableButtonBounds(row int, key string) geometry.Rect {
-	return skillTableButtonBoundsForColumns(skillTableColumns, row, key)
+	return skillTableButtonBoundsForColumns(skillTableColumns, row, key, 1)
 }
 
-func skillTableButtonBoundsForColumns(columns []rotheme.TableViewColumn, row int, key string) geometry.Rect {
+func skillTableButtonBoundsForColumns(columns []rotheme.TableViewColumn, row int, key string, scale float32) geometry.Rect {
+	if scale <= 0 {
+		scale = 1
+	}
+	button := rotheme.IconButtonSize * scale
+	rowH := float32(skillRowH) * scale
 	x := float32(0)
 	for _, col := range columns {
+		width := col.Width * scale
 		if col.Key == key {
 			return geometry.NewRect(
-				x+(col.Width-rotheme.IconButtonSize)/2,
-				float32(row)*float32(skillRowH)+(float32(skillRowH)-rotheme.IconButtonSize)/2,
-				rotheme.IconButtonSize,
-				rotheme.IconButtonSize,
+				x+(width-button)/2,
+				float32(row)*rowH+(rowH-button)/2,
+				button,
+				button,
 			)
 		}
-		x += col.Width
+		x += width
 	}
 	return geometry.Rect{}
 }

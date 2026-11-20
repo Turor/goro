@@ -167,13 +167,14 @@ func (w *MakingItemWindow) updateDoubleClick(ctx Context) {
 }
 
 func (w *MakingItemWindow) rowAtMouse(mouseX, mouseY int) (int, bool) {
+	scale := w.elementScale()
 	tableX := w.x
-	tableY := w.y + ROWindowTitleHeight
-	rowY := tableY + makingItemTableHeaderH
-	if !pointInRect(mouseX, mouseY, tableX, rowY, scrollbarSafeIntWidth(makingItemWindowWidth), makingItemRows*makingItemRowH) {
+	tableY := w.y + scaleInt(ROWindowTitleHeight, scale)
+	rowY := tableY + scaleInt(makingItemTableHeaderH, scale)
+	if !pointInRect(mouseX, mouseY, tableX, rowY, scaleInt(scrollbarSafeIntWidth(makingItemWindowWidth), scale), scaleInt(makingItemRows*makingItemRowH, scale)) {
 		return 0, false
 	}
-	row := int((float32(mouseY-rowY) + w.ensureScrollSignal().Get()) / float32(makingItemRowH))
+	row := int((float32(mouseY-rowY) + w.ensureScrollSignal().Get()) / scaleF(float32(makingItemRowH), scale))
 	if row < 0 || row >= len(w.items) {
 		return 0, false
 	}

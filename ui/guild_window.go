@@ -1145,7 +1145,7 @@ func (w *GuildWindow) handleGuildSkillTableRowEvent(widgetCtx widget.Context, ct
 		if mouse.Button != event.ButtonLeft {
 			return false
 		}
-		if guildSkillLevelUpButtonBounds(row).Contains(mouse.Position) {
+		if guildSkillLevelUpButtonBoundsScaled(row, w.elementScale()).Contains(mouse.Position) {
 			if !w.canStageGuildSkill(display, guild) {
 				return true
 			}
@@ -1190,18 +1190,27 @@ func (w *GuildWindow) pressGuildSkill(ctx Context, skill session.Skill) {
 }
 
 func guildSkillLevelUpButtonBounds(row int) geometry.Rect {
+	return guildSkillLevelUpButtonBoundsScaled(row, 1)
+}
+
+func guildSkillLevelUpButtonBoundsScaled(row int, scale float32) geometry.Rect {
+	if scale <= 0 {
+		scale = 1
+	}
+	button := rotheme.IconButtonSize * scale
 	x := float32(0)
 	for _, col := range guildSkillTableColumns() {
+		width := col.Width * scale
 		if col.Key == "levelup" {
-			rowH := float32(guildTableRowH)
+			rowH := float32(guildTableRowH) * scale
 			return geometry.NewRect(
-				x+(col.Width-rotheme.IconButtonSize)/2,
-				float32(row)*rowH+(rowH-rotheme.IconButtonSize)/2,
-				rotheme.IconButtonSize,
-				rotheme.IconButtonSize,
+				x+(width-button)/2,
+				float32(row)*rowH+(rowH-button)/2,
+				button,
+				button,
 			)
 		}
-		x += col.Width
+		x += width
 	}
 	return geometry.Rect{}
 }

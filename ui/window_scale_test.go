@@ -149,3 +149,21 @@ func explicitSizes(root widget.Widget) map[string]float32 {
 	walk(root, "f")
 	return out
 }
+
+func TestWindowElementScaleComesFromTheFrame(t *testing.T) {
+	window := &Window{content: &windowFrame{contentScale: 0.5}}
+	if got := window.elementScale(); got != 0.5 {
+		t.Fatalf("element scale = %v, want 0.5", got)
+	}
+	skill := &SkillWindow{Window: *window}
+	skill.x, skill.y = 10, 20
+	x, y := skill.skillTableBodyOrigin()
+	if x >= 10+skillTabRailW || y >= 20+ROWindowTitleHeight+skillHeaderH {
+		t.Fatalf("skill body origin = %d,%d, want the scaled offset", x, y)
+	}
+	design := skillTableButtonBounds(0, "levelup")
+	scaled := skillTableButtonBoundsForColumns(skillTableColumns, 0, "levelup", skill.elementScale())
+	if scaled.Width() >= design.Width() {
+		t.Fatalf("scaled level button width %.1f, design %.1f", scaled.Width(), design.Width())
+	}
+}
