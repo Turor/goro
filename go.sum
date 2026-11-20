@@ -1,3 +1,5 @@
+github.com/Turor/gg v0.52.4-0.20261120020844-4040d7008dde h1:r4guGJWQHu4fui0rIDg21Hi+gXIImCLYcVS2kOb98Z4=
+github.com/Turor/gg v0.52.4-0.20261120020844-4040d7008dde/go.mod h1:76qRbhwszTfk1McnBiCPtnx1ewpR7C6+mfZoxmD5RUU=
 github.com/Turor/gogpu v0.0.0-20261118072835-2cbb91a22b86 h1:0uTv7n18/hHZz5MvzlGJoaY8CEXJW40bEENy1q7m6mU=
 github.com/Turor/gogpu v0.0.0-20261118072835-2cbb91a22b86/go.mod h1:V6+0B+iXxgiQkdlRJvUyjiYrGRDoooxYNgw9qTCZN8w=
 github.com/aymanbagabas/go-osc52/v2 v2.0.1 h1:HwpRHbFMcZLEVr42D4p7XBqjyuxQH5SMiErDT4WkJ2k=
@@ -48,8 +50,6 @@ github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=
 github.com/google/go-cmp v0.7.0/go.mod h1:pXiqmnSA92OHEEa9HXL2W4E7lf9JzCmGVUdgjX3N/iU=
 github.com/jfreymuth/pulse v0.1.1 h1:9WLNBNCijmtZ14ZJpatgJPu/NjwAl3TIKItSFnTh+9A=
 github.com/jfreymuth/pulse v0.1.1/go.mod h1:cpYspI6YljhkUf1WLXLLDmeaaPFc3CnGLjDZf9dZ4no=
-github.com/kivutar/gg v0.52.4-0.20261005130553-221e1f996c41 h1:twFQuvTAJ/ypuNngQBq6odRkoQ8W6GlXRQ5EdLsncIo=
-github.com/kivutar/gg v0.52.4-0.20261005130553-221e1f996c41/go.mod h1:76qRbhwszTfk1McnBiCPtnx1ewpR7C6+mfZoxmD5RUU=
 github.com/kivutar/ui v0.1.55-0.20261025114315-0caf9ae78f4e h1:2oepCANijwVFiK+J+KSNh/6hx3hll25XJYNTb6PE140=
 github.com/kivutar/ui v0.1.55-0.20261025114315-0caf9ae78f4e/go.mod h1:FUJbZho6XeDp0xTuDuXFqcJgZ0nmyb4W5oCyF+24qBs=
 github.com/kivutar/wgpu v0.34.4-0.20261030134930-d82232ecde21 h1:/VPPKVVmepLLa3HzuZ3kVIS2D5tBJc7DkwYqLDGRMvA=

@@ -62,7 +62,7 @@ replace github.com/godexture/metadata-id3 => github.com/godexture/godec/plugins/
 
 replace github.com/gogpu/gogpu => github.com/Turor/gogpu v0.0.0-20261118072835-2cbb91a22b86
 
-replace github.com/gogpu/gg => github.com/kivutar/gg v0.52.4-0.20261005130553-221e1f996c41
+replace github.com/gogpu/gg => github.com/Turor/gg v0.52.4-0.20261120020844-4040d7008dde
 
 replace github.com/gogpu/ui => github.com/kivutar/ui v0.1.55-0.20261025114315-0caf9ae78f4e
 
