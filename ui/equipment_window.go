@@ -112,7 +112,10 @@ func (w *EquipmentWindow) Update(ctx Context, itemInfo *ItemWindows, cart *CartW
 		w.cart = cart
 		w.hasCart = hasCart
 		w.hasPeco = hasPeco
-		if assets != nil {
+		// A dirty rebuild is not a portrait load. The first update after
+		// open always receives the live item and cart pointers, and loading
+		// the sprite there is the open hitch.
+		if needsPreview {
 			w.preview = assets.EquipmentPreviewImage(ctx, equipmentCenterColW, equipmentPreviewImageH)
 		}
 		w.SetContent(w.widgetTree(ctx, itemInfo, cart))
@@ -137,7 +140,7 @@ func (w *EquipmentWindow) Rebind(ctx Context, itemInfo *ItemWindows, cart *CartW
 	w.cart = cart
 	w.hasCart = inventoryBagHasCart(ctx)
 	w.hasPeco = equipmentHasPeco(ctx)
-	if assets != nil {
+	if assets != nil && !w.deferPreview {
 		w.preview = assets.EquipmentPreviewImage(ctx, equipmentCenterColW, equipmentPreviewImageH)
 	}
 	w.SetSize(gearWindowSize())

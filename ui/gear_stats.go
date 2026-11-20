@@ -24,7 +24,7 @@ func gearWindowSize() (int, int) {
 	if statsH := gearStatsContentHeight(); statsH > contentH {
 		contentH = statsH
 	}
-	contentH += gearCompositeBandHeight()
+	contentH += equipmentWindowPad + gearCompositeBandHeight()
 	return width, ROWindowTitleHeight + contentH + ROWindowFooterHeight
 }
 
@@ -97,12 +97,21 @@ func gearStatTabButton(label string, active bool, onClick func()) widget.Widget 
 }
 
 func gearCompositeBandHeight() int {
-	rows := gearCompositeBandRows
-	if rows < 1 {
-		rows = 1
-	}
+	rows := 1 + gearCompositeDataRows()
 	gaps := rows - 1
+	if gaps < 0 {
+		gaps = 0
+	}
 	return int(statsWindowPad*2) + rows*statsRowH + int(float32(gaps)*rotheme.TableGap)
+}
+
+func gearCompositeDataRows() int {
+	cols := gearCompositeBandCols
+	if cols < 1 {
+		cols = 1
+	}
+	count := len(gearCompositeStats(session.Stats{}))
+	return (count + cols - 1) / cols
 }
 
 type gearCompositeStat struct {
@@ -133,20 +142,35 @@ func gearCompositeStats(stats session.Stats) []gearCompositeStat {
 // window, name in a header cell and the number beside it.
 func gearCompositeBand(stats session.Stats) widget.Widget {
 	all := gearCompositeStats(stats)
-	return primitives.Box(
-		rotheme.Label("Composite"),
-		gearCompositeRow(all[:4]),
-		gearCompositeRow(all[4:8]),
-		gearCompositeRow(all[8:]),
-	).Gap(rotheme.TableGap).Padding(statsWindowPad)
+	cols := gearCompositeBandCols
+	if cols < 1 {
+		cols = 1
+	}
+	children := make([]widget.Widget, 0, 1+gearCompositeDataRows())
+	children = append(children, rotheme.Label("Composite"))
+	for start := 0; start < len(all); start += cols {
+		end := start + cols
+		if end > len(all) {
+			end = len(all)
+		}
+		children = append(children, gearCompositeRow(all[start:end], cols))
+	}
+	return primitives.Box(children...).Gap(rotheme.TableGap).Padding(statsWindowPad)
 }
 
-func gearCompositeRow(stats []gearCompositeStat) widget.Widget {
-	cells := make([]widget.Widget, 0, len(stats))
+func gearCompositeRow(stats []gearCompositeStat, cols int) widget.Widget {
+	cells := make([]widget.Widget, 0, cols)
 	for _, stat := range stats {
 		cells = append(cells, gearCompositeCell(stat))
 	}
+	for len(cells) < cols {
+		cells = append(cells, gearCompositePad())
+	}
 	return primitives.HBox(cells...).Gap(rotheme.TableGap)
+}
+
+func gearCompositePad() widget.Widget {
+	return primitives.Expanded(primitives.Box().Height(float32(statsRowH)))
 }
 
 func gearCompositeCell(stat gearCompositeStat) widget.Widget {

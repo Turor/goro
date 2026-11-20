@@ -2,6 +2,7 @@ package ui
 
 import (
 	"image"
+	"math"
 	"testing"
 
 	"github.com/gogpu/ui/geometry"
@@ -13,13 +14,15 @@ import (
 func TestGearOpenDefersPortrait(t *testing.T) {
 	window := &EquipmentWindow{}
 	assets := &countingPreview{}
+	itemInfo := &ItemWindows{}
+	cart := &CartWindow{}
 	ctx := Context{Session: &session.Session{}, ScreenW: 1280, ScreenH: 720}
 	window.Toggle(ctx)
-	window.Update(ctx, nil, nil, assets)
+	window.Update(ctx, itemInfo, cart, assets)
 	if assets.calls != 0 {
 		t.Fatalf("open frame loaded the portrait %d times", assets.calls)
 	}
-	window.Update(ctx, nil, nil, assets)
+	window.Update(ctx, itemInfo, cart, assets)
 	if assets.calls != 1 {
 		t.Fatalf("next frame portrait calls = %d, want 1", assets.calls)
 	}
@@ -32,19 +35,43 @@ func TestGearCompositeCellsUseTheWindowWidth(t *testing.T) {
 	tree := window.widgetTree(ctx, nil, nil)
 	width, height := gearWindowSize()
 	tree.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(float32(width), float32(height))))
-	if !hasWideStatRow(tree, float32(gearStatsColumnWidth())) {
-		t.Fatal("composite row is not wider than the status column")
+	widths := compositeCellWidths(tree)
+	if len(widths) < gearCompositeBandCols*2 {
+		t.Fatalf("found %d composite cells, want at least %d", len(widths), gearCompositeBandCols*2)
+	}
+	for _, cell := range widths {
+		if math.Abs(float64(cell-widths[0])) > 1 {
+			t.Fatalf("composite cells are not equal width: %v", widths)
+		}
 	}
 }
 
-func hasWideStatRow(root widget.Widget, column float32) bool {
-	found := false
+func compositeCellWidths(root widget.Widget) []float32 {
+	var widths []float32
 	var walk func(widget.Widget)
 	walk = func(current widget.Widget) {
-		if box, ok := current.(*primitives.BoxWidget); ok {
-			bounds := box.Bounds()
-			if bounds.Height() == float32(statsRowH) && bounds.Width() > column {
-				found = true
+		if current == nil {
+			return
+		}
+		if box, ok := current.(*primitives.BoxWidget); ok && box.Bounds().Width() > float32(gearStatsColumnWidth()) {
+			children := box.Children()
+			if len(children) != gearCompositeBandCols {
+				for _, child := range children {
+					walk(child)
+				}
+				return
+			}
+			row := make([]float32, 0, len(children))
+			for _, child := range children {
+				expanded, isExpanded := child.(*primitives.ExpandedWidget)
+				if !isExpanded {
+					row = nil
+					break
+				}
+				row = append(row, expanded.Bounds().Width())
+			}
+			if len(row) == gearCompositeBandCols {
+				widths = append(widths, row...)
 			}
 		}
 		for _, child := range current.Children() {
@@ -52,7 +79,7 @@ func hasWideStatRow(root widget.Widget, column float32) bool {
 		}
 	}
 	walk(root)
-	return found
+	return widths
 }
 
 type countingPreview struct {
