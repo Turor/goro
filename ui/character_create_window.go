@@ -306,7 +306,7 @@ func (w *characterCreatePreview) Height(height float32) *characterCreatePreview 
 }
 
 func (w *characterCreatePreview) Layout(_ widget.Context, constraints geometry.Constraints) geometry.Size {
-	size := constraints.Constrain(geometry.Sz(w.width, w.height))
+	size := constraints.Constrain(geometry.Sz(w.width*rotheme.ContentScale(), w.height*rotheme.ContentScale()))
 	w.SetBounds(geometry.FromPointSize(w.Position(), size))
 	return size
 }
@@ -427,7 +427,7 @@ func (w *characterCreateStatGraph) Height(height float32) *characterCreateStatGr
 }
 
 func (w *characterCreateStatGraph) Layout(_ widget.Context, constraints geometry.Constraints) geometry.Size {
-	size := constraints.Constrain(geometry.Sz(w.width, w.height))
+	size := constraints.Constrain(geometry.Sz(w.width*rotheme.ContentScale(), w.height*rotheme.ContentScale()))
 	w.SetBounds(geometry.FromPointSize(w.Position(), size))
 	return size
 }

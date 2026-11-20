@@ -57,6 +57,12 @@ type windowFrame struct {
 	titleSize    float32
 	fillUserSize bool
 	hasFooter    bool
+	// designW and designH are the token frame size. contentScale fits the
+	// elements into a player resize. Zero means the window is still at that token.
+	designW      float32
+	designH      float32
+	contentScale float32
+	scaleTokens  map[widget.Widget]*scaleToken
 }
 
 func (f *windowFrame) applyBackground() {
@@ -109,10 +115,21 @@ func (f *windowFrame) Layout(ctx widget.Context, constraints geometry.Constraint
 			if height < 0 {
 				height = 0
 			}
-			growWindowPanes(content, width, height)
+			_, _ = width, height
+			f.applyContentScale()
 		}
 	}
-	return f.BoxWidget.Layout(ctx, constraints)
+	var size geometry.Size
+	f.withContentScale(func() {
+		size = f.BoxWidget.Layout(ctx, constraints)
+	})
+	return size
+}
+
+func (f *windowFrame) Draw(ctx widget.Context, canvas widget.Canvas) {
+	f.withContentScale(func() {
+		f.BoxWidget.Draw(ctx, canvas)
+	})
 }
 
 func windowFrameContent(frame *primitives.BoxWidget) widget.Widget {
@@ -381,6 +398,9 @@ type Window struct {
 	userSized     bool
 	userWidth     int
 	userHeight    int
+	looseDesignW  float32
+	looseDesignH  float32
+	looseTokens   map[widget.Widget]*scaleToken
 	dragging      bool
 	resizing      bool
 	resizeStartW  int
@@ -1076,6 +1096,7 @@ type positionedOverlay struct {
 	hidden        bool
 	raiseOnPress  bool
 	closeOnEsc    bool
+	contentScale  float32
 }
 
 func (w *positionedOverlay) setFrame(x, y, width, height int) geometry.Rect {
@@ -1157,7 +1178,9 @@ func (w *positionedOverlay) Layout(ctx widget.Context, _ geometry.Constraints) g
 	size := geometry.Sz(float32(w.width), float32(w.height))
 	w.SetBounds(geometry.NewRect(float32(w.x), float32(w.y), size.Width, size.Height))
 	if w.child != nil {
-		w.child.Layout(ctx, geometry.Tight(size))
+		withContentScale(w.contentScale, func() {
+			w.child.Layout(ctx, geometry.Tight(size))
+		})
 		if setter, ok := w.child.(interface{ SetBounds(geometry.Rect) }); ok {
 			setter.SetBounds(geometry.FromPointSize(geometry.Point{}, size))
 		}
@@ -1175,7 +1198,9 @@ func (w *positionedOverlay) Draw(ctx widget.Context, canvas widget.Canvas) {
 	if w.hasDamage {
 		widget.ClearRedrawInTree(w.child)
 	}
-	widget.DrawChild(w.child, ctx, canvas)
+	withContentScale(w.contentScale, func() {
+		widget.DrawChild(w.child, ctx, canvas)
+	})
 	drawWindowResizeGrip(canvas, w.width, w.height)
 	canvas.PopTransform()
 }

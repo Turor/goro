@@ -343,7 +343,7 @@ type friendRowWidget struct {
 }
 
 func (w *friendRowWidget) Layout(_ widget.Context, constraints geometry.Constraints) geometry.Size {
-	size := constraints.Constrain(geometry.Sz(float32(friendsWindowWidth), float32(friendsRowHeight)))
+	size := constraints.Constrain(geometry.Sz(float32(friendsWindowWidth)*rotheme.ContentScale(), float32(friendsRowHeight)*rotheme.ContentScale()))
 	w.SetBounds(geometry.FromPointSize(w.Position(), size))
 	return size
 }
@@ -478,7 +478,7 @@ type partyRowWidget struct {
 }
 
 func (w *partyRowWidget) Layout(_ widget.Context, constraints geometry.Constraints) geometry.Size {
-	size := constraints.Constrain(geometry.Sz(float32(friendsWindowWidth), float32(friendsRowHeight)))
+	size := constraints.Constrain(geometry.Sz(float32(friendsWindowWidth)*rotheme.ContentScale(), float32(friendsRowHeight)*rotheme.ContentScale()))
 	w.SetBounds(geometry.FromPointSize(w.Position(), size))
 	return size
 }

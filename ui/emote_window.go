@@ -269,7 +269,7 @@ func newEmoteCellWidget(emote db.Emotion, icon image.Image, onSelect, onPlay fun
 }
 
 func (w *emoteCellWidget) Layout(_ widget.Context, constraints geometry.Constraints) geometry.Size {
-	size := constraints.Constrain(geometry.Sz(float32(emoteCellSize), float32(emoteCellSize)))
+	size := constraints.Constrain(geometry.Sz(float32(emoteCellSize)*rotheme.ContentScale(), float32(emoteCellSize)*rotheme.ContentScale()))
 	w.SetBounds(geometry.FromPointSize(w.Position(), size))
 	return size
 }

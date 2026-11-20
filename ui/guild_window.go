@@ -1712,7 +1712,7 @@ type guildRelationRowWidget struct {
 }
 
 func (w *guildRelationRowWidget) Layout(_ widget.Context, constraints geometry.Constraints) geometry.Size {
-	size := constraints.Constrain(geometry.Sz(float32(guildRelationRowW), float32(guildRelationRowH)))
+	size := constraints.Constrain(geometry.Sz(float32(guildRelationRowW)*rotheme.ContentScale(), float32(guildRelationRowH)*rotheme.ContentScale()))
 	w.SetBounds(geometry.FromPointSize(w.Position(), size))
 	return size
 }

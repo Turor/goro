@@ -650,6 +650,9 @@ func minimapMapRect(x, y, w, h int) minimapRect {
 	if size < minimapMapMin {
 		size = minimapMapMin
 	}
+	if limit := minInt(w, h); limit > 0 && size > limit {
+		size = limit
+	}
 	return minimapRect{
 		x: x + (w-size)/2,
 		y: y + ROWindowTitleHeight + minimapMapTop,
@@ -703,7 +706,7 @@ func newMinimapWidget() *minimapWidget {
 }
 
 func (w *minimapWidget) Layout(_ widget.Context, constraints geometry.Constraints) geometry.Size {
-	size := constraints.Constrain(geometry.Size{Width: float32(minimapWidth), Height: float32(minimapHeight - ROWindowTitleHeight)})
+	size := constraints.Constrain(geometry.Size{Width: float32(minimapWidth) * rotheme.ContentScale(), Height: float32(minimapHeight-ROWindowTitleHeight) * rotheme.ContentScale()})
 	w.SetBounds(geometry.FromPointSize(w.Position(), size))
 	return size
 }
@@ -715,7 +718,7 @@ func (w *minimapWidget) Draw(_ widget.Context, canvas widget.Canvas) {
 	}
 	rect := minimapContentMapRect(bounds)
 	if w.image != nil {
-		canvas.DrawImage(w.image, geometry.Pt(float32(rect.x), float32(rect.y)))
+		drawFittedImage(canvas, w.image, geometry.NewRect(float32(rect.x), float32(rect.y), float32(rect.w), float32(rect.h)))
 	}
 	if w.ctx.World != nil {
 		mapW, mapH := minimapWorldSize(w.ctx.World)

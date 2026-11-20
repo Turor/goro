@@ -101,6 +101,7 @@ func DrawText(canvas widget.Canvas, text string, bounds geometry.Rect, size floa
 	if text == "" {
 		return
 	}
+	size *= ContentScale()
 	family := Default.Typography.FontFamily
 	if styled, ok := canvas.(widget.StyledTextDrawer); ok {
 		styled.DrawStyledText(text, bounds, widget.TextStyle{
@@ -119,6 +120,7 @@ func MeasureText(canvas widget.Canvas, text string, size float32, bold bool) flo
 	if text == "" {
 		return 0
 	}
+	size *= ContentScale()
 	family := Default.Typography.FontFamily
 	if styled, ok := canvas.(widget.StyledTextDrawer); ok {
 		return styled.MeasureStyledText(text, widget.TextStyle{

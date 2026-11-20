@@ -513,7 +513,7 @@ func newShortcutSlotButton(bar *ShortcutBar, slot int) *shortcutSlotButton {
 }
 
 func (w *shortcutSlotButton) Layout(ctx widget.Context, constraints geometry.Constraints) geometry.Size {
-	size := constraints.Constrain(geometry.Sz(float32(shortcutSlot), float32(shortcutSlot)))
+	size := constraints.Constrain(geometry.Sz(float32(shortcutSlot)*rotheme.ContentScale(), float32(shortcutSlot)*rotheme.ContentScale()))
 	w.SetBounds(geometry.FromPointSize(w.Position(), size))
 	return size
 }

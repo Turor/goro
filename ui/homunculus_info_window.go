@@ -338,7 +338,7 @@ func newHomunculusBarWidget(ratio float64, fill widget.Color, width, height floa
 }
 
 func (w *homunculusBarWidget) Layout(ctx widget.Context, constraints geometry.Constraints) geometry.Size {
-	size := constraints.Constrain(geometry.Sz(w.width, w.height))
+	size := constraints.Constrain(geometry.Sz(w.width*rotheme.ContentScale(), w.height*rotheme.ContentScale()))
 	w.SetBounds(geometry.FromPointSize(w.Position(), size))
 	return size
 }

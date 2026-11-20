@@ -584,7 +584,7 @@ func (w *MailWindow) newAttachmentSlot(item session.InventoryItem) *mailAttachme
 	return slot
 }
 func (s *mailAttachmentSlot) Layout(_ widget.Context, c geometry.Constraints) geometry.Size {
-	size := c.Constrain(geometry.Sz(mailSlot, mailSlot))
+	size := c.Constrain(geometry.Sz(mailSlot*rotheme.ContentScale(), mailSlot*rotheme.ContentScale()))
 	s.SetBounds(geometry.FromPointSize(s.Position(), size))
 	return size
 }

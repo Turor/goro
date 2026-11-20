@@ -387,7 +387,7 @@ func newStaticImageWidget(img image.Image, width, height int) *staticImageWidget
 }
 
 func (w *staticImageWidget) Layout(ctx widget.Context, constraints geometry.Constraints) geometry.Size {
-	size := constraints.Constrain(geometry.Sz(float32(w.width), float32(w.height)))
+	size := constraints.Constrain(geometry.Sz(float32(w.width)*rotheme.ContentScale(), float32(w.height)*rotheme.ContentScale()))
 	w.SetBounds(geometry.FromPointSize(w.Position(), size))
 	return size
 }
@@ -488,7 +488,7 @@ func newEquipmentSlotWidget(cfg equipmentSlotWidgetConfig) *equipmentSlotWidget 
 }
 
 func (w *equipmentSlotWidget) Layout(ctx widget.Context, constraints geometry.Constraints) geometry.Size {
-	size := constraints.Constrain(geometry.Sz(float32(w.cfg.width), float32(equipmentRowH)))
+	size := constraints.Constrain(geometry.Sz(float32(w.cfg.width)*rotheme.ContentScale(), float32(equipmentRowH)*rotheme.ContentScale()))
 	w.SetBounds(geometry.FromPointSize(w.Position(), size))
 	return size
 }
