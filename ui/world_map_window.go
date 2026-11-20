@@ -175,17 +175,15 @@ func (w *WorldMapWindow) Close() {
 }
 
 func (w *WorldMapWindow) widgetTree(ctx Context) widget.Widget {
-	imageLayer := newWorldMapImage(w.scaled)
 	w.board = &worldMapWidget{
 		resources: ctx.Resources, entries: w.activeEntries(ctx),
-		image: w.scaled, imageLayer: imageLayer, sourceSize: w.art.Bounds().Size(), previews: w.previews,
+		image: w.scaled, sourceSize: w.art.Bounds().Size(), previews: w.previews,
 		hovered: -1, showNames: w.showNames, marks: w.marks,
 		onClick: func(index int) { w.clickEntry(ctx, index) },
 	}
 	w.board.SetVisible(true)
 	w.board.SetEnabled(true)
 	w.board.SetRepaintBoundary(true)
-	imageLayer.SetParent(w.board)
 	content := widget.Widget(w.board)
 	if rail := w.regionRail(ctx); rail != nil {
 		content = primitives.HBox(rail, w.board).Gap(worldMapPreviewEdge)
@@ -299,6 +297,7 @@ func (w *WorldMapWindow) UpdatePresentation(ctx Context) {
 	}
 	b.currentMap, b.mapW, b.mapH = current, mapW, mapH
 	b.members = slices.Clone(w.memberBuf)
+	b.indexMembers()
 	b.dots = slices.Clone(w.dotBuf)
 	b.marks = append(b.marks[:0], w.markBuf...)
 	w.marks = b.marks
@@ -441,73 +440,29 @@ func scaleWorldMap(img image.Image, size image.Point, scaler xdraw.Scaler) image
 	return dst
 }
 
-type worldMapImage struct {
-	widget.WidgetBase
-	image image.Image
-}
-
-func newWorldMapImage(img image.Image) *worldMapImage {
-	w := &worldMapImage{image: img}
-	w.SetVisible(true)
-	w.SetEnabled(false)
-	// The bitmap is uploaded once. Hover and labels redraw the overlay, not this.
-	w.SetRepaintBoundary(true)
-	return w
-}
-
-func (w *worldMapImage) Layout(_ widget.Context, constraints geometry.Constraints) geometry.Size {
-	if w.image == nil {
-		return geometry.Size{}
-	}
-	size := w.image.Bounds().Size()
-	result := constraints.Constrain(geometry.Sz(float32(size.X), float32(size.Y)))
-	w.SetBounds(geometry.FromPointSize(w.Position(), result))
-	return result
-}
-
-func (w *worldMapImage) Draw(_ widget.Context, canvas widget.Canvas) {
-	if w.image == nil {
-		return
-	}
-	canvas.DrawImage(w.image, w.Bounds().Min)
-}
-
-func (w *worldMapImage) Event(widget.Context, event.Event) bool { return false }
-
 type worldMapWidget struct {
 	widget.WidgetBase
-	resources  *res.Manager
-	entries    []res.WorldMapEntry
-	image      image.Image
-	imageLayer *worldMapImage
-	sourceSize image.Point
-	previews   map[string]image.Image
-	hovered    int
-	showNames  bool
-	currentMap string
-	members    []worldMapMember
-	dots       []worldMapDot
-	marks      []worldMapExploreMark
-	onClick    func(int)
-	mapW, mapH int
+	resources   *res.Manager
+	entries     []res.WorldMapEntry
+	image       image.Image
+	sourceSize  image.Point
+	previews    map[string]image.Image
+	hovered     int
+	showNames   bool
+	currentMap  string
+	members     []worldMapMember
+	memberByMap map[string]uint32
+	dots        []worldMapDot
+	marks       []worldMapExploreMark
+	onClick     func(int)
+	mapW, mapH  int
 }
 
-func (w *worldMapWidget) Layout(ctx widget.Context, constraints geometry.Constraints) geometry.Size {
+func (w *worldMapWidget) Layout(_ widget.Context, constraints geometry.Constraints) geometry.Size {
 	size := w.image.Bounds().Size()
 	result := constraints.Constrain(geometry.Sz(float32(size.X), float32(size.Y)))
 	w.SetBounds(geometry.FromPointSize(w.Position(), result))
-	if w.imageLayer != nil {
-		widget.LayoutChild(w.imageLayer, ctx, constraints)
-		w.imageLayer.SetBounds(w.Bounds())
-	}
 	return result
-}
-
-func (w *worldMapWidget) Children() []widget.Widget {
-	if w.imageLayer == nil {
-		return nil
-	}
-	return []widget.Widget{w.imageLayer}
 }
 
 func (w *worldMapWidget) mapRect(entry res.WorldMapEntry) geometry.Rect {
@@ -571,26 +526,35 @@ func (w *worldMapWidget) loadPreview(name string) {
 	w.previews[name] = preview // Missing minimaps are normal, and cached too.
 }
 
-func (w *worldMapWidget) Draw(ctx widget.Context, canvas widget.Canvas) {
+func (w *worldMapWidget) indexMembers() {
+	if len(w.members) == 0 {
+		w.memberByMap = nil
+		return
+	}
+	if w.memberByMap == nil {
+		w.memberByMap = make(map[string]uint32, len(w.members))
+	}
+	for name := range w.memberByMap {
+		delete(w.memberByMap, name)
+	}
+	for i := range w.members {
+		w.memberByMap[w.members[i].MapName] = w.members[i].ID
+	}
+}
+
+func (w *worldMapWidget) Draw(_ widget.Context, canvas widget.Canvas) {
 	bounds := w.Bounds()
 	canvas.PushClip(bounds)
 	defer canvas.PopClip()
-	// The image is its own repaint boundary. DrawChild blits the cache, so a
-	// hover redraw does not upload the bitmap again.
-	if w.imageLayer != nil {
-		widget.DrawChild(w.imageLayer, ctx, canvas)
-	}
+	canvas.DrawImage(w.image, bounds.Min)
 	for i, entry := range w.entries {
 		r := w.mapRect(entry)
 		if i == w.hovered {
 			canvas.DrawRect(r, worldMapHoverFill)
 			canvas.StrokeRect(r, widget.ColorWhite, worldMapHoverStroke)
 		}
-		for _, member := range w.members {
-			if member.MapName == entry.MapName {
-				canvas.StrokeRect(r, Color(minimapMemberColor(member.ID)), worldMapMemberStroke)
-				break
-			}
+		if id, ok := w.memberByMap[entry.MapName]; ok {
+			canvas.StrokeRect(r, Color(minimapMemberColor(id)), worldMapMemberStroke)
 		}
 		if w.showNames {
 			size := worldMapNameSize
