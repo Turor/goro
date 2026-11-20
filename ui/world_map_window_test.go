@@ -74,12 +74,15 @@ func TestWorldMapIdleAndPartySnapshots(t *testing.T) {
 	if board.highlight != nil {
 		board.highlight.SetNeedsRedraw(false)
 	}
+	if board.previewLayer != nil {
+		board.previewLayer.SetNeedsRedraw(false)
+	}
 	ctx.World.Player.X++
 	w.UpdatePresentation(ctx)
 	if board.NeedsRedraw() {
 		t.Fatal("walking redrew the atlas")
 	}
-	if board.highlight == nil || !board.highlight.NeedsRedraw() {
+	if board.previewLayer == nil || !board.previewLayer.NeedsRedraw() {
 		t.Fatal("visible preview did not update")
 	}
 	board.hovered = 1
@@ -113,11 +116,16 @@ func TestWorldMapPublishedHoverClicksAndEscape(t *testing.T) {
 	r := w.board.mapRect(w.board.entries[0])
 	p := w.board.ScreenBounds().Min.Add(r.Min.Sub(w.board.Bounds().Min)).Add(geometry.Pt(10, 10))
 	a.Window().HandleEvent(event.NewMouseEvent(event.MouseMove, event.ButtonNone, 0, p, p, event.ModNone))
-	if w.board.hovered != 0 || w.previews["prontera"] == nil {
-		t.Fatalf("hover = %d, preview = %v, point = %v, screen bounds = %v", w.board.hovered, w.previews["prontera"], p, w.board.ScreenBounds())
+	if w.board.hovered != 0 {
+		t.Fatalf("hover = %d, point = %v, screen bounds = %v", w.board.hovered, p, w.board.ScreenBounds())
 	}
-	if len(w.previews) != 1 {
-		t.Fatal("direct enter and translated move disagreed about the hovered map")
+	if w.previews["prontera"] != nil {
+		t.Fatal("hover decoded the preview before the cell could paint")
+	}
+	w.Update(ctx)
+	w.Update(ctx)
+	if w.previews["prontera"] == nil || len(w.previews) != 1 {
+		t.Fatalf("settled preview = %v, count = %d", w.previews["prontera"], len(w.previews))
 	}
 	for _, button := range []event.Button{event.ButtonLeft, event.ButtonRight} {
 		a.Window().HandleEvent(event.NewMouseEvent(event.MousePress, button, 0, p, p, event.ModNone))

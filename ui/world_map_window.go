@@ -160,6 +160,7 @@ func (w *WorldMapWindow) Update(ctx Context) bool {
 	if !w.IsOpen() {
 		return false
 	}
+	w.loadSettledPreview()
 	consumed := w.Window.Update(ctx)
 	w.Publish(ctx)
 	return consumed
@@ -427,8 +428,8 @@ func (w *WorldMapWindow) redraw(ctx Context) {
 }
 
 func (w *WorldMapWindow) markHighlight(ctx Context) {
-	if w.board != nil && w.board.highlight != nil {
-		w.board.highlight.SetNeedsRedraw(true)
+	if w.board != nil && w.board.previewLayer != nil {
+		w.board.previewLayer.SetNeedsRedraw(true)
 	}
 	invalidateWindowRect(ctx, windowFrameRect(w.x, w.y, w.width, w.height))
 }
@@ -455,21 +456,23 @@ func scaleWorldMap(img image.Image, size image.Point, scaler xdraw.Scaler) image
 
 type worldMapWidget struct {
 	widget.WidgetBase
-	resources   *res.Manager
-	entries     []res.WorldMapEntry
-	image       image.Image
-	sourceSize  image.Point
-	previews    map[string]image.Image
-	hovered     int
-	showNames   bool
-	currentMap  string
-	members     []worldMapMember
-	memberByMap map[string]uint32
-	dots        []worldMapDot
-	marks       []worldMapExploreMark
-	onClick     func(int)
-	highlight   *worldMapHighlight
-	mapW, mapH  int
+	resources    *res.Manager
+	entries      []res.WorldMapEntry
+	image        image.Image
+	sourceSize   image.Point
+	previews     map[string]image.Image
+	hovered      int
+	showNames    bool
+	currentMap   string
+	members      []worldMapMember
+	memberByMap  map[string]uint32
+	dots         []worldMapDot
+	marks        []worldMapExploreMark
+	onClick      func(int)
+	highlight    *worldMapHighlight
+	previewLayer *worldMapPreview
+	hoverArmed   bool
+	mapW, mapH   int
 }
 
 func (w *worldMapWidget) Layout(_ widget.Context, constraints geometry.Constraints) geometry.Size {
@@ -487,12 +490,34 @@ func (w *worldMapWidget) mapRect(entry res.WorldMapEntry) geometry.Rect {
 }
 
 func (w *worldMapWidget) mapAt(point geometry.Point) int {
+	// Later sections are drawn on top. A point inside two cells uses the later
+	// one. A point in the gap between neighbors stays with the nearer cell.
+	hit := -1
+	best := worldMapHitSlack * worldMapHitSlack
 	for i, entry := range w.entries {
-		if w.mapRect(entry).Contains(point) {
-			return i
+		dist := worldMapRectDistance(w.mapRect(entry), point)
+		if dist <= best {
+			hit = i
+			best = dist
 		}
 	}
-	return -1
+	return hit
+}
+
+func worldMapRectDistance(r geometry.Rect, p geometry.Point) float32 {
+	x, y := p.X, p.Y
+	if x < r.Min.X {
+		x = r.Min.X
+	} else if x > r.Max.X {
+		x = r.Max.X
+	}
+	if y < r.Min.Y {
+		y = r.Min.Y
+	} else if y > r.Max.Y {
+		y = r.Max.Y
+	}
+	dx, dy := p.X-x, p.Y-y
+	return dx*dx + dy*dy
 }
 
 func (w *worldMapWidget) Event(ctx widget.Context, e event.Event) bool {
@@ -512,9 +537,6 @@ func (w *worldMapWidget) Event(ctx widget.Context, e event.Event) bool {
 	}
 	if index != w.hovered {
 		w.hovered = index
-		if index >= 0 {
-			w.loadPreview(w.entries[index].MapName)
-		}
 		w.markHoverDirty(ctx)
 	}
 	if mouse.MouseType == event.MousePress && mouse.Button == event.ButtonLeft && w.hovered >= 0 && w.onClick != nil {
@@ -522,6 +544,28 @@ func (w *worldMapWidget) Event(ctx widget.Context, e event.Event) bool {
 	}
 	// Clicks never issue a movement command; they warp through Warpra instead.
 	return true
+}
+
+func (w *WorldMapWindow) loadSettledPreview() {
+	b := w.board
+	if b == nil || b.hovered < 0 || b.hovered >= len(b.entries) {
+		if b != nil {
+			b.hoverArmed = false
+		}
+		return
+	}
+	if !b.hoverArmed {
+		b.hoverArmed = true
+		return
+	}
+	name := b.entries[b.hovered].MapName
+	if _, cached := b.previews[name]; cached {
+		return
+	}
+	b.loadPreview(name)
+	if b.previewLayer != nil {
+		b.previewLayer.SetNeedsRedraw(true)
+	}
 }
 
 func (w *worldMapWidget) loadPreview(name string) {
@@ -618,6 +662,20 @@ func drawWorldMapStar(canvas widget.Canvas, center geometry.Point) {
 	for i, point := range points {
 		canvas.DrawLine(point, points[(i+1)%len(points)], Color(minimapPlayerColor), worldMapStarStroke)
 	}
+}
+
+func (w *worldMapWidget) previewPanel(entry res.WorldMapEntry) geometry.Rect {
+	b := w.Bounds()
+	width := min(worldMapPreviewW, b.Width()-worldMapPreviewEdge)
+	rows := 0
+	for _, member := range w.members {
+		if member.MapName == entry.MapName {
+			rows++
+		}
+	}
+	rows = min(rows, max(0, int((b.Height()-worldMapPreviewRowsTop)/worldMapPreviewRowH)))
+	height := min(worldMapPreviewBaseH+float32(rows)*worldMapPreviewRowH, b.Height()-worldMapPreviewEdge)
+	return geometry.NewRect(b.Max.X-width-worldMapPreviewInset, b.Min.Y+worldMapPreviewInset, width, height)
 }
 
 func (w *worldMapWidget) drawPreview(canvas widget.Canvas, entry res.WorldMapEntry) {

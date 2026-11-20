@@ -162,11 +162,14 @@ func drawAtlas(t *testing.T, atlas *WorldMapWindow) *uitest.MockCanvas {
 	} else {
 		atlas.board.Layout(widget.NewContext(), tight)
 	}
+	atlas.board.placeHighlight()
 	canvas := &uitest.MockCanvas{}
 	atlas.board.Draw(widget.NewContext(), canvas)
 	if atlas.board.highlight != nil {
-		atlas.board.highlight.SetBounds(atlas.board.Bounds())
 		atlas.board.highlight.Draw(widget.NewContext(), canvas)
+	}
+	if atlas.board.previewLayer != nil {
+		atlas.board.previewLayer.Draw(widget.NewContext(), canvas)
 	}
 	return canvas
 }

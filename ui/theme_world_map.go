@@ -12,6 +12,7 @@ var (
 	worldMapPreviewFill = widget.Color{R: 1, G: 1, B: 1, A: .95}
 
 	worldMapHoverStroke    float32 = 1
+	worldMapHitSlack       float32 = 12
 	worldMapMemberStroke   float32 = 2
 	worldMapNameSize       float32 = 9
 	worldMapNameH          float32 = 14
@@ -49,6 +50,7 @@ func init() {
 	s.Color("label_fill", &worldMapLabelFill, "map name label background")
 	s.Color("preview_fill", &worldMapPreviewFill, "preview panel background")
 	s.Float("hover_stroke", &worldMapHoverStroke, 0, 8, "hovered map outline width")
+	s.Float("hit_slack", &worldMapHitSlack, 0, 24, "how far a roll can be from a cell and still highlight it")
 	s.Float("member_stroke", &worldMapMemberStroke, 0, 8, "party member map outline width")
 	s.Float("name_size", &worldMapNameSize, 6, 32, "map name text size")
 	s.Float("name_height", &worldMapNameH, 8, 40, "map name label height")
