@@ -56,6 +56,7 @@ type windowFrame struct {
 	titleColor   widget.Color
 	titleSize    float32
 	fillUserSize bool
+	hasFooter    bool
 }
 
 func (f *windowFrame) applyBackground() {
@@ -101,6 +102,9 @@ func (f *windowFrame) Layout(ctx widget.Context, constraints geometry.Constraint
 			height := f.Style().ExplicitHeight
 			if f.titleBar {
 				height -= float32(windowTitleHeight)
+			}
+			if f.hasFooter {
+				height -= float32(windowFooterHeight)
 			}
 			if height < 0 {
 				height = 0
@@ -220,6 +224,7 @@ func Win(options ...WindowOption) widget.Widget {
 		background:  cfg.background,
 		radiusSet:   cfg.radiusSet,
 		titleBar:    cfg.titleBar,
+		hasFooter:   cfg.footer != nil,
 		heightDelta: heightDelta,
 		opacity:     1,
 		layoutGen:   rotheme.Generation(),

@@ -65,4 +65,17 @@ func TestResizedWindowGrowsTheRightPane(t *testing.T) {
 	if !grown {
 		t.Fatal("resized window did not widen the status column")
 	}
+	contentH := float32(window.height - windowTitleHeight - windowFooterHeight)
+	for _, box := range windowBoxes(frame) {
+		if box.Style().ExplicitHeight > contentH+1 {
+			t.Fatalf("pane height %.0f overlaps the footer; content area is %.0f", box.Style().ExplicitHeight, contentH)
+		}
+	}
+	window.resizeTo(ctx, width, height)
+	frame.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(float32(window.width), float32(window.height))))
+	for _, box := range windowBoxes(frame) {
+		if box.Style().ExplicitWidth > float32(gearStatsColumnWidth())+1 && box.Style().MinWidth > 0 && box.Style().MinWidth < box.Style().ExplicitWidth {
+			t.Fatalf("shrunk window kept grown width %.0f", box.Style().ExplicitWidth)
+		}
+	}
 }

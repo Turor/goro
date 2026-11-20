@@ -1,84 +1,9 @@
 package ui
 
 import (
-	"github.com/gogpu/ui/event"
-	"github.com/gogpu/ui/geometry"
 	"github.com/gogpu/ui/primitives"
 	"github.com/gogpu/ui/widget"
 )
-
-// growingContent lets the main panes inside a window fill extra space when
-// the window is resized. A fixed Width/Height is a minimum; the tallest body
-// and the right-hand pane pick up the leftover.
-type growingContent struct {
-	widget.WidgetBase
-	child widget.Widget
-}
-
-func newGrowingContent(child widget.Widget) widget.Widget {
-	g := &growingContent{child: child}
-	g.SetVisible(true)
-	g.SetEnabled(true)
-	if child != nil {
-		type parentSetter interface{ SetParent(widget.Widget) }
-		if ps, ok := child.(parentSetter); ok {
-			ps.SetParent(g)
-		}
-	}
-	return g
-}
-
-func (g *growingContent) Layout(ctx widget.Context, constraints geometry.Constraints) geometry.Size {
-	if g.child == nil {
-		return geometry.Size{}
-	}
-	if constraints.HasBoundedWidth() && constraints.HasBoundedHeight() {
-		growWindowPanes(g.child, constraints.MaxWidth, constraints.MaxHeight)
-	}
-	size := widget.LayoutChild(g.child, ctx, constraints)
-	if setter, ok := g.child.(interface{ SetBounds(geometry.Rect) }); ok {
-		setter.SetBounds(geometry.FromPointSize(geometry.Point{}, size))
-	}
-	if constraints.HasBoundedWidth() && constraints.HasBoundedHeight() {
-		size = geometry.Sz(constraints.MaxWidth, constraints.MaxHeight)
-	}
-	g.SetBounds(geometry.FromPointSize(g.Position(), size))
-	return size
-}
-
-func (g *growingContent) Draw(ctx widget.Context, canvas widget.Canvas) {
-	if g.child == nil || !g.IsVisible() {
-		return
-	}
-	canvas.PushTransform(g.Bounds().Min)
-	widget.StampScreenOrigin(g.child, canvas)
-	g.child.Draw(ctx, canvas)
-	canvas.PopTransform()
-}
-
-func (g *growingContent) Event(ctx widget.Context, ev event.Event) bool {
-	if g.child == nil || !g.IsVisible() || !g.IsEnabled() {
-		return false
-	}
-	if me, ok := ev.(*event.MouseEvent); ok {
-		local := *me
-		local.Position = me.Position.Sub(g.Bounds().Min)
-		return g.child.Event(ctx, &local)
-	}
-	if we, ok := ev.(*event.WheelEvent); ok {
-		local := *we
-		local.Position = we.Position.Sub(g.Bounds().Min)
-		return g.child.Event(ctx, &local)
-	}
-	return g.child.Event(ctx, ev)
-}
-
-func (g *growingContent) Children() []widget.Widget {
-	if g.child == nil {
-		return nil
-	}
-	return []widget.Widget{g.child}
-}
 
 func growWindowPanes(root widget.Widget, availW, availH float32) {
 	growWindowHeight(root, availH)
@@ -96,21 +21,25 @@ func growWindowHeight(root widget.Widget, availH float32) {
 			maxH = h
 		}
 	}
-	if maxH < float32(windowMinHeight) || availH <= maxH {
+	if maxH < float32(windowMinHeight) {
 		return
 	}
 	for _, box := range boxes {
 		style := box.Style()
-		if style.ExplicitHeight != maxH {
+		if style.ExplicitHeight != maxH && style.MinHeight != maxH {
 			continue
 		}
 		token := style.MinHeight
-		if token <= 0 || token > maxH {
-			token = maxH
+		if token <= 0 || token > style.ExplicitHeight {
+			token = style.ExplicitHeight
 			box.MinHeightValue(token)
 		}
+		want := token
 		if availH > token {
-			box.Height(availH)
+			want = availH
+		}
+		if style.ExplicitHeight != want {
+			box.Height(want)
 		}
 	}
 }
@@ -120,7 +49,7 @@ func growWindowWidth(root widget.Widget, availW float32) {
 	if !ok || availW <= 0 {
 		return
 	}
-	var sum float32
+	var tokenSum float32
 	var count int
 	var rightmost *primitives.BoxWidget
 	for _, child := range box.Children() {
@@ -132,16 +61,15 @@ func growWindowWidth(root widget.Widget, availW float32) {
 		if width <= 0 {
 			continue
 		}
-		sum += width
+		token := childBox.Style().MinWidth
+		if token <= 0 || token > width {
+			token = width
+		}
+		tokenSum += token
 		count++
 		rightmost = childBox
 	}
 	if rightmost == nil || count == 0 {
-		return
-	}
-	gaps := box.Style().Gap * float32(count-1)
-	extra := availW - sum - gaps
-	if extra <= 0 {
 		return
 	}
 	token := rightmost.Style().MinWidth
@@ -150,7 +78,14 @@ func growWindowWidth(root widget.Widget, availW float32) {
 		token = current
 		rightmost.MinWidthValue(token)
 	}
-	rightmost.Width(token + extra)
+	extra := availW - tokenSum - box.Style().Gap*float32(count-1)
+	want := token
+	if extra > 0 {
+		want = token + extra
+	}
+	if current != want {
+		rightmost.Width(want)
+	}
 }
 
 func windowBoxes(root widget.Widget) []*primitives.BoxWidget {
