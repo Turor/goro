@@ -787,7 +787,7 @@ func (w *SkillWindow) clampScroll(ctx Context) {
 }
 
 func (w *SkillWindow) clampScrollHeight(contentHeight, viewHeight int) {
-	maxScroll := float32(maxInt(0, contentHeight-viewHeight))
+	maxScroll := scaledScrollMax(contentHeight, viewHeight, w.elementScale())
 	scroll := w.ensureScrollSignal()
 	switch value := scroll.Get(); {
 	case value < 0:

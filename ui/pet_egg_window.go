@@ -135,7 +135,7 @@ func (w *PetEggWindow) ClampScroll(s *session.Session) {
 		w.selectedRow = -1
 	}
 	scroll := w.ensureScrollSignal()
-	maxScroll := float32(maxInt(0, len(items)-petEggRows) * petEggRowH)
+	maxScroll := scaledScrollMax(maxInt(0, len(items)-petEggRows)*petEggRowH, 0, w.elementScale())
 	switch value := scroll.Get(); {
 	case value < 0:
 		scroll.Set(0)

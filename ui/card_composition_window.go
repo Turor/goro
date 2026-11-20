@@ -147,7 +147,7 @@ func (w *CardCompositionWindow) ClampScroll(s *session.Session) {
 		w.selected = session.InventoryItem{}
 	}
 	scroll := w.ensureScrollSignal()
-	maxScroll := float32(maxInt(0, len(items)-cardCompositionRows) * cardCompositionRowH)
+	maxScroll := scaledScrollMax(maxInt(0, len(items)-cardCompositionRows)*cardCompositionRowH, 0, w.elementScale())
 	switch value := scroll.Get(); {
 	case value < 0:
 		scroll.Set(0)

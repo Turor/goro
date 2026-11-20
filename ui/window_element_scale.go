@@ -34,3 +34,10 @@ func scaleF(v, scale float32) float32 {
 	}
 	return v * scale
 }
+
+func scaledScrollMax(content, view int, scale float32) float32 {
+	if scale <= 0 {
+		scale = 1
+	}
+	return float32(maxInt(0, content-view)) * scale
+}

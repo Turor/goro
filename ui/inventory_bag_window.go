@@ -479,7 +479,7 @@ func (w *InventoryBagWindow) activateItem(ctx Context, item session.InventoryIte
 func (w *InventoryBagWindow) ClampScroll(s *session.Session) {
 	scroll := w.ensureScrollSignal()
 	contentHeight := inventoryBagTotalRows(len(w.tabItems(s))) * inventoryBagCell
-	maxScroll := float32(maxInt(0, contentHeight-inventoryBagViewH))
+	maxScroll := scaledScrollMax(contentHeight, inventoryBagViewH, w.elementScale())
 	value := scroll.Get()
 	switch {
 	case value < 0:
@@ -640,10 +640,16 @@ func (w *inventoryGridWidget) Draw(ctx widget.Context, canvas widget.Canvas) {
 			if amount == "" {
 				amount = strconv.Itoa(item.Amount)
 			}
-			rotheme.DrawText(canvas, amount, geometry.NewRect(cell.Max.X-inventoryBagAmountInsetX, cell.Max.Y-inventoryBagAmountInsetY, inventoryBagAmountW, inventoryBagAmountH), rotheme.Default.Typography.TextSize, rotheme.Default.Colors.Text, false, widget.TextAlignRight)
+			amountW := cell.Width() * inventoryBagAmountW / float32(inventoryBagCell)
+			amountH := cell.Height() * inventoryBagAmountH / float32(inventoryBagCell)
+			amountX := cell.Width() * inventoryBagAmountInsetX / float32(inventoryBagCell)
+			amountY := cell.Height() * inventoryBagAmountInsetY / float32(inventoryBagCell)
+			rotheme.DrawText(canvas, amount, geometry.NewRect(cell.Max.X-amountX, cell.Max.Y-amountY, amountW, amountH), rotheme.Default.Typography.TextSize, rotheme.Default.Colors.Text, false, widget.TextAlignRight)
 		}
 		if item.Equipped {
-			rotheme.DrawText(canvas, "E", geometry.NewRect(cell.Min.X+inventoryBagEquipInset, cell.Min.Y+inventoryBagEquipInset, inventoryBagEquipSize, inventoryBagEquipSize), rotheme.Default.Typography.TextSize, inventoryBagEquippedColor, false, widget.TextAlignLeft)
+			equip := cell.Width() * inventoryBagEquipSize / float32(inventoryBagCell)
+			equipInset := cell.Width() * inventoryBagEquipInset / float32(inventoryBagCell)
+			rotheme.DrawText(canvas, "E", geometry.NewRect(cell.Min.X+equipInset, cell.Min.Y+equipInset, equip, equip), rotheme.Default.Typography.TextSize, inventoryBagEquippedColor, false, widget.TextAlignLeft)
 		}
 	}
 }

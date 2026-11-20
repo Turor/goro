@@ -318,7 +318,7 @@ func (w *CartWindow) ClampScroll(s *session.Session) {
 	}
 	scroll := w.ensureScrollSignal()
 	contentHeight := inventoryGridTotalRows(itemCount, cartGridCols, cartGridRows) * cartGridCell
-	maxScroll := float32(maxInt(0, contentHeight-cartGridViewH))
+	maxScroll := scaledScrollMax(contentHeight, cartGridViewH, w.elementScale())
 	switch value := scroll.Get(); {
 	case value < 0:
 		scroll.Set(0)

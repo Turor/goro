@@ -227,7 +227,7 @@ func (w *equipmentChoiceWindow) clampScroll() {
 		w.selectedRow = -1
 	}
 	scroll := w.ensureScrollSignal()
-	maxScroll := float32(maxInt(0, len(w.items)-equipmentChoiceRows) * equipmentChoiceRowH)
+	maxScroll := scaledScrollMax(maxInt(0, len(w.items)-equipmentChoiceRows)*equipmentChoiceRowH, 0, w.elementScale())
 	switch value := scroll.Get(); {
 	case value < 0:
 		scroll.Set(0)

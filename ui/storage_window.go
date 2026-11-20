@@ -364,7 +364,7 @@ func (w *StorageWindow) ClampScroll(s *session.Session) {
 		w.setSelectedRow(-1)
 	}
 	scroll := w.ensureScrollSignal()
-	maxScroll := float32(maxInt(0, itemCount-storageRows) * storageRowH)
+	maxScroll := scaledScrollMax(maxInt(0, itemCount-storageRows)*storageRowH, 0, w.elementScale())
 	switch value := scroll.Get(); {
 	case value < 0:
 		scroll.Set(0)

@@ -585,7 +585,7 @@ func (w *HomunculusSkillWindow) clampScroll(ctx Context) {
 }
 
 func (w *HomunculusSkillWindow) clampScrollCount(skillCount int) {
-	maxScroll := float32(maxInt(0, skillCount*skillRowH-homunculusSkillTableBodyH()))
+	maxScroll := scaledScrollMax(skillCount*skillRowH, homunculusSkillTableBodyH(), w.elementScale())
 	scroll := w.ensureScrollSignal()
 	switch value := scroll.Get(); {
 	case value < 0:
