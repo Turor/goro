@@ -184,9 +184,10 @@ func (w *WorldMapWindow) widgetTree(ctx Context) widget.Widget {
 	w.board.SetVisible(true)
 	w.board.SetEnabled(true)
 	w.board.SetRepaintBoundary(true)
-	content := widget.Widget(w.board)
+	layers := newWorldMapLayers(w.board)
+	content := widget.Widget(layers)
 	if rail := w.regionRail(ctx); rail != nil {
-		content = primitives.HBox(rail, w.board).Gap(worldMapPreviewEdge)
+		content = primitives.HBox(rail, layers).Gap(worldMapPreviewEdge)
 	}
 	return Win(Title("World Map"), CloseButton(true), OnClose(w.Close),
 		TitleButton(rotheme.IconButtonSearch, func() {
@@ -295,13 +296,18 @@ func (w *WorldMapWindow) UpdatePresentation(ctx Context) {
 	if b.currentMap == current && b.mapW == mapW && b.mapH == mapH && slices.Equal(b.members, w.memberBuf) && slices.Equal(b.dots, w.dotBuf) && exploreMarksEqual(b.marks, w.markBuf) {
 		return
 	}
+	atlasChanged := b.currentMap != current || !slices.Equal(b.members, w.memberBuf) || !exploreMarksEqual(b.marks, w.markBuf)
 	b.currentMap, b.mapW, b.mapH = current, mapW, mapH
 	b.members = slices.Clone(w.memberBuf)
 	b.indexMembers()
 	b.dots = slices.Clone(w.dotBuf)
 	b.marks = append(b.marks[:0], w.markBuf...)
 	w.marks = b.marks
-	w.redraw(ctx)
+	if atlasChanged {
+		w.redraw(ctx)
+		return
+	}
+	w.markHighlight(ctx)
 }
 
 func exploreMarksEqual(a, b []worldMapExploreMark) bool {
@@ -417,6 +423,13 @@ func (w *WorldMapWindow) CloseAfterWarp() {
 
 func (w *WorldMapWindow) redraw(ctx Context) {
 	w.board.SetNeedsRedraw(true)
+	w.markHighlight(ctx)
+}
+
+func (w *WorldMapWindow) markHighlight(ctx Context) {
+	if w.board != nil && w.board.highlight != nil {
+		w.board.highlight.SetNeedsRedraw(true)
+	}
 	invalidateWindowRect(ctx, windowFrameRect(w.x, w.y, w.width, w.height))
 }
 
@@ -455,6 +468,7 @@ type worldMapWidget struct {
 	dots        []worldMapDot
 	marks       []worldMapExploreMark
 	onClick     func(int)
+	highlight   *worldMapHighlight
 	mapW, mapH  int
 }
 
@@ -501,8 +515,7 @@ func (w *worldMapWidget) Event(ctx widget.Context, e event.Event) bool {
 		if index >= 0 {
 			w.loadPreview(w.entries[index].MapName)
 		}
-		w.SetNeedsRedraw(true)
-		ctx.InvalidateRect(w.Bounds())
+		w.markHoverDirty(ctx)
 	}
 	if mouse.MouseType == event.MousePress && mouse.Button == event.ButtonLeft && w.hovered >= 0 && w.onClick != nil {
 		w.onClick(w.hovered)
@@ -549,10 +562,6 @@ func (w *worldMapWidget) Draw(_ widget.Context, canvas widget.Canvas) {
 	canvas.DrawImage(w.image, bounds.Min)
 	for i, entry := range w.entries {
 		r := w.mapRect(entry)
-		if i == w.hovered {
-			canvas.DrawRect(r, worldMapHoverFill)
-			canvas.StrokeRect(r, widget.ColorWhite, worldMapHoverStroke)
-		}
 		if id, ok := w.memberByMap[entry.MapName]; ok {
 			canvas.StrokeRect(r, Color(minimapMemberColor(id)), worldMapMemberStroke)
 		}
@@ -572,9 +581,6 @@ func (w *worldMapWidget) Draw(_ widget.Context, canvas widget.Canvas) {
 		if i < len(w.marks) && w.marks[i].Present {
 			drawWorldMapExploreMark(canvas, r, w.marks[i].Unlocked)
 		}
-	}
-	if w.hovered >= 0 {
-		w.drawPreview(canvas, w.entries[w.hovered])
 	}
 }
 

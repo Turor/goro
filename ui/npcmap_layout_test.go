@@ -156,8 +156,17 @@ func drawAtlas(t *testing.T, atlas *WorldMapWindow) *uitest.MockCanvas {
 	}
 	atlas.board.hovered = 0
 	size := atlas.scaled.Bounds().Size()
-	atlas.board.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(float32(size.X), float32(size.Y))))
+	tight := geometry.Tight(geometry.Sz(float32(size.X), float32(size.Y)))
+	if parent := atlas.board.Parent(); parent != nil {
+		parent.Layout(widget.NewContext(), tight)
+	} else {
+		atlas.board.Layout(widget.NewContext(), tight)
+	}
 	canvas := &uitest.MockCanvas{}
 	atlas.board.Draw(widget.NewContext(), canvas)
+	if atlas.board.highlight != nil {
+		atlas.board.highlight.SetBounds(atlas.board.Bounds())
+		atlas.board.highlight.Draw(widget.NewContext(), canvas)
+	}
 	return canvas
 }
