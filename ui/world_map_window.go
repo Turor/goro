@@ -297,6 +297,7 @@ func (w *WorldMapWindow) UpdatePresentation(ctx Context) {
 	}
 	b.currentMap, b.mapW, b.mapH = current, mapW, mapH
 	b.members = slices.Clone(w.memberBuf)
+	b.indexMembers()
 	b.dots = slices.Clone(w.dotBuf)
 	b.marks = append(b.marks[:0], w.markBuf...)
 	w.marks = b.marks
@@ -426,26 +427,35 @@ func worldMapSize(source image.Point, screenW, screenH int) image.Point {
 }
 
 func scaleWorldMapImage(img image.Image, size image.Point) image.Image {
+	return scaleWorldMap(img, size, xdraw.ApproxBiLinear)
+}
+
+func scaleWorldMapPreview(img image.Image, size image.Point) image.Image {
+	return scaleWorldMap(img, size, xdraw.NearestNeighbor)
+}
+
+func scaleWorldMap(img image.Image, size image.Point, scaler xdraw.Scaler) image.Image {
 	dst := image.NewRGBA(image.Rectangle{Max: size})
-	xdraw.ApproxBiLinear.Scale(dst, dst.Bounds(), img, img.Bounds(), xdraw.Src, nil)
+	scaler.Scale(dst, dst.Bounds(), img, img.Bounds(), xdraw.Src, nil)
 	return dst
 }
 
 type worldMapWidget struct {
 	widget.WidgetBase
-	resources  *res.Manager
-	entries    []res.WorldMapEntry
-	image      image.Image
-	sourceSize image.Point
-	previews   map[string]image.Image
-	hovered    int
-	showNames  bool
-	currentMap string
-	members    []worldMapMember
-	dots       []worldMapDot
-	marks      []worldMapExploreMark
-	onClick    func(int)
-	mapW, mapH int
+	resources   *res.Manager
+	entries     []res.WorldMapEntry
+	image       image.Image
+	sourceSize  image.Point
+	previews    map[string]image.Image
+	hovered     int
+	showNames   bool
+	currentMap  string
+	members     []worldMapMember
+	memberByMap map[string]uint32
+	dots        []worldMapDot
+	marks       []worldMapExploreMark
+	onClick     func(int)
+	mapW, mapH  int
 }
 
 func (w *worldMapWidget) Layout(_ widget.Context, constraints geometry.Constraints) geometry.Size {
@@ -510,10 +520,26 @@ func (w *worldMapWidget) loadPreview(name string) {
 		if img, _, err := res.LoadImage(w.resources, minimapImageCandidates(name)); err == nil {
 			size := img.Bounds().Size()
 			scale := float64(worldMapPreviewMax) / float64(max(size.X, size.Y))
-			preview = scaleWorldMapImage(img, image.Pt(max(1, int(float64(size.X)*scale)), max(1, int(float64(size.Y)*scale))))
+			preview = scaleWorldMapPreview(img, image.Pt(max(1, int(float64(size.X)*scale)), max(1, int(float64(size.Y)*scale))))
 		}
 	}
 	w.previews[name] = preview // Missing minimaps are normal, and cached too.
+}
+
+func (w *worldMapWidget) indexMembers() {
+	if len(w.members) == 0 {
+		w.memberByMap = nil
+		return
+	}
+	if w.memberByMap == nil {
+		w.memberByMap = make(map[string]uint32, len(w.members))
+	}
+	for name := range w.memberByMap {
+		delete(w.memberByMap, name)
+	}
+	for i := range w.members {
+		w.memberByMap[w.members[i].MapName] = w.members[i].ID
+	}
 }
 
 func (w *worldMapWidget) Draw(_ widget.Context, canvas widget.Canvas) {
@@ -527,11 +553,8 @@ func (w *worldMapWidget) Draw(_ widget.Context, canvas widget.Canvas) {
 			canvas.DrawRect(r, worldMapHoverFill)
 			canvas.StrokeRect(r, widget.ColorWhite, worldMapHoverStroke)
 		}
-		for _, member := range w.members {
-			if member.MapName == entry.MapName {
-				canvas.StrokeRect(r, Color(minimapMemberColor(member.ID)), worldMapMemberStroke)
-				break
-			}
+		if id, ok := w.memberByMap[entry.MapName]; ok {
+			canvas.StrokeRect(r, Color(minimapMemberColor(id)), worldMapMemberStroke)
 		}
 		if w.showNames {
 			size := worldMapNameSize
