@@ -27,6 +27,7 @@ type EquipmentWindow struct {
 	hasPeco       bool
 	preview       image.Image
 	tooltip       tooltipState
+	statTab       int
 	lastClickItem uint16
 	lastClickAt   time.Time
 	icons         map[equipmentItemIconKey]image.Image
@@ -152,6 +153,18 @@ func (w *EquipmentWindow) bindLayoutReload() {
 	})
 }
 
+func (w *EquipmentWindow) showStatTab(tab int) {
+	if w == nil || tab == w.statTab {
+		return
+	}
+	w.statTab = tab
+	if !w.IsOpen() {
+		return
+	}
+	w.SetContent(w.widgetTree(w.ctx, w.itemInfo, w.cart))
+	w.Publish(w.ctx)
+}
+
 func (w *EquipmentWindow) widgetTree(ctx Context, itemInfo *ItemWindows, cart *CartWindow) widget.Widget {
 	gearW, gearH := gearWindowSize()
 	return Win(
@@ -210,7 +223,7 @@ func (w *EquipmentWindow) widgetTree(ctx Context, itemInfo *ItemWindows, cart *C
 				).
 					Width(float32(equipmentWindowWidth)).
 					Padding(float32(equipmentWindowPad)),
-				gearStatsColumn(ctx),
+				gearStatsColumn(ctx, w.statTab, w.showStatTab),
 			).
 				Gap(float32(equipmentWindowPad)).
 				CrossAlign(primitives.CrossAxisStart),

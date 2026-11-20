@@ -63,12 +63,14 @@ func TestGameWindowsKeepDraggedPositionWhenReopened(t *testing.T) {
 			ctx.Input.SetMouseButton(input.MouseButtonLeft, false)
 			w.Update(ctx)
 			ctx.Input.EndFrame()
-			if w.x != 700 || w.y != 500 {
-				t.Fatalf("dragged position = %d,%d", w.x, w.y)
+			wantX := min(700, ctx.ScreenW-w.width-windowScreenMargin)
+			wantY := min(500, ctx.ScreenH-w.height-windowScreenMargin)
+			if w.x != wantX || w.y != wantY {
+				t.Fatalf("dragged position = %d,%d, want %d,%d", w.x, w.y, wantX, wantY)
 			}
 			w.Close()
 			test.open(ctx)
-			if w.x != 700 || w.y != 500 {
+			if w.x != wantX || w.y != wantY {
 				t.Fatalf("reopening reset position to %d,%d", w.x, w.y)
 			}
 			w.Close()
