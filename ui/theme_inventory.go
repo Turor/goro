@@ -10,6 +10,8 @@ import (
 var (
 	inventoryBagTabW                     = 32
 	inventoryBagTabH                     = 44
+	inventoryBagFilterH                  = 22
+	inventoryBagFilterCols               = 3
 	inventoryBagCell                     = 32
 	inventoryBagCols                     = 8
 	inventoryBagRows                     = 5
@@ -40,10 +42,10 @@ var (
 func recomputeInventoryBagMetrics() {
 	inventoryBagTabRail = inventoryBagTabW + inventoryBagTabOver*2
 	inventoryBagWidth = characterWindowWidth
-	inventoryBagViewW = inventoryBagWidth - inventoryBagTabRail - verticalTabDividerW
+	inventoryBagViewW = inventoryBagWidth
 	inventoryBagGridW = inventoryBagCols * inventoryBagCell
 	inventoryBagViewH = inventoryBagRows * inventoryBagCell
-	inventoryBagHeight = ROWindowTitleHeight + inventoryBagViewH
+	inventoryBagHeight = ROWindowTitleHeight + inventoryBagFilterBandH() + inventoryBagViewH
 }
 
 func init() {
@@ -53,6 +55,8 @@ func init() {
 	s.Int("rows", &inventoryBagRows, 1, 20, "visible inventory rows")
 	s.Int("tab_width", &inventoryBagTabW, 16, 96, "inventory tab width")
 	s.Int("tab_height", &inventoryBagTabH, 20, 120, "inventory tab height")
+	s.Int("filter_height", &inventoryBagFilterH, 16, 48, "inventory filter row height")
+	s.Int("filter_cols", &inventoryBagFilterCols, 1, 8, "inventory filter tabs per row")
 	s.Float("shadow_inset", &inventoryBagCellShadowInset, 0, 16, "inventory cell shadow inset")
 	s.Float("shadow_radius", &inventoryBagCellShadowRadius, 0, 16, "inventory cell shadow radius")
 	s.Float("shadow_alpha", &inventoryBagCellShadowAlpha, 0, 1, "inventory cell shadow opacity")
@@ -70,4 +74,38 @@ func init() {
 	s.Int("tooltip_above", &inventoryBagTooltipAbove, 0, 48, "tooltip offset above the cursor")
 	rotheme.OnLayoutApplied(recomputeInventoryBagMetrics)
 	recomputeInventoryBagMetrics()
+}
+
+func inventoryBagFilterRowCount() int {
+	cols := inventoryBagFilterCols
+	if cols < 1 {
+		cols = 1
+	}
+	count := len(inventoryBagTabs)
+	if count < 1 {
+		return 1
+	}
+	return (count + cols - 1) / cols
+}
+
+func inventoryBagFilterBandH() int {
+	return inventoryBagFilterRowCount() * inventoryBagFilterH
+}
+
+func inventoryBagFilterTabWidth(indexInRow, countInRow int) int {
+	cols := inventoryBagFilterCols
+	if cols < 1 {
+		cols = 1
+	}
+	base := inventoryBagWidth / cols
+	if countInRow < cols && indexInRow == countInRow-1 {
+		return inventoryBagWidth - base*(countInRow-1)
+	}
+	if indexInRow == cols-1 {
+		return inventoryBagWidth - base*(cols-1)
+	}
+	if base < 1 {
+		return 1
+	}
+	return base
 }

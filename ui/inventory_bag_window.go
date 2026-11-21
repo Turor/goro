@@ -26,9 +26,12 @@ import (
 const inventoryBagTabOver = 1
 
 const (
-	inventoryBagTabItem = iota
+	inventoryBagTabAll = iota
+	inventoryBagTabUsable
 	inventoryBagTabEquip
+	inventoryBagTabAmmo
 	inventoryBagTabEtc
+	inventoryBagTabCard
 )
 
 // theme:ok packet option bits
@@ -38,9 +41,12 @@ var inventoryBagTabs = []struct {
 	label string
 	tab   int
 }{
-	{label: "Item", tab: inventoryBagTabItem},
+	{label: "All", tab: inventoryBagTabAll},
+	{label: "Usable", tab: inventoryBagTabUsable},
 	{label: "Equip", tab: inventoryBagTabEquip},
+	{label: "Ammo", tab: inventoryBagTabAmmo},
 	{label: "Etc", tab: inventoryBagTabEtc},
+	{label: "Cards", tab: inventoryBagTabCard},
 }
 
 type InventoryBagWindow struct {
@@ -292,26 +298,44 @@ func (w *InventoryBagWindow) widgetTree(ctx Context, itemInfo *ItemWindows) widg
 		}),
 		Size(float32(inventoryBagWidth), float32(inventoryBagHeight)),
 		Content(
-			verticalTabFrame(
-				w.tabColumn(ctx),
+			primitives.Box(
+				w.filterRows(ctx),
 				primitives.Box(scroll).
 					Width(float32(inventoryBagViewW)).
 					Height(float32(inventoryBagViewH)),
-			),
+			).Gap(0),
 		),
 	)
 }
 
-func (w *InventoryBagWindow) tabColumn(ctx Context) widget.Widget {
-	tabs := make([]widget.Widget, 0, len(inventoryBagTabs))
-	for _, tab := range inventoryBagTabs {
+func (w *InventoryBagWindow) filterRows(ctx Context) widget.Widget {
+	cols := inventoryBagFilterCols
+	if cols < 1 {
+		cols = 1
+	}
+	rows := make([]widget.Widget, 0, inventoryBagFilterRowCount())
+	for start := 0; start < len(inventoryBagTabs); start += cols {
+		end := start + cols
+		if end > len(inventoryBagTabs) {
+			end = len(inventoryBagTabs)
+		}
+		rows = append(rows, w.filterRow(ctx, inventoryBagTabs[start:end]))
+	}
+	return primitives.Box(rows...).Gap(0).Width(float32(inventoryBagWidth))
+}
+
+func (w *InventoryBagWindow) filterRow(ctx Context, tabs []struct {
+	label string
+	tab   int
+}) widget.Widget {
+	cells := make([]widget.Widget, 0, len(tabs))
+	for i, tab := range tabs {
 		tab := tab
-		tabs = append(tabs, newTabWidget(tabWidgetConfig{
-			label:         tab.label,
-			labelRotation: rotheme.TextRotationCounterClockwise,
-			active:        tab.tab == w.tab,
-			width:         inventoryBagTabW + inventoryBagTabOver*2,
-			height:        inventoryBagTabH,
+		cells = append(cells, newTabWidget(tabWidgetConfig{
+			label:  tab.label,
+			active: tab.tab == w.tab,
+			width:  inventoryBagFilterTabWidth(i, len(tabs)),
+			height: inventoryBagFilterH,
 			onClick: func() {
 				w.hideTooltip()
 				w.tab = tab.tab
@@ -321,10 +345,7 @@ func (w *InventoryBagWindow) tabColumn(ctx Context) widget.Widget {
 			},
 		}))
 	}
-	return primitives.Box(tabs...).
-		Width(float32(inventoryBagTabRail)).
-		Height(float32(inventoryBagViewH)).
-		Gap(-inventoryBagTabOver)
+	return primitives.HBox(cells...).Gap(0)
 }
 
 func (w *InventoryBagWindow) refresh(ctx Context, itemInfo *ItemWindows) {
@@ -511,6 +532,9 @@ func (w *InventoryBagWindow) tabItems(s *session.Session) []session.InventoryIte
 	items := sortedInventoryItems(s)
 	if len(items) == 0 {
 		return nil
+	}
+	if w.tab == inventoryBagTabAll {
+		return items
 	}
 	filtered := items[:0]
 	for _, item := range items {
@@ -821,11 +845,17 @@ func (w *inventoryGridWidget) totalRows() int {
 }
 
 func inventoryItemTab(item session.InventoryItem) int {
+	switch item.Type {
+	case db.ItemTypeAmmo:
+		return inventoryBagTabAmmo
+	case db.ItemTypeCard:
+		return inventoryBagTabCard
+	}
 	if inventoryItemUsesEquipmentTab(item) {
 		return inventoryBagTabEquip
 	}
 	if db.ItemTypeIsUsable(item.Type) {
-		return inventoryBagTabItem
+		return inventoryBagTabUsable
 	}
 	return inventoryBagTabEtc
 }
