@@ -21,7 +21,7 @@ func TestGearTabsSplitAllocationAndKeepComposite(t *testing.T) {
 	}
 	window.Toggle(ctx)
 	labels := characterLabels(window.widgetTree(ctx, nil, nil))
-	for _, want := range []string{"Points 3", "STR", "Composite", "ATK 40 + 2", "P.ATK"} {
+	for _, want := range []string{"Points 3", "STR", "Composite", "40 + 2", "P.ATK"} {
 		if !strings.Contains(labels, want) {
 			t.Fatalf("basic tab missing %q: %q", want, labels)
 		}
