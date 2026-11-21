@@ -67,8 +67,13 @@ func TestLivePresentationDefersRebuildUntilWindowDragEnds(t *testing.T) {
 				if blocker.Update(ctx) {
 					t.Fatal("another window consumed input belonging to the drag")
 				}
-				if !update() || window.x != 70 || window.y != 390 {
-					t.Fatalf("drag stopped: position=%d,%d", window.x, window.y)
+				wantX, wantY := 70, 390
+				maxY := maxInt(windowScreenMargin, ctx.ScreenH-window.height-windowScreenMargin)
+				if wantY > maxY {
+					wantY = maxY
+				}
+				if !update() || window.x != wantX || window.y != wantY {
+					t.Fatalf("drag stopped: position=%d,%d want %d,%d", window.x, window.y, wantX, wantY)
 				}
 				ctx.Input.EndFrame()
 			}
