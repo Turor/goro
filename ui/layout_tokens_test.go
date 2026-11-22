@@ -15,7 +15,7 @@ func TestInventoryLayoutTokensRecomputeDerivedSizes(t *testing.T) {
 		t.Fatal(err)
 	}
 	layout.Apply()
-	if inventoryBagGridW != 240 || inventoryBagViewH != 120 || inventoryBagHeight != ROWindowTitleHeight+inventoryBagFilterBandH()+120 {
+	if inventoryBagGridW != 240 || inventoryBagViewH != 120 || inventoryBagHeight != ROWindowTitleHeight+120 {
 		t.Fatalf("grid %d view %d height %d", inventoryBagGridW, inventoryBagViewH, inventoryBagHeight)
 	}
 	rotheme.ResetLayout()

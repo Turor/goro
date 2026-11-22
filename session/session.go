@@ -20,6 +20,7 @@ type Session struct {
 	KeepLoginID          bool
 	SavedUsername        string
 	NoShift              bool
+	OpinionatedUI        bool
 	NoCtrl               bool
 	BattleMode           bool
 	ScriptPath           string // Runtime override; empty uses the configured script.

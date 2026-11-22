@@ -274,16 +274,16 @@ func TestInventoryBagClassifiesTabs(t *testing.T) {
 		item session.InventoryItem
 		tab  int
 	}{
-		{name: "healing item", item: session.InventoryItem{Type: 0}, tab: inventoryBagTabUsable},
-		{name: "usable item", item: session.InventoryItem{Type: 2}, tab: inventoryBagTabUsable},
+		{name: "healing item", item: session.InventoryItem{Type: 0}, tab: inventoryBagTabItem},
+		{name: "usable item", item: session.InventoryItem{Type: 2}, tab: inventoryBagTabItem},
 		{name: "equipment flag", item: session.InventoryItem{Type: 4, Equip: true}, tab: inventoryBagTabEquip},
 		{name: "weapon type", item: session.InventoryItem{Type: 5}, tab: inventoryBagTabEquip},
 		{name: "pet egg type", item: session.InventoryItem{Type: 7}, tab: inventoryBagTabEquip},
 		{name: "etc", item: session.InventoryItem{Type: 3}, tab: inventoryBagTabEtc},
-		{name: "card", item: session.InventoryItem{Type: 6}, tab: inventoryBagTabCard},
-		{name: "card with stale equipment flag", item: session.InventoryItem{Type: 6, Equip: true}, tab: inventoryBagTabCard},
-		{name: "ammo", item: session.InventoryItem{Type: 10}, tab: inventoryBagTabAmmo},
-		{name: "ammo with equipment flag", item: session.InventoryItem{Type: 10, Equip: true}, tab: inventoryBagTabAmmo},
+		{name: "card", item: session.InventoryItem{Type: 6}, tab: inventoryBagTabEtc},
+		{name: "card with stale equipment flag", item: session.InventoryItem{Type: 6, Equip: true}, tab: inventoryBagTabEtc},
+		{name: "ammo", item: session.InventoryItem{Type: 10}, tab: inventoryBagTabEtc},
+		{name: "ammo with equipment flag", item: session.InventoryItem{Type: 10, Equip: true}, tab: inventoryBagTabEtc},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -309,7 +309,7 @@ func TestInventoryBagClampScrollUsesPixelOffset(t *testing.T) {
 		items[i] = session.InventoryItem{Index: uint16(i + 1), ItemID: 501, Type: db.ItemTypeHealing}
 	}
 	sessionState := &session.Session{Inventory: session.Inventory{Items: items}}
-	window := InventoryBagWindow{tab: inventoryBagTabUsable}
+	window := InventoryBagWindow{tab: inventoryBagTabItem}
 	scroll := window.ensureScrollSignal()
 
 	scroll.Set(999)
@@ -326,8 +326,8 @@ func TestInventoryBagClampScrollUsesPixelOffset(t *testing.T) {
 }
 
 func TestInventoryBagWindowHeightEndsAtGridBottom(t *testing.T) {
-	if got, want := inventoryBagHeight-ROWindowTitleHeight, inventoryBagFilterBandH()+inventoryBagViewH; got != want {
-		t.Fatalf("inventory content height = %d, want filter plus grid %d", got, want)
+	if got, want := inventoryBagHeight-ROWindowTitleHeight, inventoryBagViewH; got != want {
+		t.Fatalf("inventory content height = %d, want grid height %d", got, want)
 	}
 }
 
@@ -335,8 +335,9 @@ func TestInventoryBagMatchesCharacterWindowWidth(t *testing.T) {
 	if inventoryBagWidth != characterWindowWidth {
 		t.Fatalf("inventory width = %d, want character width %d", inventoryBagWidth, characterWindowWidth)
 	}
-	if inventoryBagViewW != inventoryBagWidth {
-		t.Fatalf("inventory view width = %d, want full width %d", inventoryBagViewW, inventoryBagWidth)
+	wantViewWidth := inventoryBagWidth - inventoryBagTabRail - verticalTabDividerW
+	if inventoryBagViewW != wantViewWidth {
+		t.Fatalf("inventory view width = %d, want remaining width %d", inventoryBagViewW, wantViewWidth)
 	}
 	if inventoryBagGridW+ROScrollbarGutter >= inventoryBagViewW {
 		t.Fatal("wider inventory should leave trailing room while keeping the grid left aligned")

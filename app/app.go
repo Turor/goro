@@ -126,6 +126,7 @@ func NewWithResources(cfg config.Config, resource *res.Manager) *Game {
 	g.session.KeepLoginID = cfg.Login.KeepID
 	g.session.SavedUsername = cfg.Login.SavedUsername
 	g.session.NoShift = cfg.Gameplay.NoShift
+	g.session.OpinionatedUI = cfg.Gameplay.OpinionatedUI
 	g.session.NoCtrl = cfg.Gameplay.NoCtrl
 	g.session.LessEffects = cfg.Gameplay.LessEffects
 	g.session.NoEffects = cfg.Gameplay.NoEffects

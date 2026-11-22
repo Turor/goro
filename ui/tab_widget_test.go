@@ -85,7 +85,27 @@ func TestTabWidgetDrawsCounterClockwiseLabelAsCenteredImage(t *testing.T) {
 	}
 }
 
-func TestInventoryBagUsesHorizontalFilterTabs(t *testing.T) {
+func TestInventoryBagUsesOnlyVerticalCategoryTabs(t *testing.T) {
+	window := InventoryBagWindow{}
+	column := window.tabColumn(Context{})
+	column.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(float32(inventoryBagTabRail), float32(inventoryBagViewH))))
+
+	children := column.Children()
+	if len(children) != len(inventoryBagTabs) {
+		t.Fatalf("tab column children = %d, want only %d category tabs", len(children), len(inventoryBagTabs))
+	}
+	for i := range inventoryBagTabs {
+		tab, ok := children[i].(*tabWidget)
+		if !ok {
+			t.Fatalf("tab column child %d = %T, want *tabWidget", i, children[i])
+		}
+		if tab.cfg.labelRotation != rotheme.TextRotationCounterClockwise {
+			t.Fatalf("tab %q rotation = %v, want counter-clockwise", tab.cfg.label, tab.cfg.labelRotation)
+		}
+	}
+}
+
+func TestOpinionatedInventoryUsesHorizontalFilterTabs(t *testing.T) {
 	window := InventoryBagWindow{}
 	rows := window.filterRows(Context{})
 	rows.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(float32(inventoryBagWidth), float32(inventoryBagFilterBandH()))))
@@ -102,14 +122,14 @@ func TestInventoryBagUsesHorizontalFilterTabs(t *testing.T) {
 			if tab.cfg.labelRotation != rotheme.TextRotationNone {
 				t.Fatalf("tab %q is still rotated", tab.cfg.label)
 			}
-			if seen >= len(inventoryBagTabs) || tab.cfg.label != inventoryBagTabs[seen].label {
+			if seen >= len(opinionatedInventoryTabs) || tab.cfg.label != opinionatedInventoryTabs[seen].label {
 				t.Fatalf("tab %d label = %q", seen, tab.cfg.label)
 			}
 			seen++
 		}
 	}
-	if seen != len(inventoryBagTabs) {
-		t.Fatalf("saw %d tabs, want %d", seen, len(inventoryBagTabs))
+	if seen != len(opinionatedInventoryTabs) {
+		t.Fatalf("saw %d tabs, want %d", seen, len(opinionatedInventoryTabs))
 	}
 }
 

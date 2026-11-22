@@ -42,10 +42,10 @@ var (
 func recomputeInventoryBagMetrics() {
 	inventoryBagTabRail = inventoryBagTabW + inventoryBagTabOver*2
 	inventoryBagWidth = characterWindowWidth
-	inventoryBagViewW = inventoryBagWidth
+	inventoryBagViewW = inventoryBagWidth - inventoryBagTabRail - verticalTabDividerW
 	inventoryBagGridW = inventoryBagCols * inventoryBagCell
 	inventoryBagViewH = inventoryBagRows * inventoryBagCell
-	inventoryBagHeight = ROWindowTitleHeight + inventoryBagFilterBandH() + inventoryBagViewH
+	inventoryBagHeight = ROWindowTitleHeight + inventoryBagViewH
 }
 
 func init() {
@@ -81,7 +81,7 @@ func inventoryBagFilterRowCount() int {
 	if cols < 1 {
 		cols = 1
 	}
-	count := len(inventoryBagTabs)
+	count := len(opinionatedInventoryTabs)
 	if count < 1 {
 		return 1
 	}
@@ -90,6 +90,17 @@ func inventoryBagFilterRowCount() int {
 
 func inventoryBagFilterBandH() int {
 	return inventoryBagFilterRowCount() * inventoryBagFilterH
+}
+
+func inventoryBagFrameSize(opinionated bool) (int, int) {
+	if opinionated {
+		return inventoryBagWidth, inventoryBagHeight + inventoryBagFilterBandH()
+	}
+	return inventoryBagWidth, inventoryBagHeight
+}
+
+func inventoryOpinionatedViewW() int {
+	return inventoryBagWidth
 }
 
 func inventoryBagFilterTabWidth(indexInRow, countInRow int) int {
