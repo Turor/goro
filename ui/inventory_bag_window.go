@@ -86,6 +86,7 @@ type InventoryBagWindow struct {
 	search        string
 	sort          int
 	source        int
+	resources     *res.Manager
 	scrollY       state.Signal[float32]
 	snapshot      string
 	itemInfo      *ItemWindows
@@ -150,6 +151,9 @@ func (w *InventoryBagWindow) Update(ctx Context, shortcuts *ShortcutBar, storage
 
 // UpdatePresentation follows server changes even when another window consumes input.
 func (w *InventoryBagWindow) UpdatePresentation(ctx Context, itemInfo *ItemWindows) {
+	if ctx.Resources != nil {
+		w.resources = ctx.Resources
+	}
 	width, height := inventoryBagFrameSize(inventoryOpinionatedSession(ctx.Session))
 	w.EnsureWindow(width, height)
 	// SetContent releases the window's drag capture. Leave the snapshot stale
@@ -727,9 +731,8 @@ func (w *InventoryBagWindow) matchSearch(items []session.InventoryItem) []sessio
 }
 
 func (w *InventoryBagWindow) itemName(item session.InventoryItem) string {
-	return ItemDisplayName(nil, item)
+	return ItemDisplayName(w.resources, item)
 }
-
 func (w *InventoryBagWindow) sortOpinionated(items []session.InventoryItem) {
 	switch w.sort {
 	case opinionatedSortName:
