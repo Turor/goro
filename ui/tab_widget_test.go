@@ -108,9 +108,9 @@ func TestInventoryBagUsesOnlyVerticalCategoryTabs(t *testing.T) {
 func TestOpinionatedInventoryUsesHorizontalFilterTabs(t *testing.T) {
 	window := InventoryBagWindow{}
 	rows := window.filterRows(Context{})
-	rows.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(float32(inventoryBagWidth), float32(inventoryBagFilterBandH()))))
-	if len(rows.Children()) != inventoryBagFilterRowCount() {
-		t.Fatalf("filter rows = %d, want %d", len(rows.Children()), inventoryBagFilterRowCount())
+	rows.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(float32(opinionatedFrameW()), float32(inventoryBagFilterH))))
+	if len(rows.Children()) != 1 {
+		t.Fatalf("filter rows = %d, want 1", len(rows.Children()))
 	}
 	seen := 0
 	for _, row := range rows.Children() {

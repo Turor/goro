@@ -16,6 +16,9 @@ var (
 	inventoryBagSortW                    = 64
 	inventoryBagCell                     = 32
 	inventoryBagCols                     = 8
+	opinionatedBagCols                   = 10
+	opinionatedSplitCols                 = 4
+	opinionatedDividerCols               = 2
 	inventoryBagRows                     = 5
 	inventoryBagCellShadowInset  float32 = 3
 	inventoryBagCellShadowRadius float32 = 3
@@ -29,6 +32,7 @@ var (
 	inventoryBagEquipInset       float32 = 2
 	inventoryBagEquipSize        float32 = 12
 	inventoryBagEquippedColor            = widget.RGBA8(54, 128, 76, 255)
+	inventoryBagTabActive                = widget.RGBA8(70, 110, 168, 255)
 	inventoryBagMenuGap                  = 8
 	inventoryBagTooltipBelow             = 18
 	inventoryBagTooltipAbove             = 6
@@ -54,6 +58,9 @@ func init() {
 	s := rotheme.Section("inventory", "inventory bag")
 	s.Int("cell_size", &inventoryBagCell, 16, 96, "inventory cell size")
 	s.Int("cols", &inventoryBagCols, 1, 16, "inventory columns")
+	s.Int("opinionated_cols", &opinionatedBagCols, 4, 16, "opinionated inventory columns")
+	s.Int("split_cols", &opinionatedSplitCols, 1, 8, "columns in each split inventory pane")
+	s.Int("divider_cols", &opinionatedDividerCols, 1, 4, "columns between the split inventory panes")
 	s.Int("rows", &inventoryBagRows, 1, 20, "visible inventory rows")
 	s.Int("tab_width", &inventoryBagTabW, 16, 96, "inventory tab width")
 	s.Int("tab_height", &inventoryBagTabH, 20, 120, "inventory tab height")
@@ -73,6 +80,7 @@ func init() {
 	s.Float("equipped_inset", &inventoryBagEquipInset, 0, 16, "equipped marker inset")
 	s.Float("equipped_size", &inventoryBagEquipSize, 8, 40, "equipped marker size")
 	s.Color("equipped_color", &inventoryBagEquippedColor, "equipped marker color")
+	s.Color("tab_active", &inventoryBagTabActive, "selected inventory tab highlight")
 	s.Int("menu_gap", &inventoryBagMenuGap, 0, 32, "gap between the basic menu and the inventory")
 	s.Int("tooltip_below", &inventoryBagTooltipBelow, 0, 64, "tooltip offset below the cursor")
 	s.Int("tooltip_above", &inventoryBagTooltipAbove, 0, 48, "tooltip offset above the cursor")
@@ -97,12 +105,55 @@ func inventoryBagFilterBandH() int {
 }
 
 func inventoryOpinionatedChromeH() int {
-	return inventoryBagSearchH + inventoryBagFilterH + inventoryBagFilterH + inventoryBagFilterBandH()
+	return inventoryBagSearchH + inventoryBagFilterH + inventoryBagFilterH
+}
+
+func opinionatedContentW() int {
+	return opinionatedBagCols * inventoryBagCell
+}
+
+func opinionatedFrameW() int {
+	return opinionatedContentW() + ROScrollbarGutter*2
+}
+
+func opinionatedDividerW() int {
+	return opinionatedDividerCols * inventoryBagCell
+}
+
+func opinionatedSideViewW() int {
+	return opinionatedSplitCols*inventoryBagCell + ROScrollbarGutter
+}
+
+func opinionatedEqualTabWidth(index, count int) int {
+	width := opinionatedFrameW()
+	if count < 1 {
+		return width
+	}
+	base := width / count
+	if index == count-1 {
+		return width - base*(count-1)
+	}
+	if base < 1 {
+		return 1
+	}
+	return base
+}
+
+func opinionatedSplitContentW() int {
+	return opinionatedSplitCols * inventoryBagCell
+}
+
+func opinionatedScrollW(contentW int) int {
+	return contentW + ROScrollbarGutter
+}
+
+func opinionatedWidthBounded(width float32) bool {
+	return width > 0 && width <= float32(opinionatedFrameW()*opinionatedBagCols)
 }
 
 func inventoryBagFrameSize(opinionated bool) (int, int) {
 	if opinionated {
-		return inventoryBagWidth, inventoryBagHeight + inventoryOpinionatedChromeH()
+		return opinionatedFrameW(), inventoryBagHeight + inventoryOpinionatedChromeH()
 	}
 	return inventoryBagWidth, inventoryBagHeight
 }

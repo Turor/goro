@@ -17,6 +17,8 @@ type tabWidgetConfig struct {
 	disabled      bool
 	width         int
 	height        int
+	omitBottom    bool
+	activeFill    widget.Color
 	onClick       func()
 }
 
@@ -57,14 +59,31 @@ func (w *tabWidget) Draw(ctx widget.Context, canvas widget.Canvas) {
 	textColor := rotheme.Default.Colors.Text
 	if w.cfg.active {
 		fill = rotheme.Default.Colors.WindowBody
+		if w.cfg.activeFill.A > 0 {
+			fill = w.cfg.activeFill
+		}
 	} else if w.cfg.disabled {
 		textColor = rotheme.Default.Colors.MutedText
 	} else if w.hovered {
 		fill = rotheme.Default.Colors.ButtonHover
 	}
 	canvas.DrawRect(bounds, fill)
-	canvas.StrokeRect(bounds, rotheme.Default.Colors.WindowBorder, tabBorderW)
+	if w.cfg.omitBottom {
+		strokeTabOpenBottom(canvas, bounds, rotheme.Default.Colors.WindowBorder)
+	} else {
+		canvas.StrokeRect(bounds, rotheme.Default.Colors.WindowBorder, tabBorderW)
+	}
 	rotheme.DrawRotatedText(canvas, w.cfg.label, bounds, rotheme.Default.Typography.TextSize, textColor, false, w.cfg.labelRotation)
+}
+
+func strokeTabOpenBottom(canvas widget.Canvas, bounds geometry.Rect, color widget.Color) {
+	thick := tabBorderW
+	if thick <= 0 {
+		return
+	}
+	canvas.DrawRect(geometry.NewRect(bounds.Min.X, bounds.Min.Y, bounds.Width(), thick), color)
+	canvas.DrawRect(geometry.NewRect(bounds.Min.X, bounds.Min.Y, thick, bounds.Height()), color)
+	canvas.DrawRect(geometry.NewRect(bounds.Max.X-thick, bounds.Min.Y, thick, bounds.Height()), color)
 }
 
 func (w *tabWidget) Event(ctx widget.Context, e event.Event) bool {

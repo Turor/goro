@@ -92,6 +92,8 @@ type InventoryBagWindow struct {
 	source        int
 	resources     *res.Manager
 	scrollY       state.Signal[float32]
+	scrollYSide   state.Signal[float32]
+	dragPane      int
 	snapshot      string
 	itemInfo      *ItemWindows
 	lastClickItem uint16
@@ -223,8 +225,13 @@ func (w *InventoryBagWindow) UpdateDrag(ctx Context, shortcuts *ShortcutBar, sto
 		if manager, ok := ctx.UIManager.(interface{ PointerBlocked(int, int) bool }); ok && manager.PointerBlocked(ctx.Input.MouseX, ctx.Input.MouseY) {
 			return true
 		}
+		if w.tryOpinionatedTransfer(ctx, item, ctx.Input.MouseX, ctx.Input.MouseY) {
+			return true
+		}
 		if !w.pointInside(ctx.Input.MouseX, ctx.Input.MouseY) {
-			w.requestDrop(ctx, item)
+			if !inventoryOpinionated(ctx) || w.dragPane == opinionatedPaneBag {
+				w.requestDrop(ctx, item)
+			}
 			return true
 		}
 		return true
@@ -346,16 +353,7 @@ func (w *InventoryBagWindow) widgetTree(ctx Context, itemInfo *ItemWindows) widg
 			Height(float32(inventoryBagViewH)),
 	)
 	if inventoryOpinionated(ctx) {
-		viewW = inventoryOpinionatedViewW()
-		body = primitives.Box(
-			w.searchRow(ctx),
-			w.sourceRow(ctx),
-			w.moveRow(ctx),
-			w.filterRows(ctx),
-			primitives.Box(scroll).
-				Width(float32(viewW)).
-				Height(float32(inventoryBagViewH)),
-		).Gap(0)
+		return w.opinionatedWindow(ctx, itemInfo)
 	}
 	return Win(
 		Title("Inventory"),
@@ -461,6 +459,9 @@ func (w *InventoryBagWindow) searchRow(ctx Context) widget.Widget {
 			w.ensureScrollSignal().Set(0)
 			w.refresh(ctx, w.itemInfo)
 		}).Width(float32(inventoryBagSortW)),
+		rotheme.Button("Favorite", func() {
+			w.toggleFavorite(ctx)
+		}),
 	).Gap(float32(inventoryBagMenuGap)).Height(float32(inventoryBagSearchH))
 }
 
@@ -473,11 +474,17 @@ func opinionatedMoveAmount(item session.InventoryItem) uint32 {
 }
 
 func opinionatedWithdraw(ctx Context, source int, item session.InventoryItem) {
+	opinionatedWithdrawAmount(ctx, source, item, opinionatedMoveAmount(item))
+}
+
+func opinionatedWithdrawAmount(ctx Context, source int, item session.InventoryItem, amount uint32) {
 	if ctx.Network == nil {
 		glog.Warnf("opinionated withdraw failed: not connected")
 		return
 	}
-	amount := opinionatedMoveAmount(item)
+	if amount == 0 {
+		amount = opinionatedMoveAmount(item)
+	}
 	var err error
 	switch source {
 	case opinionatedSourceCart:
@@ -503,11 +510,17 @@ func opinionatedWithdraw(ctx Context, source int, item session.InventoryItem) {
 }
 
 func opinionatedDeposit(ctx Context, dest int, item session.InventoryItem) {
+	opinionatedDepositAmount(ctx, dest, item, opinionatedMoveAmount(item))
+}
+
+func opinionatedDepositAmount(ctx Context, dest int, item session.InventoryItem, amount uint32) {
 	if ctx.Network == nil {
 		glog.Warnf("opinionated deposit failed: not connected")
 		return
 	}
-	amount := opinionatedMoveAmount(item)
+	if amount == 0 {
+		amount = opinionatedMoveAmount(item)
+	}
 	var err error
 	switch dest {
 	case opinionatedSourceCart:
@@ -573,19 +586,7 @@ func (w *InventoryBagWindow) sourceRow(ctx Context) widget.Widget {
 }
 
 func (w *InventoryBagWindow) filterRows(ctx Context) widget.Widget {
-	cols := inventoryBagFilterCols
-	if cols < 1 {
-		cols = 1
-	}
-	rows := make([]widget.Widget, 0, inventoryBagFilterRowCount())
-	for start := 0; start < len(opinionatedInventoryTabs); start += cols {
-		end := start + cols
-		if end > len(opinionatedInventoryTabs) {
-			end = len(opinionatedInventoryTabs)
-		}
-		rows = append(rows, w.filterRow(ctx, opinionatedInventoryTabs[start:end]))
-	}
-	return primitives.Box(rows...).Gap(0).Width(float32(inventoryBagWidth))
+	return primitives.Box(w.filterRow(ctx, opinionatedInventoryTabs)).Gap(0).Width(float32(opinionatedFrameW()))
 }
 
 func (w *InventoryBagWindow) filterRow(ctx Context, tabs []struct {
@@ -596,10 +597,12 @@ func (w *InventoryBagWindow) filterRow(ctx Context, tabs []struct {
 	for i, tab := range tabs {
 		tab := tab
 		cells = append(cells, newTabWidget(tabWidgetConfig{
-			label:  tab.label,
-			active: tab.tab == w.tab,
-			width:  inventoryBagFilterTabWidth(i, len(tabs)),
-			height: inventoryBagFilterH,
+			label:      tab.label,
+			active:     tab.tab == w.tab,
+			width:      opinionatedEqualTabWidth(i, len(opinionatedInventoryTabs)),
+			height:     inventoryBagFilterH,
+			omitBottom: tab.tab == w.tab,
+			activeFill: inventoryBagTabActive,
 			onClick: func() {
 				w.hideTooltip()
 				w.tab = tab.tab
@@ -953,17 +956,19 @@ func inventoryGridAmountLabels(items []session.InventoryItem) []string {
 }
 
 type inventoryGridConfig struct {
-	items        []session.InventoryItem
-	icons        []image.Image
-	amounts      []string
-	cols         int
-	minRows      int
-	cellSize     int
-	viewWidth    int
-	onPress      func(session.InventoryItem)
-	onHover      func(session.InventoryItem)
-	onLeave      func()
-	onRightClick func(session.InventoryItem, int, int)
+	items            []session.InventoryItem
+	icons            []image.Image
+	amounts          []string
+	cols             int
+	minRows          int
+	cellSize         int
+	viewWidth        int
+	onPress          func(session.InventoryItem)
+	onHover          func(session.InventoryItem)
+	onLeave          func()
+	onRightClick     func(session.InventoryItem, int, int)
+	onRightClickMods func(session.InventoryItem, int, int, event.Modifiers)
+	fillWidth        bool
 }
 
 type inventoryGridWidget struct {
@@ -982,14 +987,18 @@ func newInventoryGridWidget(cfg inventoryGridConfig) *inventoryGridWidget {
 
 func (w *inventoryGridWidget) Layout(ctx widget.Context, constraints geometry.Constraints) geometry.Size {
 	cell := float32(w.cellSize()) * rotheme.ContentScale()
-	pref := geometry.Sz(float32(w.viewWidth())*rotheme.ContentScale(), float32(w.totalRows())*cell)
-	size := constraints.Constrain(pref)
-	if cols := w.cols(); cols > 0 && size.Width > 0 {
-		fitted := size.Width / float32(cols)
-		if fitted > 0 && fitted < cell {
+	width := float32(w.viewWidth()) * rotheme.ContentScale()
+	if w.cfg.fillWidth && opinionatedWidthBounded(constraints.MaxWidth) {
+		width = constraints.MaxWidth
+	}
+	if cols := w.cols(); cols > 0 && width > 0 {
+		fitted := width / float32(cols)
+		if w.cfg.fillWidth || (fitted > 0 && fitted < cell) {
 			cell = fitted
 		}
 	}
+	pref := geometry.Sz(width, float32(w.totalRows())*cell)
+	size := constraints.Constrain(pref)
 	if cell <= 0 {
 		cell = float32(w.cellSize())
 	}
@@ -1126,7 +1135,9 @@ func (w *inventoryGridWidget) Event(ctx widget.Context, e event.Event) bool {
 					w.cfg.onPress(item)
 				}
 			case event.ButtonRight:
-				if w.cfg.onRightClick != nil {
+				if w.cfg.onRightClickMods != nil {
+					w.cfg.onRightClickMods(item, int(ev.GlobalPosition.X), int(ev.GlobalPosition.Y), ev.Modifiers())
+				} else if w.cfg.onRightClick != nil {
 					w.cfg.onRightClick(item, int(ev.GlobalPosition.X), int(ev.GlobalPosition.Y))
 				}
 			}

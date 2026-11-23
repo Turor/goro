@@ -30,7 +30,7 @@ func TestOpinionatedInventorySplitsAmmoAndCards(t *testing.T) {
 		t.Fatalf("all tab items = %d, want 2", got)
 	}
 	width, height := inventoryBagFrameSize(true)
-	if height <= inventoryBagHeight || width != inventoryBagWidth {
+	if height <= inventoryBagHeight || width != opinionatedFrameW() {
 		t.Fatalf("opinionated frame = %d,%d classic height %d", width, height, inventoryBagHeight)
 	}
 }
