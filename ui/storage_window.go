@@ -343,19 +343,7 @@ func (w *StorageWindow) close(ctx Context) {
 }
 
 func (w *StorageWindow) withdraw(ctx Context, item session.InventoryItem) {
-	amount := uint32(item.Amount)
-	if amount == 0 {
-		amount = 1
-	}
-	if ctx.Network == nil {
-		glog.Warnf("storage withdraw failed: not connected")
-		return
-	}
-	if err := ctx.Network.SendMoveFromStorage(item.Index, amount); err != nil {
-		glog.Warnf("storage withdraw failed: %v", err)
-		return
-	}
-	glog.Debugf("storage withdraw requested index=%d item=%d amount=%d", item.Index, item.ItemID, amount)
+	opinionatedWithdraw(ctx, opinionatedSourceStorage, item)
 }
 
 func (w *StorageWindow) ClampScroll(s *session.Session) {

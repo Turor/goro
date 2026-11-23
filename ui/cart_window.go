@@ -274,19 +274,7 @@ func (w *CartWindow) close(ctx Context) {
 }
 
 func (w *CartWindow) withdraw(ctx Context, item session.InventoryItem) {
-	amount := uint32(item.Amount)
-	if amount == 0 {
-		amount = 1
-	}
-	if ctx.Network == nil {
-		glog.Warnf("cart withdraw failed: not connected")
-		return
-	}
-	if err := ctx.Network.SendMoveFromCart(item.Index, amount); err != nil {
-		glog.Warnf("cart withdraw failed: %v", err)
-		return
-	}
-	glog.Debugf("cart withdraw requested index=%d item=%d amount=%d", item.Index, item.ItemID, amount)
+	opinionatedWithdraw(ctx, opinionatedSourceCart, item)
 }
 
 func (w *CartWindow) refresh(ctx Context, itemInfo *ItemWindows) {

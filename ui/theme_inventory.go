@@ -97,7 +97,7 @@ func inventoryBagFilterBandH() int {
 }
 
 func inventoryOpinionatedChromeH() int {
-	return inventoryBagSearchH + inventoryBagFilterH + inventoryBagFilterBandH()
+	return inventoryBagSearchH + inventoryBagFilterH + inventoryBagFilterH + inventoryBagFilterBandH()
 }
 
 func inventoryBagFrameSize(opinionated bool) (int, int) {

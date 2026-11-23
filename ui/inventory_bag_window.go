@@ -346,6 +346,7 @@ func (w *InventoryBagWindow) widgetTree(ctx Context, itemInfo *ItemWindows) widg
 		body = primitives.Box(
 			w.searchRow(ctx),
 			w.sourceRow(ctx),
+			w.moveRow(ctx),
 			w.filterRows(ctx),
 			primitives.Box(scroll).
 				Width(float32(viewW)).
@@ -390,6 +391,28 @@ func (w *InventoryBagWindow) tabColumn(ctx Context) widget.Widget {
 		Gap(-inventoryBagTabOver)
 }
 
+func (w *InventoryBagWindow) moveRow(ctx Context) widget.Widget {
+	return primitives.HBox(
+		rotheme.Button("To cart", func() {
+			w.depositSelected(ctx, opinionatedSourceCart)
+		}),
+		rotheme.Button("To storage", func() {
+			w.depositSelected(ctx, opinionatedSourceStorage)
+		}),
+	).Gap(float32(inventoryBagMenuGap)).Height(float32(inventoryBagFilterH))
+}
+
+func (w *InventoryBagWindow) depositSelected(ctx Context, dest int) {
+	if !inventoryOpinionated(ctx) || w.source != opinionatedSourceBag {
+		return
+	}
+	item, ok := session.FindInventoryItem(ctx.Session, w.lastClickItem)
+	if !ok {
+		return
+	}
+	opinionatedDeposit(ctx, dest, item)
+}
+
 func (w *InventoryBagWindow) searchRow(ctx Context) widget.Widget {
 	field := rotheme.TextField(w.search, textfield.TypeText, func(value string) {
 		w.search = value
@@ -404,6 +427,58 @@ func (w *InventoryBagWindow) searchRow(ctx Context) widget.Widget {
 			w.refresh(ctx, w.itemInfo)
 		}).Width(float32(inventoryBagSortW)),
 	).Gap(float32(inventoryBagMenuGap)).Height(float32(inventoryBagSearchH))
+}
+
+func opinionatedMoveAmount(item session.InventoryItem) uint32 {
+	amount := uint32(item.Amount)
+	if amount == 0 {
+		return 1
+	}
+	return amount
+}
+
+func opinionatedWithdraw(ctx Context, source int, item session.InventoryItem) {
+	if ctx.Network == nil {
+		glog.Warnf("opinionated withdraw failed: not connected")
+		return
+	}
+	amount := opinionatedMoveAmount(item)
+	var err error
+	switch source {
+	case opinionatedSourceCart:
+		err = ctx.Network.SendMoveFromCart(item.Index, amount)
+	case opinionatedSourceStorage:
+		err = ctx.Network.SendMoveFromStorage(item.Index, amount)
+	default:
+		return
+	}
+	if err != nil {
+		glog.Warnf("opinionated withdraw failed: %v", err)
+		return
+	}
+	glog.Debugf("opinionated withdraw requested source=%d index=%d item=%d amount=%d", source, item.Index, item.ItemID, amount)
+}
+
+func opinionatedDeposit(ctx Context, dest int, item session.InventoryItem) {
+	if ctx.Network == nil {
+		glog.Warnf("opinionated deposit failed: not connected")
+		return
+	}
+	amount := opinionatedMoveAmount(item)
+	var err error
+	switch dest {
+	case opinionatedSourceCart:
+		err = ctx.Network.SendMoveToCart(item.Index, amount)
+	case opinionatedSourceStorage:
+		err = ctx.Network.SendMoveToStorage(item.Index, amount)
+	default:
+		return
+	}
+	if err != nil {
+		glog.Warnf("opinionated deposit failed: %v", err)
+		return
+	}
+	glog.Debugf("opinionated deposit requested dest=%d index=%d item=%d amount=%d", dest, item.Index, item.ItemID, amount)
 }
 
 func opinionatedSortLabel(sort int) string {
@@ -506,10 +581,20 @@ func inventoryBagHasCart(ctx Context) bool {
 
 func (w *InventoryBagWindow) startItemDragOrActivate(ctx Context, item session.InventoryItem) {
 	w.hideTooltip()
+	now := time.Now()
 	if inventoryOpinionated(ctx) && w.source != opinionatedSourceBag {
+		if w.lastClickItem == item.Index && now.Sub(w.lastClickAt) <= 360*time.Millisecond {
+			opinionatedWithdraw(ctx, w.source, item)
+			w.lastClickItem = 0
+			w.refresh(ctx, w.itemInfo)
+			return
+		}
+		w.dragActive = false
+		w.dragItem = session.InventoryItem{}
+		w.lastClickItem = item.Index
+		w.lastClickAt = now
 		return
 	}
-	now := time.Now()
 	if w.lastClickItem == item.Index && now.Sub(w.lastClickAt) <= 360*time.Millisecond {
 		w.dragActive = false
 		w.dragItem = session.InventoryItem{}
