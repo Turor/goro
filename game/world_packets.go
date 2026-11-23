@@ -690,6 +690,12 @@ func (m *WorldMode) handleNetworkPacket(ctx client.Context, pkt network.Packet, 
 		m.ui.inventoryBag.ClampScroll(ctx.Session)
 		return nil, false
 	}
+	if favorite, ok, err := network.ParseItemFavorite(pkt); err != nil {
+		glog.Errorf("parse item favorite 0x%04X: %v", pkt.ID, err)
+	} else if ok {
+		applyItemFavorite(ctx, favorite)
+		return nil, false
+	}
 	if prompt, ok, err := network.ParseStoragePasswordPrompt(pkt); err != nil {
 		glog.Errorf("parse storage password prompt 0x%04X: %v", pkt.ID, err)
 	} else if ok {

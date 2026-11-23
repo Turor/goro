@@ -27,3 +27,15 @@ func TestOpinionatedDepositStaysOnTheBag(t *testing.T) {
 		t.Fatal("deposit changed the source tab")
 	}
 }
+
+func TestOpinionatedFavoritesTabKeepsMarkedItems(t *testing.T) {
+	window := &InventoryBagWindow{source: opinionatedSourceBag, tab: opinionatedBagTabFavorite}
+	ctx := Context{Session: &session.Session{OpinionatedUI: true, Inventory: session.Inventory{Items: []session.InventoryItem{
+		{Index: 1, ItemID: 501, Amount: 1},
+		{Index: 2, ItemID: 502, Amount: 1, Favorite: true},
+	}}}}
+	items := window.tabItems(ctx.Session)
+	if len(items) != 1 || items[0].Index != 2 {
+		t.Fatalf("favorites tab = %+v", items)
+	}
+}

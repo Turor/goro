@@ -492,3 +492,15 @@ func applySwapEquipInfo(ctx client.Context, slots []network.SwapEquipSlot) {
 		}
 	}
 }
+
+func applyItemFavorite(ctx client.Context, favorite network.ItemFavorite) {
+	if ctx.Session == nil || favorite.Index == 0 {
+		return
+	}
+	for i := range ctx.Session.Inventory.Items {
+		if ctx.Session.Inventory.Items[i].Index == favorite.Index {
+			ctx.Session.Inventory.Items[i].Favorite = favorite.Favorite
+			return
+		}
+	}
+}

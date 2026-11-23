@@ -387,6 +387,7 @@ type InventoryItem struct {
 	Amount         int
 	Equip          bool
 	Equipped       bool
+	Favorite       bool
 	Damaged        bool
 	Refine         uint8
 	Grade          uint8

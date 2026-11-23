@@ -76,7 +76,10 @@ var opinionatedInventoryTabs = []struct {
 	{label: "Ammo", tab: opinionatedBagTabAmmo},
 	{label: "Etc", tab: opinionatedBagTabEtc},
 	{label: "Cards", tab: opinionatedBagTabCard},
+	{label: "Favorites", tab: opinionatedBagTabFavorite},
 }
+
+const opinionatedBagTabFavorite = opinionatedBagTabCard + 1
 
 type InventoryBagWindow struct {
 	Window
@@ -399,7 +402,32 @@ func (w *InventoryBagWindow) moveRow(ctx Context) widget.Widget {
 		rotheme.Button("To storage", func() {
 			w.depositSelected(ctx, opinionatedSourceStorage)
 		}),
+		rotheme.Button("Favorite", func() {
+			w.toggleFavorite(ctx)
+		}),
 	).Gap(float32(inventoryBagMenuGap)).Height(float32(inventoryBagFilterH))
+}
+
+func (w *InventoryBagWindow) toggleFavorite(ctx Context) {
+	if !inventoryOpinionated(ctx) || w.source != opinionatedSourceBag || ctx.Session == nil {
+		return
+	}
+	for i := range ctx.Session.Inventory.Items {
+		item := &ctx.Session.Inventory.Items[i]
+		if item.Index != w.lastClickItem {
+			continue
+		}
+		next := !item.Favorite
+		if ctx.Network != nil {
+			if err := ctx.Network.SendItemFavorite(item.Index, next); err != nil {
+				glog.Warnf("favorite toggle failed: %v", err)
+				return
+			}
+		}
+		item.Favorite = next
+		w.refresh(ctx, w.itemInfo)
+		return
+	}
 }
 
 func (w *InventoryBagWindow) depositSelected(ctx Context, dest int) {
@@ -770,7 +798,15 @@ func (w *InventoryBagWindow) tabItems(s *session.Session) []session.InventoryIte
 		})
 		return filtered
 	}
-	if w.tab != opinionatedBagTabAll {
+	if w.tab == opinionatedBagTabFavorite {
+		filtered := make([]session.InventoryItem, 0, len(items))
+		for _, item := range items {
+			if item.Favorite {
+				filtered = append(filtered, item)
+			}
+		}
+		items = filtered
+	} else if w.tab != opinionatedBagTabAll {
 		filtered := make([]session.InventoryItem, 0, len(items))
 		for _, item := range items {
 			if opinionatedInventoryTab(item) == w.tab {
@@ -842,7 +878,7 @@ func (w *InventoryBagWindow) inventorySnapshot(s *session.Session) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "tab=%d;opinionated=%t;search=%s;sort=%d;source=%d;", w.tab, s != nil && s.OpinionatedUI, w.search, w.sort, w.source)
 	for _, item := range sortedInventoryItems(s) {
-		fmt.Fprintf(&b, "%d:%d:%d:%d:%d:%t:%t;", item.Index, item.ItemID, item.Type, item.Amount, item.Location, item.Equip, item.Equipped)
+		fmt.Fprintf(&b, "%d:%d:%d:%d:%d:%t:%t:%t;", item.Index, item.ItemID, item.Type, item.Amount, item.Location, item.Equip, item.Equipped, item.Favorite)
 	}
 	if s != nil && s.OpinionatedUI {
 		for _, item := range s.Cart.Items {
