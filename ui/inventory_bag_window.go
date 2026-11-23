@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gogpu/ui/core/scrollview"
+	"github.com/gogpu/ui/core/textfield"
 	"github.com/gogpu/ui/event"
 	"github.com/gogpu/ui/geometry"
 	"github.com/gogpu/ui/primitives"
@@ -29,6 +30,19 @@ const (
 	inventoryBagTabItem = iota
 	inventoryBagTabEquip
 	inventoryBagTabEtc
+)
+
+const (
+	opinionatedSourceBag = iota
+	opinionatedSourceCart
+	opinionatedSourceStorage
+)
+
+const (
+	opinionatedSortRecent = iota
+	opinionatedSortName
+	opinionatedSortNameDesc
+	opinionatedSortCount
 )
 
 const (
@@ -69,6 +83,9 @@ type InventoryBagWindow struct {
 	layoutGen     uint64
 	tab           int
 	opinionated   bool
+	search        string
+	sort          int
+	source        int
 	scrollY       state.Signal[float32]
 	snapshot      string
 	itemInfo      *ItemWindows
@@ -323,6 +340,8 @@ func (w *InventoryBagWindow) widgetTree(ctx Context, itemInfo *ItemWindows) widg
 	if inventoryOpinionated(ctx) {
 		viewW = inventoryOpinionatedViewW()
 		body = primitives.Box(
+			w.searchRow(ctx),
+			w.sourceRow(ctx),
 			w.filterRows(ctx),
 			primitives.Box(scroll).
 				Width(float32(viewW)).
@@ -365,6 +384,61 @@ func (w *InventoryBagWindow) tabColumn(ctx Context) widget.Widget {
 		Width(float32(inventoryBagTabRail)).
 		Height(float32(inventoryBagViewH)).
 		Gap(-inventoryBagTabOver)
+}
+
+func (w *InventoryBagWindow) searchRow(ctx Context) widget.Widget {
+	field := rotheme.TextField(w.search, textfield.TypeText, func(value string) {
+		w.search = value
+		w.ensureScrollSignal().Set(0)
+		w.refresh(ctx, w.itemInfo)
+	}, func(string) {})
+	return primitives.HBox(
+		primitives.Expanded(field),
+		rotheme.Button(opinionatedSortLabel(w.sort), func() {
+			w.sort = (w.sort + 1) % opinionatedSortCount
+			w.ensureScrollSignal().Set(0)
+			w.refresh(ctx, w.itemInfo)
+		}).Width(float32(inventoryBagSortW)),
+	).Gap(float32(inventoryBagMenuGap)).Height(float32(inventoryBagSearchH))
+}
+
+func opinionatedSortLabel(sort int) string {
+	switch sort {
+	case opinionatedSortName:
+		return "A-Z"
+	case opinionatedSortNameDesc:
+		return "Z-A"
+	default:
+		return "Recent"
+	}
+}
+
+func (w *InventoryBagWindow) sourceRow(ctx Context) widget.Widget {
+	tabs := []struct {
+		label  string
+		source int
+	}{
+		{label: "Bag", source: opinionatedSourceBag},
+		{label: "Cart", source: opinionatedSourceCart},
+		{label: "Storage", source: opinionatedSourceStorage},
+	}
+	cells := make([]widget.Widget, 0, len(tabs))
+	for i, tab := range tabs {
+		tab := tab
+		cells = append(cells, newTabWidget(tabWidgetConfig{
+			label:  tab.label,
+			active: tab.source == w.source,
+			width:  inventoryBagFilterTabWidth(i, len(tabs)),
+			height: inventoryBagFilterH,
+			onClick: func() {
+				w.hideTooltip()
+				w.source = tab.source
+				w.ensureScrollSignal().Set(0)
+				w.refresh(ctx, w.itemInfo)
+			},
+		}))
+	}
+	return primitives.HBox(cells...).Gap(0).Height(float32(inventoryBagFilterH))
 }
 
 func (w *InventoryBagWindow) filterRows(ctx Context) widget.Widget {
@@ -588,34 +662,104 @@ func (w *InventoryBagWindow) selectFirstNonEmptyTab(s *session.Session) {
 }
 
 func (w *InventoryBagWindow) tabItems(s *session.Session) []session.InventoryItem {
-	items := sortedInventoryItems(s)
+	items := w.sourceItems(s)
 	if len(items) == 0 {
 		return nil
 	}
-	classify := inventoryItemTab
-	if inventoryOpinionatedSession(s) {
-		classify = opinionatedInventoryTab
-		if w.tab == opinionatedBagTabAll {
-			return items
+	if !inventoryOpinionatedSession(s) {
+		filtered := make([]session.InventoryItem, 0, len(items))
+		for _, item := range items {
+			if inventoryItemTab(item) == w.tab {
+				filtered = append(filtered, item)
+			}
 		}
+		sort.SliceStable(filtered, func(i, j int) bool {
+			return filtered[i].Index < filtered[j].Index
+		})
+		return filtered
 	}
-	filtered := items[:0]
-	for _, item := range items {
-		if classify(item) == w.tab {
-			filtered = append(filtered, item)
+	if w.tab != opinionatedBagTabAll {
+		filtered := make([]session.InventoryItem, 0, len(items))
+		for _, item := range items {
+			if opinionatedInventoryTab(item) == w.tab {
+				filtered = append(filtered, item)
+			}
 		}
+		items = filtered
 	}
-	sort.SliceStable(filtered, func(i, j int) bool {
-		return filtered[i].Index < filtered[j].Index
+	items = w.matchSearch(items)
+	w.sortOpinionated(items)
+	return items
+}
+
+func (w *InventoryBagWindow) sourceItems(s *session.Session) []session.InventoryItem {
+	if s == nil || !s.OpinionatedUI || w.source == opinionatedSourceBag {
+		return sortedInventoryItems(s)
+	}
+	var src []session.InventoryItem
+	switch w.source {
+	case opinionatedSourceCart:
+		src = s.Cart.Items
+	case opinionatedSourceStorage:
+		src = s.Storage.Items
+	default:
+		src = s.Inventory.Items
+	}
+	items := append([]session.InventoryItem(nil), src...)
+	sort.SliceStable(items, func(i, j int) bool {
+		return items[i].Index < items[j].Index
 	})
-	return filtered
+	return items
+}
+
+func (w *InventoryBagWindow) matchSearch(items []session.InventoryItem) []session.InventoryItem {
+	query := strings.TrimSpace(strings.ToLower(w.search))
+	if query == "" {
+		return items
+	}
+	matched := make([]session.InventoryItem, 0, len(items))
+	for _, item := range items {
+		if strings.Contains(strings.ToLower(w.itemName(item)), query) {
+			matched = append(matched, item)
+		}
+	}
+	return matched
+}
+
+func (w *InventoryBagWindow) itemName(item session.InventoryItem) string {
+	return ItemDisplayName(nil, item)
+}
+
+func (w *InventoryBagWindow) sortOpinionated(items []session.InventoryItem) {
+	switch w.sort {
+	case opinionatedSortName:
+		sort.SliceStable(items, func(i, j int) bool {
+			return strings.ToLower(w.itemName(items[i])) < strings.ToLower(w.itemName(items[j]))
+		})
+	case opinionatedSortNameDesc:
+		sort.SliceStable(items, func(i, j int) bool {
+			return strings.ToLower(w.itemName(items[i])) > strings.ToLower(w.itemName(items[j]))
+		})
+	default:
+		sort.SliceStable(items, func(i, j int) bool {
+			return items[i].Index < items[j].Index
+		})
+	}
 }
 
 func (w *InventoryBagWindow) inventorySnapshot(s *session.Session) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "tab=%d;opinionated=%t;", w.tab, s != nil && s.OpinionatedUI)
+	fmt.Fprintf(&b, "tab=%d;opinionated=%t;search=%s;sort=%d;source=%d;", w.tab, s != nil && s.OpinionatedUI, w.search, w.sort, w.source)
 	for _, item := range sortedInventoryItems(s) {
 		fmt.Fprintf(&b, "%d:%d:%d:%d:%d:%t:%t;", item.Index, item.ItemID, item.Type, item.Amount, item.Location, item.Equip, item.Equipped)
+	}
+	if s != nil && s.OpinionatedUI {
+		for _, item := range s.Cart.Items {
+			fmt.Fprintf(&b, "c%d:%d:%d;", item.Index, item.ItemID, item.Amount)
+		}
+		for _, item := range s.Storage.Items {
+			fmt.Fprintf(&b, "s%d:%d:%d;", item.Index, item.ItemID, item.Amount)
+		}
 	}
 	return b.String()
 }

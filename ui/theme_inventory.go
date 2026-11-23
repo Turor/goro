@@ -12,6 +12,8 @@ var (
 	inventoryBagTabH                     = 44
 	inventoryBagFilterH                  = 22
 	inventoryBagFilterCols               = 3
+	inventoryBagSearchH                  = 24
+	inventoryBagSortW                    = 64
 	inventoryBagCell                     = 32
 	inventoryBagCols                     = 8
 	inventoryBagRows                     = 5
@@ -57,6 +59,8 @@ func init() {
 	s.Int("tab_height", &inventoryBagTabH, 20, 120, "inventory tab height")
 	s.Int("filter_height", &inventoryBagFilterH, 16, 48, "inventory filter row height")
 	s.Int("filter_cols", &inventoryBagFilterCols, 1, 8, "inventory filter tabs per row")
+	s.Int("search_height", &inventoryBagSearchH, 16, 48, "opinionated inventory search row height")
+	s.Int("sort_width", &inventoryBagSortW, 40, 160, "opinionated inventory sort button width")
 	s.Float("shadow_inset", &inventoryBagCellShadowInset, 0, 16, "inventory cell shadow inset")
 	s.Float("shadow_radius", &inventoryBagCellShadowRadius, 0, 16, "inventory cell shadow radius")
 	s.Float("shadow_alpha", &inventoryBagCellShadowAlpha, 0, 1, "inventory cell shadow opacity")
@@ -92,9 +96,13 @@ func inventoryBagFilterBandH() int {
 	return inventoryBagFilterRowCount() * inventoryBagFilterH
 }
 
+func inventoryOpinionatedChromeH() int {
+	return inventoryBagSearchH + inventoryBagFilterH + inventoryBagFilterBandH()
+}
+
 func inventoryBagFrameSize(opinionated bool) (int, int) {
 	if opinionated {
-		return inventoryBagWidth, inventoryBagHeight + inventoryBagFilterBandH()
+		return inventoryBagWidth, inventoryBagHeight + inventoryOpinionatedChromeH()
 	}
 	return inventoryBagWidth, inventoryBagHeight
 }

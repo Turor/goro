@@ -34,3 +34,37 @@ func TestOpinionatedInventorySplitsAmmoAndCards(t *testing.T) {
 		t.Fatalf("opinionated frame = %d,%d classic height %d", width, height, inventoryBagHeight)
 	}
 }
+
+func TestOpinionatedInventorySearchSortAndSources(t *testing.T) {
+	window := &InventoryBagWindow{search: "item 12", sort: opinionatedSortName}
+	s := &session.Session{
+		OpinionatedUI: true,
+		Inventory: session.Inventory{Items: []session.InventoryItem{
+			{Index: 2, ItemID: 12, Type: db.ItemTypeEtc},
+			{Index: 1, ItemID: 9, Type: db.ItemTypeEtc},
+		}},
+		Cart: session.Cart{Items: []session.InventoryItem{{Index: 4, ItemID: 12, Type: db.ItemTypeEtc, Amount: 3}}},
+	}
+	window.syncStyle(s)
+	found := window.tabItems(s)
+	if len(found) != 1 || found[0].ItemID != 12 {
+		t.Fatalf("search found %+v, want item 12", found)
+	}
+	window.search = ""
+	window.sort = opinionatedSortName
+	window.tab = opinionatedBagTabAll
+	named := window.tabItems(s)
+	if len(named) != 2 || named[0].ItemID != 12 {
+		t.Fatalf("name sort = %+v, want item 12 first", named)
+	}
+	window.source = opinionatedSourceCart
+	cart := window.tabItems(s)
+	if len(cart) != 1 || cart[0].Index != 4 {
+		t.Fatalf("cart source = %+v, want cart index 4", cart)
+	}
+	classic := &InventoryBagWindow{search: "item 12", tab: inventoryBagTabEtc}
+	plain := &session.Session{Inventory: s.Inventory}
+	if got := classic.tabItems(plain); len(got) != 2 {
+		t.Fatalf("classic search leaked, got %d items", len(got))
+	}
+}
