@@ -32,7 +32,7 @@ var (
 	inventoryBagEquipInset       float32 = 2
 	inventoryBagEquipSize        float32 = 12
 	inventoryBagEquippedColor            = widget.RGBA8(54, 128, 76, 255)
-	inventoryBagTabActive                = widget.RGBA8(70, 110, 168, 255)
+	inventoryBagTabActive                = widget.RGBA8(118, 160, 206, 255)
 	inventoryBagMenuGap                  = 8
 	inventoryBagTooltipBelow             = 18
 	inventoryBagTooltipAbove             = 6
