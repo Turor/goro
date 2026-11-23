@@ -659,6 +659,11 @@ func (m *WorldMode) handleNetworkPacket(ctx client.Context, pkt network.Packet, 
 		glog.Errorf("parse inventory boundary 0x%04X: %v", pkt.ID, err)
 	} else if ok {
 		glog.Debugf("inventory list start=%t type=%d", boundary.Start, boundary.Type)
+		if boundary.Start && boundary.Type == network.InventoryTypeGuildStorage && ctx.Session != nil {
+			ctx.Session.GuildStorage.Items = nil
+			ctx.Session.GuildStorage.Open = true
+			ctx.Session.Storage.Open = false
+		}
 		return nil, false
 	}
 	if items, ok, err := network.ParseInventoryItemList(pkt); err != nil {
@@ -711,10 +716,7 @@ func (m *WorldMode) handleNetworkPacket(ctx client.Context, pkt network.Packet, 
 	if guildItems, ok, err := network.ParseGuildStorageItemList(pkt); err != nil {
 		glog.Errorf("parse guild storage 0x%04X: %v", pkt.ID, err)
 	} else if ok {
-		applyStorageItemList(ctx, guildItems)
-		if ctx.Session != nil {
-			ctx.Session.Storage.Open = true
-		}
+		applyGuildStorageItemList(ctx, guildItems)
 		m.ui.storageWindow.OpenWindow(ctx)
 		return nil, false
 	}

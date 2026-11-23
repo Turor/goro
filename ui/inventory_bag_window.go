@@ -36,6 +36,7 @@ const (
 	opinionatedSourceBag = iota
 	opinionatedSourceCart
 	opinionatedSourceStorage
+	opinionatedSourceGuild
 )
 
 const (
@@ -395,12 +396,18 @@ func (w *InventoryBagWindow) tabColumn(ctx Context) widget.Widget {
 }
 
 func (w *InventoryBagWindow) moveRow(ctx Context) widget.Widget {
+	storageLabel := "To storage"
+	storageDest := opinionatedSourceStorage
+	if ctx.Session != nil && ctx.Session.GuildStorage.Open {
+		storageLabel = "To guild"
+		storageDest = opinionatedSourceGuild
+	}
 	return primitives.HBox(
 		rotheme.Button("To cart", func() {
 			w.depositSelected(ctx, opinionatedSourceCart)
 		}),
-		rotheme.Button("To storage", func() {
-			w.depositSelected(ctx, opinionatedSourceStorage)
+		rotheme.Button(storageLabel, func() {
+			w.depositSelected(ctx, storageDest)
 		}),
 		rotheme.Button("Favorite", func() {
 			w.toggleFavorite(ctx)
@@ -476,6 +483,14 @@ func opinionatedWithdraw(ctx Context, source int, item session.InventoryItem) {
 	case opinionatedSourceCart:
 		err = ctx.Network.SendMoveFromCart(item.Index, amount)
 	case opinionatedSourceStorage:
+		if ctx.Session == nil || !ctx.Session.Storage.Open || ctx.Session.GuildStorage.Open {
+			return
+		}
+		err = ctx.Network.SendMoveFromStorage(item.Index, amount)
+	case opinionatedSourceGuild:
+		if ctx.Session == nil || !ctx.Session.GuildStorage.Open {
+			return
+		}
 		err = ctx.Network.SendMoveFromStorage(item.Index, amount)
 	default:
 		return
@@ -498,6 +513,14 @@ func opinionatedDeposit(ctx Context, dest int, item session.InventoryItem) {
 	case opinionatedSourceCart:
 		err = ctx.Network.SendMoveToCart(item.Index, amount)
 	case opinionatedSourceStorage:
+		if ctx.Session == nil || !ctx.Session.Storage.Open || ctx.Session.GuildStorage.Open {
+			return
+		}
+		err = ctx.Network.SendMoveToStorage(item.Index, amount)
+	case opinionatedSourceGuild:
+		if ctx.Session == nil || !ctx.Session.GuildStorage.Open {
+			return
+		}
 		err = ctx.Network.SendMoveToStorage(item.Index, amount)
 	default:
 		return
@@ -528,6 +551,7 @@ func (w *InventoryBagWindow) sourceRow(ctx Context) widget.Widget {
 		{label: "Bag", source: opinionatedSourceBag},
 		{label: "Cart", source: opinionatedSourceCart},
 		{label: "Storage", source: opinionatedSourceStorage},
+		{label: "Guild", source: opinionatedSourceGuild},
 	}
 	cells := make([]widget.Widget, 0, len(tabs))
 	for i, tab := range tabs {
@@ -830,6 +854,8 @@ func (w *InventoryBagWindow) sourceItems(s *session.Session) []session.Inventory
 		src = s.Cart.Items
 	case opinionatedSourceStorage:
 		src = s.Storage.Items
+	case opinionatedSourceGuild:
+		src = s.GuildStorage.Items
 	default:
 		src = s.Inventory.Items
 	}
@@ -886,6 +912,9 @@ func (w *InventoryBagWindow) inventorySnapshot(s *session.Session) string {
 		}
 		for _, item := range s.Storage.Items {
 			fmt.Fprintf(&b, "s%d:%d:%d;", item.Index, item.ItemID, item.Amount)
+		}
+		for _, item := range s.GuildStorage.Items {
+			fmt.Fprintf(&b, "g%d:%d:%d:%t;", item.Index, item.ItemID, item.Amount, s.GuildStorage.Open)
 		}
 	}
 	return b.String()

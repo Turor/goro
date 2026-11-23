@@ -39,3 +39,22 @@ func TestOpinionatedFavoritesTabKeepsMarkedItems(t *testing.T) {
 		t.Fatalf("favorites tab = %+v", items)
 	}
 }
+
+func TestOpinionatedGuildSourceIsNotKafra(t *testing.T) {
+	window := &InventoryBagWindow{source: opinionatedSourceGuild}
+	s := &session.Session{
+		OpinionatedUI: true,
+		Storage:       session.Storage{Items: []session.InventoryItem{{Index: 1, ItemID: 501, Amount: 1}}},
+		GuildStorage:  session.Storage{Open: true, Items: []session.InventoryItem{{Index: 9, ItemID: 909, Amount: 2}}},
+	}
+	items := window.sourceItems(s)
+	if len(items) != 1 || items[0].Index != 9 {
+		t.Fatalf("guild source = %+v", items)
+	}
+}
+
+func TestOpinionatedGuildMoveRequiresTheOpenStorage(t *testing.T) {
+	ctx := Context{Session: &session.Session{OpinionatedUI: true}}
+	opinionatedWithdraw(ctx, opinionatedSourceGuild, session.InventoryItem{Index: 9, Amount: 1})
+	opinionatedDeposit(ctx, opinionatedSourceGuild, session.InventoryItem{Index: 3, Amount: 1})
+}
