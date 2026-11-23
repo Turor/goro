@@ -506,6 +506,9 @@ func inventoryBagHasCart(ctx Context) bool {
 
 func (w *InventoryBagWindow) startItemDragOrActivate(ctx Context, item session.InventoryItem) {
 	w.hideTooltip()
+	if inventoryOpinionated(ctx) && w.source != opinionatedSourceBag {
+		return
+	}
 	now := time.Now()
 	if w.lastClickItem == item.Index && now.Sub(w.lastClickAt) <= 360*time.Millisecond {
 		w.dragActive = false
