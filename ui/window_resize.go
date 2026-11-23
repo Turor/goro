@@ -59,6 +59,10 @@ func (w *Window) resizeHit(x, y int) bool {
 }
 
 func (w *Window) resizeTo(ctx client.Context, width, height int) {
+	designW, designH := w.resizeDesign()
+	width, height = lockResizeAspect(designW, designH, width, height)
+	width, height = w.clampResize(ctx, width, height)
+	width, height = lockResizeAspect(designW, designH, width, height)
 	width, height = w.clampResize(ctx, width, height)
 	if width == w.width && height == w.height {
 		return
@@ -153,6 +157,38 @@ func drawWindowResizeGrip(canvas widget.Canvas, width, height int) {
 		geometry.NewRect(float32(width)-grip, float32(height)-grip, grip, grip),
 		rotheme.Default.Colors.ButtonBorder,
 	)
+}
+
+func (w *Window) resizeDesign() (int, int) {
+	if frame, ok := w.content.(*windowFrame); ok && frame.designW > 0 && frame.designH > 0 {
+		return int(frame.designW), int(frame.designH)
+	}
+	if w.looseDesignW > 0 && w.looseDesignH > 0 {
+		return int(w.looseDesignW), int(w.looseDesignH)
+	}
+	return w.width, w.height
+}
+
+func lockResizeAspect(designW, designH, width, height int) (int, int) {
+	if designW <= 0 || designH <= 0 || width <= 0 || height <= 0 {
+		return width, height
+	}
+	deltaW := width - designW
+	if deltaW < 0 {
+		deltaW = -deltaW
+	}
+	deltaH := height - designH
+	if deltaH < 0 {
+		deltaH = -deltaH
+	}
+	scale := float32(width) / float32(designW)
+	if deltaH > deltaW {
+		scale = float32(height) / float32(designH)
+	}
+	if scale <= 0 {
+		return width, height
+	}
+	return int(float32(designW) * scale), int(float32(designH) * scale)
 }
 
 func frameScale(designW, designH, userW, userH float32) float32 {

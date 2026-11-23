@@ -18,7 +18,8 @@ var (
 	inventoryBagCols                     = 8
 	opinionatedBagCols                   = 10
 	opinionatedSplitCols                 = 4
-	opinionatedDividerCols               = 2
+	inventoryBagSplitFrame               = 4
+	inventoryBagSearchClear              = 16
 	inventoryBagRows                     = 5
 	inventoryBagCellShadowInset  float32 = 3
 	inventoryBagCellShadowRadius float32 = 3
@@ -60,7 +61,8 @@ func init() {
 	s.Int("cols", &inventoryBagCols, 1, 16, "inventory columns")
 	s.Int("opinionated_cols", &opinionatedBagCols, 4, 16, "opinionated inventory columns")
 	s.Int("split_cols", &opinionatedSplitCols, 1, 8, "columns in each split inventory pane")
-	s.Int("divider_cols", &opinionatedDividerCols, 1, 4, "columns between the split inventory panes")
+	s.Int("split_frame", &inventoryBagSplitFrame, 1, 16, "thin frame between split inventory panes")
+	s.Int("search_clear", &inventoryBagSearchClear, 8, 32, "opinionated search clear mark width")
 	s.Int("rows", &inventoryBagRows, 1, 20, "visible inventory rows")
 	s.Int("tab_width", &inventoryBagTabW, 16, 96, "inventory tab width")
 	s.Int("tab_height", &inventoryBagTabH, 20, 120, "inventory tab height")
@@ -117,11 +119,23 @@ func opinionatedFrameW() int {
 }
 
 func opinionatedDividerW() int {
-	return opinionatedDividerCols * inventoryBagCell
+	gap := inventoryBagSplitFrame
+	if gap < 1 {
+		return 1
+	}
+	return gap
 }
 
 func opinionatedSideViewW() int {
-	return opinionatedSplitCols*inventoryBagCell + ROScrollbarGutter
+	remain := opinionatedFrameW() - opinionatedDividerW()
+	if remain < 2 {
+		return 1
+	}
+	return remain / 2
+}
+
+func opinionatedSideViewWRight() int {
+	return opinionatedFrameW() - opinionatedDividerW() - opinionatedSideViewW()
 }
 
 func opinionatedEqualTabWidth(index, count int) int {
@@ -140,7 +154,19 @@ func opinionatedEqualTabWidth(index, count int) int {
 }
 
 func opinionatedSplitContentW() int {
-	return opinionatedSplitCols * inventoryBagCell
+	width := opinionatedSideViewW() - ROScrollbarGutter
+	if width < 1 {
+		return 1
+	}
+	return width
+}
+
+func opinionatedSplitContentWRight() int {
+	width := opinionatedSideViewWRight() - ROScrollbarGutter
+	if width < 1 {
+		return 1
+	}
+	return width
 }
 
 func opinionatedScrollW(contentW int) int {

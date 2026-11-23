@@ -224,6 +224,7 @@ func (u *worldUI) nonConsoleKeyboardInputBlockedExcept(ctx client.Context, excep
 		(except != &u.companions.HomunculusInfo.Window && u.companions.HomunculusInfo.KeyboardShortcutsBlocked()) ||
 		u.changeCartWindow.IsOpen() ||
 		u.itemWindows.KeyboardShortcutsBlocked() ||
+		u.inventoryBag.KeyboardShortcutsBlocked() ||
 		u.npc.Shop.KeyboardShortcutsBlocked() ||
 		u.social.VendingWindow.KeyboardShortcutsBlocked() ||
 		u.social.TradeWindow.IsOpen() ||

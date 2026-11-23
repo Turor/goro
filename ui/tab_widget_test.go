@@ -109,12 +109,15 @@ func TestOpinionatedInventoryUsesHorizontalFilterTabs(t *testing.T) {
 	window := InventoryBagWindow{}
 	rows := window.filterRows(Context{})
 	rows.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(float32(opinionatedFrameW()), float32(inventoryBagFilterH))))
-	if len(rows.Children()) != 1 {
-		t.Fatalf("filter rows = %d, want 1", len(rows.Children()))
+	children := rows.Children()
+	if len(children) == 1 {
+		if _, ok := children[0].(*tabWidget); !ok {
+			children = children[0].Children()
+		}
 	}
 	seen := 0
-	for _, row := range rows.Children() {
-		for _, child := range row.Children() {
+	for _, child := range children {
+		{
 			tab, ok := child.(*tabWidget)
 			if !ok {
 				t.Fatalf("filter child = %T, want *tabWidget", child)

@@ -106,6 +106,10 @@ type InventoryBagWindow struct {
 	tooltip       tooltipState
 	icons         map[inventoryBagIconKey]image.Image
 	iconMiss      map[inventoryBagIconKey]struct{}
+	searchCtx     Context
+	searchField   *textfield.Widget
+	bagGrid       *inventoryGridWidget
+	sideGrid      *inventoryGridWidget
 }
 
 type inventoryBagIconKey struct {
@@ -178,6 +182,12 @@ func (w *InventoryBagWindow) UpdatePresentation(ctx Context, itemInfo *ItemWindo
 		w.snapshot = ""
 	}
 	if snapshot != w.snapshot || itemInfo != w.itemInfo {
+		if w.searchField != nil && w.searchField.IsFocused() && w.bagGrid != nil {
+			w.snapshot = snapshot
+			w.itemInfo = itemInfo
+			w.syncSearchGrids(ctx)
+			return
+		}
 		w.hideTooltip()
 		w.snapshot = snapshot
 		w.itemInfo = itemInfo
@@ -270,7 +280,13 @@ func (w *InventoryBagWindow) sendDrop(ctx Context, item session.InventoryItem, r
 }
 
 func (w *InventoryBagWindow) KeyboardShortcutsBlocked() bool {
-	return w != nil && w.amountPrompt.IsOpen()
+	if w == nil {
+		return false
+	}
+	if w.amountPrompt.IsOpen() {
+		return true
+	}
+	return w.searchField != nil && w.searchField.IsFocused()
 }
 
 func (w *InventoryBagWindow) DrawTooltip(ctx Context, screen *render.Frame) {
@@ -447,22 +463,8 @@ func (w *InventoryBagWindow) depositSelected(ctx Context, dest int) {
 }
 
 func (w *InventoryBagWindow) searchRow(ctx Context) widget.Widget {
-	field := rotheme.TextField(w.search, textfield.TypeText, func(value string) {
-		w.search = value
-		w.ensureScrollSignal().Set(0)
-		w.refresh(ctx, w.itemInfo)
-	}, func(string) {})
-	return primitives.HBox(
-		primitives.Expanded(field),
-		rotheme.Button(opinionatedSortLabel(w.sort), func() {
-			w.sort = (w.sort + 1) % opinionatedSortCount
-			w.ensureScrollSignal().Set(0)
-			w.refresh(ctx, w.itemInfo)
-		}).Width(float32(inventoryBagSortW)),
-		rotheme.Button("Favorite", func() {
-			w.toggleFavorite(ctx)
-		}),
-	).Gap(float32(inventoryBagMenuGap)).Height(float32(inventoryBagSearchH))
+	w.searchCtx = ctx
+	return newInventorySearchBox(w)
 }
 
 func opinionatedMoveAmount(item session.InventoryItem) uint32 {
@@ -586,20 +588,20 @@ func (w *InventoryBagWindow) sourceRow(ctx Context) widget.Widget {
 }
 
 func (w *InventoryBagWindow) filterRows(ctx Context) widget.Widget {
-	return primitives.Box(w.filterRow(ctx, opinionatedInventoryTabs)).Gap(0).Width(float32(opinionatedFrameW()))
+	return w.categoryStrip(ctx)
 }
 
-func (w *InventoryBagWindow) filterRow(ctx Context, tabs []struct {
-	label string
-	tab   int
-}) widget.Widget {
-	cells := make([]widget.Widget, 0, len(tabs))
-	for i, tab := range tabs {
+func (w *InventoryBagWindow) categoryStrip(ctx Context) widget.Widget {
+	tabs := make([]*tabWidget, 0, len(opinionatedInventoryTabs))
+	active := 0
+	for i, tab := range opinionatedInventoryTabs {
 		tab := tab
-		cells = append(cells, newTabWidget(tabWidgetConfig{
+		if tab.tab == w.tab {
+			active = i
+		}
+		tabs = append(tabs, newTabWidget(tabWidgetConfig{
 			label:      tab.label,
 			active:     tab.tab == w.tab,
-			width:      opinionatedEqualTabWidth(i, len(opinionatedInventoryTabs)),
 			height:     inventoryBagFilterH,
 			omitBottom: tab.tab == w.tab,
 			activeFill: inventoryBagTabActive,
@@ -612,7 +614,7 @@ func (w *InventoryBagWindow) filterRow(ctx Context, tabs []struct {
 			},
 		}))
 	}
-	return primitives.HBox(cells...).Gap(0)
+	return newOpinionatedTabStrip(tabs, active)
 }
 
 func (w *InventoryBagWindow) refresh(ctx Context, itemInfo *ItemWindows) {
@@ -983,6 +985,14 @@ func newInventoryGridWidget(cfg inventoryGridConfig) *inventoryGridWidget {
 	w.SetVisible(true)
 	w.SetEnabled(true)
 	return w
+}
+
+func (w *inventoryGridWidget) setItems(items []session.InventoryItem, icons []image.Image, amounts []string) {
+	w.cfg.items = items
+	w.cfg.icons = icons
+	w.cfg.amounts = amounts
+	w.hovered = -1
+	w.SetNeedsRedraw(true)
 }
 
 func (w *inventoryGridWidget) Layout(ctx widget.Context, constraints geometry.Constraints) geometry.Size {

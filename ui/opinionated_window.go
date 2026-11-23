@@ -23,9 +23,9 @@ func (w *InventoryBagWindow) opinionatedWindow(ctx Context, itemInfo *ItemWindow
 		}),
 		Size(float32(width), float32(height)),
 		Content(primitives.Box(
-			w.searchRow(ctx),
 			w.sourceTabs(ctx),
 			w.filterRows(ctx),
+			w.searchRow(ctx),
 			w.opinionatedPanes(ctx, itemInfo),
 		).Gap(0)),
 	)
@@ -69,7 +69,7 @@ func (w *InventoryBagWindow) opinionatedPanes(ctx Context, itemInfo *ItemWindows
 			Width(float32(opinionatedDividerW())).
 			Height(float32(inventoryBagViewH)).
 			Background(rotheme.Default.Colors.WindowBorder),
-		w.opinionatedScroll(ctx, itemInfo, w.tabItems(ctx.Session), opinionatedSplitCols, opinionatedSplitContentW(), opinionatedPaneOther, w.ensureSideScrollSignal()),
+		w.opinionatedScroll(ctx, itemInfo, w.tabItems(ctx.Session), opinionatedSplitCols, opinionatedSplitContentWRight(), opinionatedPaneOther, w.ensureSideScrollSignal()),
 	).Gap(0)
 }
 
@@ -90,10 +90,18 @@ func (w *InventoryBagWindow) opinionatedScroll(ctx Context, itemInfo *ItemWindow
 			w.opinionatedRightClick(ctx, itemInfo, item, mx, my, mods, pane)
 		},
 	})
+	if pane == opinionatedPaneBag {
+		w.bagGrid = grid
+		if !w.opinionatedSplit() {
+			w.sideGrid = nil
+		}
+	} else {
+		w.sideGrid = grid
+	}
 	scrollBox := scrollview.New(
 		grid,
 		scrollview.DirectionOpt(scrollview.Vertical),
-		scrollview.ScrollbarOpt(scrollview.ScrollbarAuto),
+		scrollview.ScrollbarOpt(scrollview.ScrollbarAlways),
 		scrollview.ScrollYSignal(scroll),
 		scrollview.ScrollStep(float32(inventoryBagCell)),
 	)

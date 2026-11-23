@@ -10,11 +10,14 @@ import (
 )
 
 func TestOpinionatedSplitIsFourAndFour(t *testing.T) {
-	if opinionatedSplitCols*2+opinionatedDividerCols != opinionatedBagCols {
-		t.Fatalf("split %d+%d+%d, want %d columns", opinionatedSplitCols, opinionatedDividerCols, opinionatedSplitCols, opinionatedBagCols)
+	if opinionatedSplitCols*2 > opinionatedBagCols {
+		t.Fatalf("split columns %d+%d exceed %d", opinionatedSplitCols, opinionatedSplitCols, opinionatedBagCols)
 	}
-	if opinionatedSideViewW()*2+opinionatedDividerW() != opinionatedFrameW() {
-		t.Fatalf("panes %d divider %d frame %d", opinionatedSideViewW(), opinionatedDividerW(), opinionatedFrameW())
+	if opinionatedDividerW() >= inventoryBagCell {
+		t.Fatalf("divider %d is still a column", opinionatedDividerW())
+	}
+	if opinionatedSideViewW()+opinionatedSideViewWRight()+opinionatedDividerW() != opinionatedFrameW() {
+		t.Fatalf("panes %d+%d divider %d frame %d", opinionatedSideViewW(), opinionatedSideViewWRight(), opinionatedDividerW(), opinionatedFrameW())
 	}
 }
 
@@ -55,11 +58,14 @@ func TestOpinionatedSourcesFollowCartAndGuild(t *testing.T) {
 func TestOpinionatedCategoryTabsAreOneRow(t *testing.T) {
 	row := (&InventoryBagWindow{}).filterRows(Context{Session: &session.Session{OpinionatedUI: true}})
 	row.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(float32(opinionatedFrameW()), float32(inventoryBagFilterH))))
-	if len(row.Children()) != 1 {
-		t.Fatalf("category rows = %d, want 1", len(row.Children()))
+	children := row.Children()
+	if len(children) == 1 {
+		if _, ok := children[0].(*tabWidget); !ok {
+			children = children[0].Children()
+		}
 	}
 	seen := 0
-	for _, child := range row.Children()[0].Children() {
+	for _, child := range children {
 		tab, ok := child.(*tabWidget)
 		if !ok {
 			t.Fatalf("category child = %T", child)
