@@ -17,9 +17,10 @@ var (
 	inventoryBagCell                     = 32
 	inventoryBagCols                     = 8
 	opinionatedBagCols                   = 10
-	opinionatedSplitCols                 = 4
+	opinionatedSplitCols                 = 6
 	inventoryBagSplitFrame               = 4
 	inventoryBagSearchClear              = 16
+	inventoryBagSearchInset              = 6
 	inventoryBagRows                     = 5
 	inventoryBagCellShadowInset  float32 = 3
 	inventoryBagCellShadowRadius float32 = 3
@@ -63,6 +64,7 @@ func init() {
 	s.Int("split_cols", &opinionatedSplitCols, 1, 8, "columns in each split inventory pane")
 	s.Int("split_frame", &inventoryBagSplitFrame, 1, 16, "thin frame between split inventory panes")
 	s.Int("search_clear", &inventoryBagSearchClear, 8, 32, "opinionated search clear mark width")
+	s.Int("search_inset", &inventoryBagSearchInset, 0, 24, "opinionated search bar inset")
 	s.Int("rows", &inventoryBagRows, 1, 20, "visible inventory rows")
 	s.Int("tab_width", &inventoryBagTabW, 16, 96, "inventory tab width")
 	s.Int("tab_height", &inventoryBagTabH, 20, 120, "inventory tab height")
@@ -106,16 +108,24 @@ func inventoryBagFilterBandH() int {
 	return inventoryBagFilterRowCount() * inventoryBagFilterH
 }
 
+func inventorySearchRowH() int {
+	return inventoryBagSearchH + inventoryBagSearchInset*2
+}
+
 func inventoryOpinionatedChromeH() int {
-	return inventoryBagSearchH + inventoryBagFilterH + inventoryBagFilterH
+	return inventorySearchRowH() + inventoryBagFilterH + inventoryBagFilterH
 }
 
 func opinionatedContentW() int {
-	return opinionatedBagCols * inventoryBagCell
+	width := opinionatedFrameW() - ROScrollbarGutter
+	if width < 1 {
+		return 1
+	}
+	return width
 }
 
 func opinionatedFrameW() int {
-	return opinionatedContentW() + ROScrollbarGutter*2
+	return opinionatedSplitCols*inventoryBagCell*2 + opinionatedDividerW() + ROScrollbarGutter*2
 }
 
 func opinionatedDividerW() int {
@@ -179,7 +189,7 @@ func opinionatedWidthBounded(width float32) bool {
 
 func inventoryBagFrameSize(opinionated bool) (int, int) {
 	if opinionated {
-		return opinionatedFrameW(), inventoryBagHeight + inventoryOpinionatedChromeH()
+		return opinionatedFrameW(), inventoryBagViewH + inventoryOpinionatedChromeH()
 	}
 	return inventoryBagWidth, inventoryBagHeight
 }

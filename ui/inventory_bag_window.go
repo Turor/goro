@@ -965,6 +965,7 @@ type inventoryGridConfig struct {
 	minRows          int
 	cellSize         int
 	viewWidth        int
+	grid             bool
 	onPress          func(session.InventoryItem)
 	onHover          func(session.InventoryItem)
 	onLeave          func()
@@ -1027,7 +1028,11 @@ func (w *inventoryGridWidget) Draw(ctx widget.Context, canvas widget.Canvas) {
 		for col := 0; col < cols; col++ {
 			index := row*cols + col
 			cell := w.cellBounds(index)
-			drawInventoryGridCellShadow(canvas, cell, index == w.hovered)
+			if w.cfg.grid {
+				drawInventoryGridCell(canvas, cell, index == w.hovered)
+			} else {
+				drawInventoryGridCellShadow(canvas, cell, index == w.hovered)
+			}
 		}
 	}
 	startIndex := startRow * cols
@@ -1059,6 +1064,15 @@ func (w *inventoryGridWidget) Draw(ctx widget.Context, canvas widget.Canvas) {
 			rotheme.DrawText(canvas, "E", geometry.NewRect(cell.Min.X+equipInset, cell.Min.Y+equipInset, equip, equip), rotheme.Default.Typography.TextSize, inventoryBagEquippedColor, false, widget.TextAlignLeft)
 		}
 	}
+}
+
+func drawInventoryGridCell(canvas widget.Canvas, cell geometry.Rect, hovered bool) {
+	fill := rotheme.Default.Colors.PanelBody
+	if hovered {
+		fill = rotheme.Default.Colors.ButtonHover
+	}
+	canvas.DrawRect(cell, fill)
+	canvas.StrokeRect(cell, rotheme.Default.Colors.WindowBorder, windowBorderWidth)
 }
 
 func drawInventoryGridCellShadow(canvas widget.Canvas, cell geometry.Rect, hovered bool) {

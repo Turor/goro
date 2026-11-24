@@ -158,7 +158,7 @@ func (w *InventoryBagWindow) opinionatedPaneAt(mx, my int) int {
 	if scale <= 0 {
 		scale = 1
 	}
-	top := w.y + scaleInt(windowTitleHeight, scale) + scaleInt(inventoryOpinionatedChromeH(), scale)
+	top := w.y + scaleInt(inventoryOpinionatedChromeH(), scale)
 	height := scaleInt(inventoryBagViewH, scale)
 	if my < top || my >= top+height {
 		return -1

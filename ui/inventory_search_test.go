@@ -44,8 +44,13 @@ func TestOpinionatedSearchKeepsFocusAndTiles(t *testing.T) {
 	}
 	box := newInventorySearchBox(window)
 	box.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(float32(opinionatedFrameW()), float32(inventoryBagSearchH))))
-	if !box.clearRect().Contains(geometry.Pt(box.Bounds().Max.X-1, 1)) {
-		t.Fatal("clear mark is not on the right of the search box")
+	clear := box.clearRect()
+	bar := box.fieldRect()
+	if clear.Max.X < bar.Max.X-1 || clear.Min.X <= bar.Min.X {
+		t.Fatalf("clear = %v, want the right side of %v", clear, bar)
+	}
+	if bar.Min.X <= box.Bounds().Min.X || bar.Max.X >= box.Bounds().Max.X {
+		t.Fatal("search bar is not inset")
 	}
 }
 

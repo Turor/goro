@@ -8,9 +8,9 @@ import (
 	"github.com/kivutar/goro/ui/rotheme"
 )
 
-// inventorySearchBox is the opinionated search field. The clear mark is drawn
-// on top of the field so showing it does not change the row size or move the
-// tiles under it.
+// inventorySearchBox draws the opinionated search field itself. The text
+// widget keeps the keystrokes, but its own paint uses bounds that the window
+// clip throws away, so the letters are drawn here.
 type inventorySearchBox struct {
 	widget.WidgetBase
 	window *InventoryBagWindow
@@ -37,7 +37,6 @@ func (w *InventoryBagWindow) ensureSearchField() *textfield.Widget {
 	field := rotheme.TextField(w.search, textfield.TypeText, func(value string) {
 		w.applySearch(w.searchCtx, value)
 	}, func(string) {})
-	field.Padding(float32(inventoryBagSearchClear))
 	w.searchField = field
 	return field
 }
@@ -79,14 +78,13 @@ func (b *inventorySearchBox) Layout(ctx widget.Context, constraints geometry.Con
 	if !opinionatedWidthBounded(width) {
 		width = float32(opinionatedFrameW()) * scale
 	}
-	height := float32(inventoryBagSearchH) * scale
+	height := float32(inventorySearchRowH()) * scale
 	size := constraints.Constrain(geometry.Sz(width, height))
+	b.SetBounds(geometry.FromPointSize(b.Position(), size))
 	if b.field != nil {
 		b.field.Layout(ctx, geometry.Tight(size))
-		var origin geometry.Point
-		b.field.SetBounds(geometry.FromPointSize(origin, size))
+		b.field.SetBounds(b.Bounds())
 	}
-	b.SetBounds(geometry.FromPointSize(b.Position(), size))
 	return size
 }
 
@@ -94,41 +92,102 @@ func (b *inventorySearchBox) Draw(ctx widget.Context, canvas widget.Canvas) {
 	if !b.IsVisible() {
 		return
 	}
-	bounds := b.Bounds()
-	canvas.PushTransform(bounds.Min)
-	if b.field != nil {
-		widget.DrawChild(b.field, ctx, canvas)
+	field := b.fieldRect()
+	border := rotheme.Default.Colors.FooterLine
+	if b.field != nil && b.field.IsFocused() {
+		border = rotheme.Default.Colors.InputFocus
 	}
-	if b.window != nil && b.window.search != "" {
+	canvas.DrawRect(field, rotheme.Default.Colors.PanelBody)
+	canvas.StrokeRect(field, border, windowBorderWidth)
+	if b.window == nil {
+		return
+	}
+	if b.window.search != "" {
+		rotheme.DrawText(canvas, b.window.search, b.textRect(), rotheme.Default.Typography.TextSize, rotheme.Default.Colors.Text, false, widget.TextAlignLeft)
 		rotheme.DrawText(canvas, "x", b.clearRect(), rotheme.Default.Typography.TextSize, rotheme.Default.Colors.Text, false, widget.TextAlignCenter)
 	}
-	canvas.PopTransform()
+	if b.field != nil && b.field.IsFocused() {
+		text := b.textRect()
+		caretX := text.Min.X
+		if b.window.search != "" {
+			caretX += rotheme.MeasureText(canvas, b.window.search, rotheme.Default.Typography.TextSize, false)
+		}
+		if caretX > text.Max.X {
+			caretX = text.Max.X
+		}
+		canvas.DrawLine(geometry.Pt(caretX, text.Min.Y), geometry.Pt(caretX, text.Max.Y), rotheme.Default.Colors.Text, windowBorderWidth)
+	}
+}
+
+func (b *inventorySearchBox) scale() float32 {
+	scale := rotheme.ContentScale()
+	if scale <= 0 {
+		return 1
+	}
+	return scale
+}
+
+func (b *inventorySearchBox) fieldRect() geometry.Rect {
+	bounds := b.Bounds()
+	inset := float32(inventoryBagSearchInset) * b.scale()
+	rect := bounds
+	rect.Min.X += inset
+	rect.Min.Y += inset
+	rect.Max.X -= inset
+	rect.Max.Y -= inset
+	if rect.Max.X < rect.Min.X {
+		rect.Max.X = rect.Min.X
+	}
+	if rect.Max.Y < rect.Min.Y {
+		rect.Max.Y = rect.Min.Y
+	}
+	return rect
+}
+
+func (b *inventorySearchBox) textRect() geometry.Rect {
+	field := b.fieldRect()
+	pad := float32(inventoryBagIconPad) * b.scale()
+	clearW := float32(inventoryBagSearchClear) * b.scale()
+	rect := field
+	rect.Min.X += pad
+	rect.Max.X -= clearW
+	if rect.Max.X < rect.Min.X {
+		rect.Max.X = rect.Min.X
+	}
+	return rect
 }
 
 func (b *inventorySearchBox) clearRect() geometry.Rect {
-	scale := rotheme.ContentScale()
-	if scale <= 0 {
-		scale = 1
+	field := b.fieldRect()
+	clearW := float32(inventoryBagSearchClear) * b.scale()
+	if clearW > field.Width() {
+		clearW = field.Width()
 	}
-	size := b.Bounds().Size()
-	clearW := float32(inventoryBagSearchClear) * scale
-	if clearW > size.Width {
-		clearW = size.Width
-	}
-	var origin geometry.Point
-	origin.X = size.Width - clearW
-	return geometry.FromPointSize(origin, geometry.Sz(clearW, size.Height))
+	rect := field
+	rect.Min.X = field.Max.X - clearW
+	return rect
 }
 
 func (b *inventorySearchBox) Event(ctx widget.Context, e event.Event) bool {
 	if b.field == nil || !b.IsVisible() || !b.IsEnabled() {
 		return false
 	}
-	if mouse, ok := e.(*event.MouseEvent); ok && b.window != nil && b.window.search != "" && mouse.MouseType == event.MousePress && mouse.Button == event.ButtonLeft && b.clearRect().Contains(mouse.Position) {
+	mouse, ok := e.(*event.MouseEvent)
+	if !ok {
+		return b.field.Event(ctx, e)
+	}
+	local := mouse.Position
+	if b.Bounds().Min.X != 0 || b.Bounds().Min.Y != 0 {
+		local = mouse.Position.Sub(b.Bounds().Min)
+	}
+	if b.window != nil && b.window.search != "" && mouse.MouseType == event.MousePress && mouse.Button == event.ButtonLeft && (b.clearRect().Contains(mouse.Position) || b.clearRect().Contains(local) || b.clearRect().Contains(mouse.Position.Add(b.Bounds().Min))) {
 		b.field.SetText("")
 		b.window.applySearch(b.window.searchCtx, "")
 		b.SetNeedsRedraw(true)
 		return true
+	}
+	if mouse.MouseType == event.MousePress && mouse.Button == event.ButtonLeft {
+		ctx.RequestFocus(b.field)
 	}
 	return b.field.Event(ctx, e)
 }

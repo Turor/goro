@@ -10,8 +10,11 @@ import (
 )
 
 func TestOpinionatedSplitIsFourAndFour(t *testing.T) {
-	if opinionatedSplitCols*2 > opinionatedBagCols {
-		t.Fatalf("split columns %d+%d exceed %d", opinionatedSplitCols, opinionatedSplitCols, opinionatedBagCols)
+	if opinionatedSplitContentW() < opinionatedSplitCols*inventoryBagCell {
+		t.Fatalf("left pane %d is narrower than %d cells", opinionatedSplitContentW(), opinionatedSplitCols)
+	}
+	if opinionatedSplitContentWRight() < opinionatedSplitCols*inventoryBagCell {
+		t.Fatalf("right pane %d is narrower than %d cells", opinionatedSplitContentWRight(), opinionatedSplitCols)
 	}
 	if opinionatedDividerW() >= inventoryBagCell {
 		t.Fatalf("divider %d is still a column", opinionatedDividerW())
@@ -117,15 +120,15 @@ func TestOpinionatedPaneHitUsesTheSplit(t *testing.T) {
 	width, height := inventoryBagFrameSize(true)
 	window.EnsureWindow(width, height)
 	window.x, window.y = 10, 20
-	if got := window.opinionatedPaneAt(window.x+4, window.y+windowTitleHeight+inventoryOpinionatedChromeH()+4); got != opinionatedPaneBag {
+	if got := window.opinionatedPaneAt(window.x+4, window.y+inventoryOpinionatedChromeH()+4); got != opinionatedPaneBag {
 		t.Fatalf("left pane = %d", got)
 	}
 	right := window.x + opinionatedSideViewW() + opinionatedDividerW() + 4
-	if got := window.opinionatedPaneAt(right, window.y+windowTitleHeight+inventoryOpinionatedChromeH()+4); got != opinionatedPaneOther {
+	if got := window.opinionatedPaneAt(right, window.y+inventoryOpinionatedChromeH()+4); got != opinionatedPaneOther {
 		t.Fatalf("right pane = %d", got)
 	}
 	mid := window.x + opinionatedSideViewW() + 1
-	if got := window.opinionatedPaneAt(mid, window.y+windowTitleHeight+inventoryOpinionatedChromeH()+4); got != -1 {
+	if got := window.opinionatedPaneAt(mid, window.y+inventoryOpinionatedChromeH()+4); got != -1 {
 		t.Fatalf("divider = %d, want no pane", got)
 	}
 }

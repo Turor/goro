@@ -3,6 +3,7 @@ package ui
 import (
 	"github.com/gogpu/ui/core/scrollview"
 	"github.com/gogpu/ui/event"
+	"github.com/gogpu/ui/geometry"
 	"github.com/gogpu/ui/primitives"
 	"github.com/gogpu/ui/state"
 	"github.com/gogpu/ui/widget"
@@ -13,22 +14,47 @@ import (
 func (w *InventoryBagWindow) opinionatedWindow(ctx Context, itemInfo *ItemWindows) widget.Widget {
 	w.normalizeOpinionatedSource(ctx)
 	width, height := inventoryBagFrameSize(true)
+	w.syncOpinionatedDrag()
 	return Win(
-		Title("Inventory"),
-		CloseButton(true),
+		TitleBar(false),
+		CloseButton(false),
 		OnClose(func() {
-			w.amountPrompt.Close(ctx)
-			w.Window.Close()
-			w.Publish(ctx)
+			w.closeFromChrome(ctx)
 		}),
 		Size(float32(width), float32(height)),
 		Content(primitives.Box(
-			w.sourceTabs(ctx),
+			w.opinionatedTabRow(ctx),
 			w.filterRows(ctx),
 			w.searchRow(ctx),
 			w.opinionatedPanes(ctx, itemInfo),
 		).Gap(0)),
 	)
+}
+
+func (w *InventoryBagWindow) closeFromChrome(ctx Context) {
+	w.amountPrompt.Close(ctx)
+	w.Window.Close()
+	w.Publish(ctx)
+}
+
+func (w *InventoryBagWindow) syncOpinionatedDrag() {
+	w.titleHeight = 0
+	margin := float32(windowScreenMargin)
+	w.dragBounds = geometry.NewRect(-margin, -margin, margin, margin)
+}
+
+func (w *InventoryBagWindow) opinionatedTabRow(ctx Context) widget.Widget {
+	return primitives.HBox(
+		primitives.Expanded(w.sourceTabs(ctx)),
+		primitives.Box(
+			rotheme.IconButton(rotheme.IconButtonClose, func() {
+				w.closeFromChrome(ctx)
+			}),
+		).
+			Width(float32(inventoryBagFilterH)).
+			Height(float32(inventoryBagFilterH)).
+			BorderStyle(windowBorderWidth, rotheme.Default.Colors.WindowBorder),
+	).Gap(0)
 }
 
 func (w *InventoryBagWindow) sourceTabs(ctx Context) widget.Widget {
@@ -81,6 +107,7 @@ func (w *InventoryBagWindow) opinionatedScroll(ctx Context, itemInfo *ItemWindow
 		cols:      cols,
 		viewWidth: viewW,
 		fillWidth: true,
+		grid:      true,
 		onPress: func(item session.InventoryItem) {
 			w.startPaneDrag(ctx, item, pane)
 		},
