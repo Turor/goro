@@ -9,18 +9,24 @@ import (
 	"github.com/kivutar/goro/session"
 )
 
-func TestOpinionatedSplitIsFourAndFour(t *testing.T) {
-	if opinionatedSplitContentW() < opinionatedSplitCols*inventoryBagCell {
-		t.Fatalf("left pane %d is narrower than %d cells", opinionatedSplitContentW(), opinionatedSplitCols)
+func TestOpinionatedSplitIsSixAndSix(t *testing.T) {
+	if opinionatedBagCols != opinionatedSplitCols*2+1 {
+		t.Fatalf("bag %d is not 6 + middle + 6", opinionatedBagCols)
 	}
-	if opinionatedSplitContentWRight() < opinionatedSplitCols*inventoryBagCell {
-		t.Fatalf("right pane %d is narrower than %d cells", opinionatedSplitContentWRight(), opinionatedSplitCols)
+	if opinionatedSplitContentW() != opinionatedSplitCols*inventoryBagCell {
+		t.Fatalf("left pane %d, want %d cells", opinionatedSplitContentW(), opinionatedSplitCols)
 	}
-	if opinionatedDividerW() >= inventoryBagCell {
-		t.Fatalf("divider %d is still a column", opinionatedDividerW())
+	if opinionatedSplitContentWRight() != opinionatedSplitCols*inventoryBagCell {
+		t.Fatalf("right pane %d, want %d cells", opinionatedSplitContentWRight(), opinionatedSplitCols)
 	}
-	if opinionatedSideViewW()+opinionatedSideViewWRight()+opinionatedDividerW() != opinionatedFrameW() {
-		t.Fatalf("panes %d+%d divider %d frame %d", opinionatedSideViewW(), opinionatedSideViewWRight(), opinionatedDividerW(), opinionatedFrameW())
+	if opinionatedMiddleW() != inventoryBagCell {
+		t.Fatalf("middle column %d, want one cell", opinionatedMiddleW())
+	}
+	if opinionatedDividerW() >= opinionatedMiddleW() {
+		t.Fatalf("divider %d fills the middle column %d", opinionatedDividerW(), opinionatedMiddleW())
+	}
+	if opinionatedSideViewW()+opinionatedSideViewWRight()+opinionatedMiddleW() != opinionatedFrameW() {
+		t.Fatalf("panes %d+%d middle %d frame %d", opinionatedSideViewW(), opinionatedSideViewWRight(), opinionatedMiddleW(), opinionatedFrameW())
 	}
 }
 
@@ -120,15 +126,52 @@ func TestOpinionatedPaneHitUsesTheSplit(t *testing.T) {
 	width, height := inventoryBagFrameSize(true)
 	window.EnsureWindow(width, height)
 	window.x, window.y = 10, 20
-	if got := window.opinionatedPaneAt(window.x+4, window.y+inventoryOpinionatedChromeH()+4); got != opinionatedPaneBag {
+	if got := window.opinionatedPaneAt(window.x+4, window.y+4); got != opinionatedPaneBag {
 		t.Fatalf("left pane = %d", got)
 	}
-	right := window.x + opinionatedSideViewW() + opinionatedDividerW() + 4
-	if got := window.opinionatedPaneAt(right, window.y+inventoryOpinionatedChromeH()+4); got != opinionatedPaneOther {
+	right := window.x + opinionatedSideViewW() + opinionatedMiddleW() + 4
+	if got := window.opinionatedPaneAt(right, window.y+4); got != opinionatedPaneOther {
 		t.Fatalf("right pane = %d", got)
 	}
 	mid := window.x + opinionatedSideViewW() + 1
-	if got := window.opinionatedPaneAt(mid, window.y+inventoryOpinionatedChromeH()+4); got != -1 {
-		t.Fatalf("divider = %d, want no pane", got)
+	if got := window.opinionatedPaneAt(mid, window.y+4); got != -1 {
+		t.Fatalf("middle column = %d, want no pane", got)
+	}
+}
+
+func TestOpinionatedSplitKeepsChromeInTheMiddleColumn(t *testing.T) {
+	window := &InventoryBagWindow{source: opinionatedSourceStorage, opinionated: true}
+	panes := window.opinionatedPanes(Context{Session: &session.Session{OpinionatedUI: true}}, nil)
+	panes.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(float32(opinionatedFrameW()), float32(opinionatedBodyH()))))
+	children := panes.Children()
+	if len(children) != 3 {
+		t.Fatalf("split children = %d, want left, middle, right", len(children))
+	}
+	center, ok := children[1].(*opinionatedCenterColumn)
+	if !ok {
+		t.Fatalf("middle child = %T, want the center column", children[1])
+	}
+	if center.Bounds().Width() != float32(opinionatedMiddleW()) {
+		t.Fatalf("middle width %v, want one cell", center.Bounds().Width())
+	}
+	labels := map[string]bool{}
+	for _, child := range center.Children() {
+		tab, ok := child.(*tabWidget)
+		if !ok {
+			continue
+		}
+		labels[tab.cfg.label] = true
+	}
+	for _, want := range []string{"Inventory", "Storage", "All", "Favorites"} {
+		if !labels[want] {
+			t.Fatalf("middle column missing %s", want)
+		}
+	}
+}
+
+func TestClosedOpinionatedSearchDoesNotBlockShortcuts(t *testing.T) {
+	window := &InventoryBagWindow{opinionated: true, searchArmed: true}
+	if window.KeyboardShortcutsBlocked() {
+		t.Fatal("a closed bag blocked the inventory hotkeys")
 	}
 }

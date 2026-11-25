@@ -144,3 +144,14 @@ func TestBasicInfoShortcut(t *testing.T) {
 		t.Fatal("Alt+V did not change the basic-info layout")
 	}
 }
+
+func TestAltIOpensInventory(t *testing.T) {
+	ctx := chatShortcutTestContext(t)
+	ctx.Session.OpinionatedUI = true
+	m := &WorldMode{}
+	ctx.Input.SetKeyCode(gpucontext.KeyLeftAlt, true)
+	ctx.Input.SetKeyCode(gpucontext.KeyI, true)
+	if !m.PrepareTextInput(ctx, gpucontext.KeyI) || !m.toggleWindowFromInput(ctx) || !m.ui.inventoryBag.IsOpen() {
+		t.Fatal("alt+i did not open inventory")
+	}
+}

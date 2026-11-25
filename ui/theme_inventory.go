@@ -16,7 +16,7 @@ var (
 	inventoryBagSortW                    = 64
 	inventoryBagCell                     = 32
 	inventoryBagCols                     = 8
-	opinionatedBagCols                   = 10
+	opinionatedBagCols                   = 13
 	opinionatedSplitCols                 = 6
 	inventoryBagSplitFrame               = 4
 	inventoryBagSearchClear              = 16
@@ -117,35 +117,82 @@ func inventoryOpinionatedChromeH() int {
 }
 
 func opinionatedContentW() int {
-	width := opinionatedFrameW() - ROScrollbarGutter
+	width := opinionatedBagCols * inventoryBagCell
 	if width < 1 {
 		return 1
 	}
 	return width
 }
 
+func opinionatedMiddleW() int {
+	if inventoryBagCell < 1 {
+		return 1
+	}
+	return inventoryBagCell
+}
+
 func opinionatedFrameW() int {
-	return opinionatedSplitCols*inventoryBagCell*2 + opinionatedDividerW() + ROScrollbarGutter*2
+	return opinionatedSplitCols*inventoryBagCell*2 + opinionatedMiddleW() + ROScrollbarGutter*2
 }
 
 func opinionatedDividerW() int {
 	gap := inventoryBagSplitFrame
-	if gap < 1 {
+	if gap < 1 || gap >= opinionatedMiddleW() {
 		return 1
 	}
 	return gap
 }
 
-func opinionatedSideViewW() int {
-	remain := opinionatedFrameW() - opinionatedDividerW()
-	if remain < 2 {
+func opinionatedCenterItemH() int {
+	if inventoryBagTabH < 1 {
 		return 1
 	}
-	return remain / 2
+	return inventoryBagTabH
+}
+
+func opinionatedCenterStackH() int {
+	// Close, every source, every category, search, and sort.
+	count := 1 + 4 + len(opinionatedInventoryTabs) + 2
+	height := count * opinionatedCenterItemH()
+	if height < 1 {
+		return 1
+	}
+	return height
+}
+
+func opinionatedCenterSearchY(sources int) int {
+	if sources < 1 {
+		sources = 1
+	}
+	return opinionatedCenterItemH() * (1 + sources + len(opinionatedInventoryTabs))
+}
+
+func opinionatedBodyH() int {
+	stack := opinionatedCenterStackH()
+	chrome := inventoryBagViewH + inventoryOpinionatedChromeH()
+	if stack > chrome {
+		return stack
+	}
+	return chrome
+}
+
+func opinionatedPaneH(split bool) int {
+	if split {
+		return opinionatedBodyH()
+	}
+	height := opinionatedBodyH() - inventoryOpinionatedChromeH()
+	if height < inventoryBagViewH {
+		return inventoryBagViewH
+	}
+	return height
+}
+
+func opinionatedSideViewW() int {
+	return opinionatedSplitCols*inventoryBagCell + ROScrollbarGutter
 }
 
 func opinionatedSideViewWRight() int {
-	return opinionatedFrameW() - opinionatedDividerW() - opinionatedSideViewW()
+	return opinionatedSideViewW()
 }
 
 func opinionatedEqualTabWidth(index, count int) int {
@@ -164,7 +211,7 @@ func opinionatedEqualTabWidth(index, count int) int {
 }
 
 func opinionatedSplitContentW() int {
-	width := opinionatedSideViewW() - ROScrollbarGutter
+	width := opinionatedSplitCols * inventoryBagCell
 	if width < 1 {
 		return 1
 	}
@@ -172,11 +219,7 @@ func opinionatedSplitContentW() int {
 }
 
 func opinionatedSplitContentWRight() int {
-	width := opinionatedSideViewWRight() - ROScrollbarGutter
-	if width < 1 {
-		return 1
-	}
-	return width
+	return opinionatedSplitContentW()
 }
 
 func opinionatedScrollW(contentW int) int {
@@ -189,7 +232,7 @@ func opinionatedWidthBounded(width float32) bool {
 
 func inventoryBagFrameSize(opinionated bool) (int, int) {
 	if opinionated {
-		return opinionatedFrameW(), inventoryBagViewH + inventoryOpinionatedChromeH()
+		return opinionatedFrameW(), opinionatedBodyH()
 	}
 	return inventoryBagWidth, inventoryBagHeight
 }

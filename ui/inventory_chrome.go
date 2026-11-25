@@ -133,13 +133,27 @@ func (w *InventoryBagWindow) syncOpinionatedDrag() {
 	if scale <= 0 {
 		scale = 1
 	}
+	w.titleHeight = 0
+	if w.opinionatedSplit() {
+		slot := float32(opinionatedCenterItemH()) * scale
+		sources := w.centerSources
+		if sources < 1 {
+			sources = 1
+		}
+		w.dragBounds = geometry.NewRect(
+			float32(opinionatedSideViewW())*scale,
+			slot,
+			float32(opinionatedMiddleW())*scale,
+			float32(sources)*slot,
+		)
+		return
+	}
 	rowH := float32(inventoryBagFilterH) * scale
 	closeW := float32(inventoryBagFilterH) * scale
 	width := float32(w.width) - closeW
 	if width < rowH {
 		width = rowH
 	}
-	w.titleHeight = 0
 	w.dragBounds = geometry.NewRect(0, 0, width, rowH)
 }
 
@@ -164,6 +178,19 @@ func (w *InventoryBagWindow) pointInSearchBar(x, y int) bool {
 	scale := w.elementScale()
 	if scale <= 0 {
 		scale = 1
+	}
+	if w.opinionatedSplit() {
+		sources := w.centerSources
+		if sources < 1 {
+			sources = 1
+		}
+		return pointInRect(
+			x, y,
+			w.x+scaleInt(opinionatedSideViewW(), scale),
+			w.y+scaleInt(opinionatedCenterSearchY(sources), scale),
+			scaleInt(opinionatedMiddleW(), scale),
+			scaleInt(opinionatedCenterItemH(), scale),
+		)
 	}
 	top := w.y + scaleInt(inventoryBagFilterH*2, scale)
 	height := scaleInt(inventorySearchRowH(), scale)

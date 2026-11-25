@@ -158,21 +158,21 @@ func (w *InventoryBagWindow) opinionatedPaneAt(mx, my int) int {
 	if scale <= 0 {
 		scale = 1
 	}
-	top := w.y + scaleInt(inventoryOpinionatedChromeH(), scale)
-	height := scaleInt(inventoryBagViewH, scale)
+	top := w.y
+	height := scaleInt(opinionatedBodyH(), scale)
 	if my < top || my >= top+height {
 		return -1
 	}
 	relX := mx - w.x
 	left := scaleInt(opinionatedSideViewW(), scale)
-	divider := scaleInt(opinionatedDividerW(), scale)
+	middle := scaleInt(opinionatedMiddleW(), scale)
 	if relX < 0 || relX >= scaleInt(opinionatedFrameW(), scale) {
 		return -1
 	}
 	if relX < left {
 		return opinionatedPaneBag
 	}
-	if relX < left+divider {
+	if relX < left+middle {
 		return -1
 	}
 	return opinionatedPaneOther

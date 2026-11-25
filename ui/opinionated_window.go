@@ -7,12 +7,22 @@ import (
 	"github.com/gogpu/ui/state"
 	"github.com/gogpu/ui/widget"
 	"github.com/kivutar/goro/session"
-	"github.com/kivutar/goro/ui/rotheme"
 )
 
 func (w *InventoryBagWindow) opinionatedWindow(ctx Context, itemInfo *ItemWindows) widget.Widget {
 	w.normalizeOpinionatedSource(ctx)
 	width, height := inventoryBagFrameSize(true)
+	var content widget.Widget
+	if w.opinionatedSplit() {
+		content = w.opinionatedPanes(ctx, itemInfo)
+	} else {
+		content = primitives.Box(
+			w.opinionatedTabRow(ctx),
+			w.filterRows(ctx),
+			w.searchRow(ctx),
+			w.opinionatedPanes(ctx, itemInfo),
+		).Gap(0)
+	}
 	w.syncOpinionatedDrag()
 	return Win(
 		TitleBar(false),
@@ -21,17 +31,13 @@ func (w *InventoryBagWindow) opinionatedWindow(ctx Context, itemInfo *ItemWindow
 			w.closeFromChrome(ctx)
 		}),
 		Size(float32(width), float32(height)),
-		Content(primitives.Box(
-			w.opinionatedTabRow(ctx),
-			w.filterRows(ctx),
-			w.searchRow(ctx),
-			w.opinionatedPanes(ctx, itemInfo),
-		).Gap(0)),
+		Content(content),
 	)
 }
 
 func (w *InventoryBagWindow) closeFromChrome(ctx Context) {
 	w.amountPrompt.Close(ctx)
+	w.disarmSearch()
 	w.Window.Close()
 	w.Publish(ctx)
 }
@@ -77,10 +83,7 @@ func (w *InventoryBagWindow) opinionatedPanes(ctx Context, itemInfo *ItemWindows
 	}
 	return primitives.HBox(
 		w.opinionatedScroll(ctx, itemInfo, w.bagItems(ctx.Session), opinionatedSplitCols, opinionatedSplitContentW(), opinionatedPaneBag, w.ensureScrollSignal()),
-		primitives.Box().
-			Width(float32(opinionatedDividerW())).
-			Height(float32(inventoryBagViewH)).
-			Background(rotheme.Default.Colors.WindowBorder),
+		w.opinionatedCenterColumn(ctx),
 		w.opinionatedScroll(ctx, itemInfo, w.tabItems(ctx.Session), opinionatedSplitCols, opinionatedSplitContentWRight(), opinionatedPaneOther, w.ensureSideScrollSignal()),
 	).Gap(0)
 }
@@ -122,7 +125,7 @@ func (w *InventoryBagWindow) opinionatedScroll(ctx Context, itemInfo *ItemWindow
 	if pane == opinionatedPaneBag && !w.opinionatedSplit() {
 		width = opinionatedScrollW(opinionatedContentW())
 	}
-	return primitives.Box(scrollBox).Width(float32(width)).Height(float32(inventoryBagViewH))
+	return primitives.Box(scrollBox).Width(float32(width)).Height(float32(opinionatedPaneH(w.opinionatedSplit())))
 }
 
 func (w *InventoryBagWindow) ensureSideScrollSignal() state.Signal[float32] {

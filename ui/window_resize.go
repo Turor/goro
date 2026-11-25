@@ -55,7 +55,9 @@ func (w *Window) resizeHit(x, y int) bool {
 		return false
 	}
 	localX, localY := x-w.x, y-w.y
-	return localX >= w.width-grip && localX < w.width && localY >= w.height-grip && localY < w.height
+	fromRight := w.width - localX
+	fromBottom := w.height - localY
+	return fromRight > 0 && fromBottom > 0 && fromRight+fromBottom <= grip
 }
 
 func (w *Window) resizeTo(ctx client.Context, width, height int) {
@@ -153,10 +155,21 @@ func drawWindowResizeGrip(canvas widget.Canvas, width, height int) {
 	if grip <= 0 || width < 1 || height < 1 {
 		return
 	}
-	canvas.DrawRect(
-		geometry.NewRect(float32(width)-grip, float32(height)-grip, grip, grip),
-		rotheme.Default.Colors.ButtonBorder,
-	)
+	row := windowBorderWidth
+	if row <= 0 {
+		row = grip
+	}
+	color := rotheme.Default.Colors.ButtonBorder
+	y := float32(height) - grip
+	bottom := float32(height)
+	for y < bottom {
+		span := bottom - y
+		if span > grip {
+			span = grip
+		}
+		canvas.DrawRect(geometry.NewRect(float32(width)-span, y, span, row), color)
+		y += row
+	}
 }
 
 func (w *Window) resizeDesign() (int, int) {

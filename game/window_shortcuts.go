@@ -9,7 +9,7 @@ import (
 
 // Like the other shortcuts, these use physical keys, not typed characters.
 var windowShortcutKeys = [...]input.KeyCode{
-	gpucontext.KeyE, gpucontext.KeyQ, gpucontext.KeyS, gpucontext.KeyA,
+	gpucontext.KeyE, gpucontext.KeyI, gpucontext.KeyQ, gpucontext.KeyS, gpucontext.KeyA,
 	gpucontext.KeyZ, gpucontext.KeyH, gpucontext.KeyW, gpucontext.KeyC,
 	gpucontext.KeyV, gpucontext.KeyJ, gpucontext.KeyR, gpucontext.KeyO,
 	gpucontext.KeyP,
@@ -25,7 +25,7 @@ func (m *WorldMode) windowShortcutAllowed(ctx client.Context, code input.KeyCode
 			return false
 		}
 		switch code {
-		case gpucontext.KeyE, gpucontext.KeyQ, gpucontext.KeyS, gpucontext.KeyA,
+		case gpucontext.KeyE, gpucontext.KeyI, gpucontext.KeyQ, gpucontext.KeyS, gpucontext.KeyA,
 			gpucontext.KeyZ, gpucontext.KeyH, gpucontext.KeyW, gpucontext.KeyV:
 		case gpucontext.KeyC:
 			target = &m.ui.social.ChatRoomCreate.Window
@@ -54,7 +54,7 @@ func (m *WorldMode) toggleWindowFromInput(ctx client.Context) bool {
 		}
 		ctx.Input.ConsumeKeyCodePress(code)
 		switch code {
-		case gpucontext.KeyE:
+		case gpucontext.KeyE, gpucontext.KeyI:
 			m.ui.inventoryBag.Toggle(ctx)
 		case gpucontext.KeyQ:
 			m.ui.equipmentWindow.Toggle(ctx)

@@ -110,6 +110,7 @@ type InventoryBagWindow struct {
 	searchField   *textfield.Widget
 	searchBox     *inventorySearchBox
 	searchArmed   bool
+	centerSources int
 	bagGrid       *inventoryGridWidget
 	sideGrid      *inventoryGridWidget
 }
@@ -126,6 +127,7 @@ func (w *InventoryBagWindow) Toggle(ctx Context) {
 	if w.IsOpen() {
 		w.hideTooltip()
 		w.amountPrompt.Close(ctx)
+		w.disarmSearch()
 		w.Window.Close()
 		w.Publish(ctx)
 		return
@@ -289,7 +291,7 @@ func (w *InventoryBagWindow) sendDrop(ctx Context, item session.InventoryItem, r
 }
 
 func (w *InventoryBagWindow) KeyboardShortcutsBlocked() bool {
-	if w == nil {
+	if w == nil || !w.IsOpen() {
 		return false
 	}
 	if w.amountPrompt.IsOpen() {
@@ -299,6 +301,16 @@ func (w *InventoryBagWindow) KeyboardShortcutsBlocked() bool {
 		return true
 	}
 	return w.searchField != nil && w.searchField.IsFocused()
+}
+
+func (w *InventoryBagWindow) disarmSearch() {
+	if w == nil {
+		return
+	}
+	w.searchArmed = false
+	if w.searchField != nil {
+		w.searchField.SetFocused(false)
+	}
 }
 
 func (w *InventoryBagWindow) DrawTooltip(ctx Context, screen *render.Frame) {
