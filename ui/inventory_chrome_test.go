@@ -78,4 +78,7 @@ func TestOpinionatedSortButtonFitsTheSearchBar(t *testing.T) {
 	if row.search.Bounds().Width() >= width-float32(inventoryBagSortW)+1 {
 		t.Fatalf("search width %v did not shrink for the sort button", row.search.Bounds().Width())
 	}
+	if row.sort.Bounds().Max.X > width-float32(inventoryBagSearchInset)+1 {
+		t.Fatalf("sort button %v is flush with the row edge %v", row.sort.Bounds(), width)
+	}
 }

@@ -167,7 +167,7 @@ func (w *InventoryBagWindow) pointInSearchBar(x, y int) bool {
 	}
 	top := w.y + scaleInt(inventoryBagFilterH*2, scale)
 	height := scaleInt(inventorySearchRowH(), scale)
-	width := w.width - scaleInt(inventoryBagSortW, scale)
+	width := w.width - scaleInt(inventoryBagSortW, scale) - scaleInt(inventoryBagSearchInset, scale)
 	return pointInRect(x, y, w.x, top, width, height)
 }
 
@@ -225,10 +225,14 @@ func (r *opinionatedSearchRow) Layout(ctx widget.Context, constraints geometry.C
 	sortW := float32(inventoryBagSortW) * scale
 	barH := float32(inventoryBagSearchH) * scale
 	inset := float32(inventoryBagSearchInset) * scale
-	if sortW > width {
-		sortW = width
+	pad := inset
+	if sortW+pad > width {
+		pad = 0
+		if sortW > width {
+			sortW = width
+		}
 	}
-	searchW := width - sortW
+	searchW := width - sortW - pad
 	if r.search != nil {
 		r.search.Layout(ctx, geometry.Tight(geometry.Sz(searchW, height)))
 		var origin geometry.Point
