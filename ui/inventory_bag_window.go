@@ -97,6 +97,7 @@ type InventoryBagWindow struct {
 	pendingStore       session.InventoryItem
 	pendingStoreAmount uint32
 	pendingStoreSource int
+	storageReleaseSent bool
 	snapshot           string
 	itemInfo           *ItemWindows
 	lastClickItem      uint16
@@ -176,6 +177,7 @@ func (w *InventoryBagWindow) Update(ctx Context, shortcuts *ShortcutBar, storage
 // UpdatePresentation follows server changes even when another window consumes input.
 func (w *InventoryBagWindow) UpdatePresentation(ctx Context, itemInfo *ItemWindows) {
 	w.flushPendingStore(ctx)
+	w.releaseServerStorage(ctx)
 	if ctx.Resources != nil {
 		w.resources = ctx.Resources
 	}

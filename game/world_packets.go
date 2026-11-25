@@ -1228,7 +1228,11 @@ func (m *WorldMode) handleNetworkPacket(ctx client.Context, pkt network.Packet, 
 		return nil, false
 	}
 	if network.ParseStorageClosed(pkt) {
-		session.CloseStorage(ctx.Session)
+		if m.ui.inventoryBag.HidesClassicStorage() {
+			session.ReleaseOpenStorage(ctx.Session)
+		} else {
+			session.CloseStorage(ctx.Session)
+		}
 		m.ui.storageWindow.SetOpen(false)
 		m.ui.npc.StoragePassword.CloseFromServer(ctx)
 		return nil, false

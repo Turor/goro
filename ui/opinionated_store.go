@@ -40,6 +40,7 @@ func (w *InventoryBagWindow) requestSourceOpen(ctx Context, source int) {
 	if w == nil || ctx.Network == nil {
 		return
 	}
+	w.storageReleaseSent = false
 	switch source {
 	case opinionatedSourceStorage:
 		if ctx.Session != nil && ctx.Session.Storage.Open && !ctx.Session.GuildStorage.Open {
@@ -66,4 +67,22 @@ func (w *InventoryBagWindow) requestSourceOpen(ctx Context, source int) {
 			glog.Warnf("open guild storage failed: %v", err)
 		}
 	}
+}
+
+func (w *InventoryBagWindow) releaseServerStorage(ctx Context) {
+	if w == nil || !w.HidesClassicStorage() || w.pendingStoreAmount != 0 || ctx.Network == nil || ctx.Session == nil {
+		return
+	}
+	if !ctx.Session.Storage.Open && !ctx.Session.GuildStorage.Open {
+		w.storageReleaseSent = false
+		return
+	}
+	if w.storageReleaseSent {
+		return
+	}
+	if err := ctx.Network.SendCloseStorage(); err != nil {
+		glog.Warnf("release storage failed: %v", err)
+		return
+	}
+	w.storageReleaseSent = true
 }
