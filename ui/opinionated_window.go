@@ -12,17 +12,12 @@ import (
 func (w *InventoryBagWindow) opinionatedWindow(ctx Context, itemInfo *ItemWindows) widget.Widget {
 	w.normalizeOpinionatedSource(ctx)
 	width, height := inventoryBagFrameSize(true)
-	var content widget.Widget
-	if w.opinionatedSplit() {
-		content = w.opinionatedPanes(ctx, itemInfo)
-	} else {
-		content = primitives.Box(
-			w.opinionatedTabRow(ctx),
-			w.filterRows(ctx),
-			w.searchRow(ctx),
-			w.opinionatedPanes(ctx, itemInfo),
-		).Gap(0)
-	}
+	content := primitives.Box(
+		w.opinionatedTabRow(ctx),
+		w.filterRows(ctx),
+		w.searchRow(ctx),
+		w.opinionatedPanes(ctx, itemInfo),
+	).Gap(0)
 	w.syncOpinionatedDrag()
 	return Win(
 		TitleBar(false),
@@ -83,7 +78,7 @@ func (w *InventoryBagWindow) opinionatedPanes(ctx Context, itemInfo *ItemWindows
 	}
 	return primitives.HBox(
 		w.opinionatedScroll(ctx, itemInfo, w.bagItems(ctx.Session), opinionatedSplitCols, opinionatedSplitContentW(), opinionatedPaneBag, w.ensureScrollSignal()),
-		w.opinionatedCenterColumn(ctx),
+		newOpinionatedDividerColumn(),
 		w.opinionatedScroll(ctx, itemInfo, w.tabItems(ctx.Session), opinionatedSplitCols, opinionatedSplitContentWRight(), opinionatedPaneOther, w.ensureSideScrollSignal()),
 	).Gap(0)
 }

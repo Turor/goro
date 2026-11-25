@@ -126,46 +126,40 @@ func TestOpinionatedPaneHitUsesTheSplit(t *testing.T) {
 	width, height := inventoryBagFrameSize(true)
 	window.EnsureWindow(width, height)
 	window.x, window.y = 10, 20
-	if got := window.opinionatedPaneAt(window.x+4, window.y+4); got != opinionatedPaneBag {
+	bodyY := window.y + inventoryOpinionatedChromeH() + 4
+	if got := window.opinionatedPaneAt(window.x+4, bodyY); got != opinionatedPaneBag {
 		t.Fatalf("left pane = %d", got)
 	}
 	right := window.x + opinionatedSideViewW() + opinionatedMiddleW() + 4
-	if got := window.opinionatedPaneAt(right, window.y+4); got != opinionatedPaneOther {
+	if got := window.opinionatedPaneAt(right, bodyY); got != opinionatedPaneOther {
 		t.Fatalf("right pane = %d", got)
 	}
 	mid := window.x + opinionatedSideViewW() + 1
-	if got := window.opinionatedPaneAt(mid, window.y+4); got != -1 {
+	if got := window.opinionatedPaneAt(mid, bodyY); got != -1 {
 		t.Fatalf("middle column = %d, want no pane", got)
 	}
 }
 
-func TestOpinionatedSplitKeepsChromeInTheMiddleColumn(t *testing.T) {
+func TestOpinionatedSplitDividerSitsInTheMiddleColumn(t *testing.T) {
 	window := &InventoryBagWindow{source: opinionatedSourceStorage, opinionated: true}
 	panes := window.opinionatedPanes(Context{Session: &session.Session{OpinionatedUI: true}}, nil)
-	panes.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(float32(opinionatedFrameW()), float32(opinionatedBodyH()))))
+	panes.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(float32(opinionatedFrameW()), float32(inventoryBagViewH))))
 	children := panes.Children()
 	if len(children) != 3 {
 		t.Fatalf("split children = %d, want left, middle, right", len(children))
 	}
 	center, ok := children[1].(*opinionatedCenterColumn)
 	if !ok {
-		t.Fatalf("middle child = %T, want the center column", children[1])
+		t.Fatalf("middle child = %T, want the divider column", children[1])
 	}
 	if center.Bounds().Width() != float32(opinionatedMiddleW()) {
 		t.Fatalf("middle width %v, want one cell", center.Bounds().Width())
 	}
-	labels := map[string]bool{}
-	for _, child := range center.Children() {
-		tab, ok := child.(*tabWidget)
-		if !ok {
-			continue
-		}
-		labels[tab.cfg.label] = true
+	if len(center.Children()) != 0 {
+		t.Fatalf("middle column holds %d controls, want only the divider", len(center.Children()))
 	}
-	for _, want := range []string{"Inventory", "Storage", "All", "Favorites"} {
-		if !labels[want] {
-			t.Fatalf("middle column missing %s", want)
-		}
+	if opinionatedBodyH() != inventoryBagViewH+inventoryOpinionatedChromeH() {
+		t.Fatalf("window height %d stretched past the rows", opinionatedBodyH())
 	}
 }
 

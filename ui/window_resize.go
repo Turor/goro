@@ -160,14 +160,23 @@ func drawWindowResizeGrip(canvas widget.Canvas, width, height int) {
 		row = grip
 	}
 	color := rotheme.Default.Colors.ButtonBorder
-	y := float32(height) - grip
+	top := float32(height) - grip
 	bottom := float32(height)
+	right := float32(width)
+	y := top
 	for y < bottom {
-		span := bottom - y
+		remain := bottom - y
+		thick := row
+		if thick > remain {
+			thick = remain
+		}
+		span := y - top + thick
 		if span > grip {
 			span = grip
 		}
-		canvas.DrawRect(geometry.NewRect(float32(width)-span, y, span, row), color)
+		if span > 0 {
+			canvas.DrawRect(geometry.NewRect(right-span, y, span, thick), color)
+		}
 		y += row
 	}
 }

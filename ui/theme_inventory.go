@@ -168,23 +168,11 @@ func opinionatedCenterSearchY(sources int) int {
 }
 
 func opinionatedBodyH() int {
-	stack := opinionatedCenterStackH()
-	chrome := inventoryBagViewH + inventoryOpinionatedChromeH()
-	if stack > chrome {
-		return stack
-	}
-	return chrome
+	return inventoryBagViewH + inventoryOpinionatedChromeH()
 }
 
-func opinionatedPaneH(split bool) int {
-	if split {
-		return opinionatedBodyH()
-	}
-	height := opinionatedBodyH() - inventoryOpinionatedChromeH()
-	if height < inventoryBagViewH {
-		return inventoryBagViewH
-	}
-	return height
+func opinionatedPaneH(bool) int {
+	return inventoryBagViewH
 }
 
 func opinionatedSideViewW() int {
