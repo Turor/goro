@@ -244,8 +244,14 @@ func (w *InventoryBagWindow) tryOpinionatedTransfer(ctx Context, item session.In
 }
 
 func (w *InventoryBagWindow) requestTransfer(ctx Context, item session.InventoryItem, from, to int, whole bool) {
-	if from == to || !w.transferAllowed(ctx) {
+	if from == to {
 		return
+	}
+	if !w.transferAllowed(ctx) {
+		if from != opinionatedPaneBag || to != opinionatedPaneOther || !w.storageSource() {
+			return
+		}
+		w.requestSourceOpen(ctx, w.source)
 	}
 	amount, prompt := opinionatedPromptAmount(item)
 	if whole || !prompt {
@@ -292,6 +298,10 @@ func (w *InventoryBagWindow) sendTransfer(ctx Context, item session.InventoryIte
 		return
 	}
 	if from == opinionatedPaneBag && to == opinionatedPaneOther {
+		if !opinionatedMoveAllowed(ctx, w.source) {
+			w.queueStore(item, amount)
+			return
+		}
 		opinionatedDepositAmount(ctx, w.source, item, uint32(amount))
 	}
 }

@@ -84,35 +84,38 @@ const opinionatedBagTabFavorite = opinionatedBagTabCard + 1
 
 type InventoryBagWindow struct {
 	Window
-	layoutGen     uint64
-	tab           int
-	opinionated   bool
-	search        string
-	sort          int
-	source        int
-	resources     *res.Manager
-	scrollY       state.Signal[float32]
-	scrollYSide   state.Signal[float32]
-	dragPane      int
-	snapshot      string
-	itemInfo      *ItemWindows
-	lastClickItem uint16
-	lastClickAt   time.Time
-	dragItem      session.InventoryItem
-	dragActive    bool
-	dragFrom      time.Time
-	amountPrompt  amountPrompt
-	pendingCard   uint16
-	tooltip       tooltipState
-	icons         map[inventoryBagIconKey]image.Image
-	iconMiss      map[inventoryBagIconKey]struct{}
-	searchCtx     Context
-	searchField   *textfield.Widget
-	searchBox     *inventorySearchBox
-	searchArmed   bool
-	centerSources int
-	bagGrid       *inventoryGridWidget
-	sideGrid      *inventoryGridWidget
+	layoutGen          uint64
+	tab                int
+	opinionated        bool
+	search             string
+	sort               int
+	source             int
+	resources          *res.Manager
+	scrollY            state.Signal[float32]
+	scrollYSide        state.Signal[float32]
+	dragPane           int
+	pendingStore       session.InventoryItem
+	pendingStoreAmount uint32
+	pendingStoreSource int
+	snapshot           string
+	itemInfo           *ItemWindows
+	lastClickItem      uint16
+	lastClickAt        time.Time
+	dragItem           session.InventoryItem
+	dragActive         bool
+	dragFrom           time.Time
+	amountPrompt       amountPrompt
+	pendingCard        uint16
+	tooltip            tooltipState
+	icons              map[inventoryBagIconKey]image.Image
+	iconMiss           map[inventoryBagIconKey]struct{}
+	searchCtx          Context
+	searchField        *textfield.Widget
+	searchBox          *inventorySearchBox
+	searchArmed        bool
+	centerSources      int
+	bagGrid            *inventoryGridWidget
+	sideGrid           *inventoryGridWidget
 }
 
 type inventoryBagIconKey struct {
@@ -172,6 +175,7 @@ func (w *InventoryBagWindow) Update(ctx Context, shortcuts *ShortcutBar, storage
 
 // UpdatePresentation follows server changes even when another window consumes input.
 func (w *InventoryBagWindow) UpdatePresentation(ctx Context, itemInfo *ItemWindows) {
+	w.flushPendingStore(ctx)
 	if ctx.Resources != nil {
 		w.resources = ctx.Resources
 	}
@@ -243,10 +247,10 @@ func (w *InventoryBagWindow) UpdateDrag(ctx Context, shortcuts *ShortcutBar, sto
 		if shortcuts != nil && shortcuts.AcceptItemDrop(ctx, item, ctx.Input.MouseX, ctx.Input.MouseY) {
 			return true
 		}
-		if manager, ok := ctx.UIManager.(interface{ PointerBlocked(int, int) bool }); ok && manager.PointerBlocked(ctx.Input.MouseX, ctx.Input.MouseY) {
+		if w.tryOpinionatedTransfer(ctx, item, ctx.Input.MouseX, ctx.Input.MouseY) {
 			return true
 		}
-		if w.tryOpinionatedTransfer(ctx, item, ctx.Input.MouseX, ctx.Input.MouseY) {
+		if manager, ok := ctx.UIManager.(interface{ PointerBlocked(int, int) bool }); ok && manager.PointerBlocked(ctx.Input.MouseX, ctx.Input.MouseY) {
 			return true
 		}
 		if !w.pointInside(ctx.Input.MouseX, ctx.Input.MouseY) {

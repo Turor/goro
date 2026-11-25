@@ -65,6 +65,7 @@ func (w *InventoryBagWindow) sourceTabs(ctx Context) widget.Widget {
 				w.source = source.source
 				w.ensureScrollSignal().Set(0)
 				w.ensureSideScrollSignal().Set(0)
+				w.requestSourceOpen(ctx, source.source)
 				w.refresh(ctx, w.itemInfo)
 			},
 		}))
