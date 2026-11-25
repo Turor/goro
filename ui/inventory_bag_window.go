@@ -108,6 +108,8 @@ type InventoryBagWindow struct {
 	iconMiss      map[inventoryBagIconKey]struct{}
 	searchCtx     Context
 	searchField   *textfield.Widget
+	searchBox     *inventorySearchBox
+	searchArmed   bool
 	bagGrid       *inventoryGridWidget
 	sideGrid      *inventoryGridWidget
 }
@@ -149,7 +151,14 @@ func (w *InventoryBagWindow) Update(ctx Context, shortcuts *ShortcutBar, storage
 	if w.UpdateDrag(ctx, shortcuts, storage, cart, trade, equipment, dropTargets...) {
 		return true
 	}
+	if w.opinionated {
+		w.syncOpinionatedDrag()
+		w.syncSearchPointer(ctx)
+	}
 	consumed := w.Window.Update(ctx)
+	if w.opinionated {
+		w.syncSearchTyping(ctx)
+	}
 	if !w.IsOpen() {
 		w.hideTooltip()
 		w.Publish(ctx)
@@ -284,6 +293,9 @@ func (w *InventoryBagWindow) KeyboardShortcutsBlocked() bool {
 		return false
 	}
 	if w.amountPrompt.IsOpen() {
+		return true
+	}
+	if w.searchArmed {
 		return true
 	}
 	return w.searchField != nil && w.searchField.IsFocused()
@@ -464,7 +476,12 @@ func (w *InventoryBagWindow) depositSelected(ctx Context, dest int) {
 
 func (w *InventoryBagWindow) searchRow(ctx Context) widget.Widget {
 	w.searchCtx = ctx
-	return newInventorySearchBox(w)
+	box := newInventorySearchBox(w)
+	w.searchBox = box
+	return primitives.HBox(
+		primitives.Expanded(box),
+		newOpinionatedSortBox(w, ctx),
+	).Gap(0)
 }
 
 func opinionatedMoveAmount(item session.InventoryItem) uint32 {
@@ -997,15 +1014,23 @@ func (w *inventoryGridWidget) setItems(items []session.InventoryItem, icons []im
 }
 
 func (w *inventoryGridWidget) Layout(ctx widget.Context, constraints geometry.Constraints) geometry.Size {
-	cell := float32(w.cellSize()) * rotheme.ContentScale()
-	width := float32(w.viewWidth()) * rotheme.ContentScale()
-	if w.cfg.fillWidth && opinionatedWidthBounded(constraints.MaxWidth) {
+	scale := rotheme.ContentScale()
+	if scale <= 0 {
+		scale = 1
+	}
+	cell := float32(w.cellSize()) * scale
+	width := float32(w.viewWidth()) * scale
+	if w.cfg.grid {
+		width = float32(w.cols()) * cell
+	} else if w.cfg.fillWidth && opinionatedWidthBounded(constraints.MaxWidth) {
 		width = constraints.MaxWidth
 	}
-	if cols := w.cols(); cols > 0 && width > 0 {
-		fitted := width / float32(cols)
-		if w.cfg.fillWidth || (fitted > 0 && fitted < cell) {
-			cell = fitted
+	if !w.cfg.grid {
+		if cols := w.cols(); cols > 0 && width > 0 {
+			fitted := width / float32(cols)
+			if w.cfg.fillWidth || (fitted > 0 && fitted < cell) {
+				cell = fitted
+			}
 		}
 	}
 	pref := geometry.Sz(width, float32(w.totalRows())*cell)

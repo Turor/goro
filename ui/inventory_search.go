@@ -94,7 +94,7 @@ func (b *inventorySearchBox) Draw(ctx widget.Context, canvas widget.Canvas) {
 	}
 	field := b.fieldRect()
 	border := rotheme.Default.Colors.FooterLine
-	if b.field != nil && b.field.IsFocused() {
+	if b.window.searchArmed || (b.field != nil && b.field.IsFocused()) {
 		border = rotheme.Default.Colors.InputFocus
 	}
 	canvas.DrawRect(field, rotheme.Default.Colors.PanelBody)
@@ -106,7 +106,7 @@ func (b *inventorySearchBox) Draw(ctx widget.Context, canvas widget.Canvas) {
 		rotheme.DrawText(canvas, b.window.search, b.textRect(), rotheme.Default.Typography.TextSize, rotheme.Default.Colors.Text, false, widget.TextAlignLeft)
 		rotheme.DrawText(canvas, "x", b.clearRect(), rotheme.Default.Typography.TextSize, rotheme.Default.Colors.Text, false, widget.TextAlignCenter)
 	}
-	if b.field != nil && b.field.IsFocused() {
+	if b.window.searchArmed || (b.field != nil && b.field.IsFocused()) {
 		text := b.textRect()
 		caretX := text.Min.X
 		if b.window.search != "" {
@@ -187,7 +187,9 @@ func (b *inventorySearchBox) Event(ctx widget.Context, e event.Event) bool {
 		return true
 	}
 	if mouse.MouseType == event.MousePress && mouse.Button == event.ButtonLeft {
+		b.window.searchArmed = true
 		ctx.RequestFocus(b.field)
+		b.field.SetFocused(true)
 	}
 	return b.field.Event(ctx, e)
 }
