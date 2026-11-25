@@ -984,7 +984,11 @@ func (m *WorldMode) Update(ctx client.Context) (Mode, error) {
 	if m.ui.social.MailWindow.Update(ctx, &m.ui.itemWindows) {
 		return nil, nil
 	}
-	if m.ui.inventoryBag.Update(ctx, &m.ui.shortcutBar, &m.ui.storageWindow, &m.ui.cartWindow, &m.ui.social.TradeWindow, &m.ui.equipmentWindow, &m.ui.itemWindows, &m.ui.social.MailWindow) {
+	inventoryConsumed := m.ui.inventoryBag.Update(ctx, &m.ui.shortcutBar, &m.ui.storageWindow, &m.ui.cartWindow, &m.ui.social.TradeWindow, &m.ui.equipmentWindow, &m.ui.itemWindows, &m.ui.social.MailWindow)
+	if m.ui.inventoryBag.HidesClassicStorage() {
+		m.ui.storageWindow.SetOpen(false)
+	}
+	if inventoryConsumed {
 		return nil, nil
 	}
 	if m.ui.social.TradeWindow.Update(ctx, &m.ui.itemWindows) {
