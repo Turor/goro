@@ -76,11 +76,11 @@ func (w *InventoryBagWindow) opinionatedPanes(ctx Context, itemInfo *ItemWindows
 	if !w.opinionatedSplit() {
 		return w.opinionatedScroll(ctx, itemInfo, w.tabItems(ctx.Session), opinionatedBagCols, opinionatedContentW(), opinionatedPaneBag, w.ensureScrollSignal())
 	}
-	return primitives.HBox(
+	return newOpinionatedSplitRow(
 		w.opinionatedScroll(ctx, itemInfo, w.bagItems(ctx.Session), opinionatedSplitCols, opinionatedSplitContentW(), opinionatedPaneBag, w.ensureScrollSignal()),
 		newOpinionatedDividerColumn(),
 		w.opinionatedScroll(ctx, itemInfo, w.tabItems(ctx.Session), opinionatedSplitCols, opinionatedSplitContentWRight(), opinionatedPaneOther, w.ensureSideScrollSignal()),
-	).Gap(0)
+	)
 }
 
 func (w *InventoryBagWindow) opinionatedScroll(ctx Context, itemInfo *ItemWindows, items []session.InventoryItem, cols, viewW, pane int, scroll state.Signal[float32]) widget.Widget {

@@ -132,7 +132,11 @@ func opinionatedMiddleW() int {
 }
 
 func opinionatedFrameW() int {
-	return opinionatedSplitCols*inventoryBagCell*2 + opinionatedMiddleW() + ROScrollbarGutter*2
+	return opinionatedContentW() + ROScrollbarGutter
+}
+
+func opinionatedRightGridX() int {
+	return (opinionatedBagCols - opinionatedSplitCols) * inventoryBagCell
 }
 
 func opinionatedDividerW() int {
@@ -141,6 +145,18 @@ func opinionatedDividerW() int {
 		return 1
 	}
 	return gap
+}
+
+func opinionatedDividerInset() int {
+	inset := ROScrollbarGutter
+	max := opinionatedMiddleW() - opinionatedDividerW()
+	if max < 1 {
+		return 0
+	}
+	if inset > max {
+		return max
+	}
+	return inset
 }
 
 func opinionatedCenterItemH() int {
@@ -176,7 +192,7 @@ func opinionatedPaneH(bool) int {
 }
 
 func opinionatedSideViewW() int {
-	return opinionatedSplitCols*inventoryBagCell + ROScrollbarGutter
+	return opinionatedSplitContentW()
 }
 
 func opinionatedSideViewWRight() int {

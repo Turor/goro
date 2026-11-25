@@ -25,8 +25,11 @@ func TestOpinionatedSplitIsSixAndSix(t *testing.T) {
 	if opinionatedDividerW() >= opinionatedMiddleW() {
 		t.Fatalf("divider %d fills the middle column %d", opinionatedDividerW(), opinionatedMiddleW())
 	}
-	if opinionatedSideViewW()+opinionatedSideViewWRight()+opinionatedMiddleW() != opinionatedFrameW() {
-		t.Fatalf("panes %d+%d middle %d frame %d", opinionatedSideViewW(), opinionatedSideViewWRight(), opinionatedMiddleW(), opinionatedFrameW())
+	if opinionatedRightGridX() != (opinionatedSplitCols+1)*inventoryBagCell {
+		t.Fatalf("right grid starts at %d, want the 8th inventory column", opinionatedRightGridX())
+	}
+	if opinionatedFrameW() != opinionatedContentW()+ROScrollbarGutter {
+		t.Fatalf("frame %d is not the 13-column grid plus one gutter", opinionatedFrameW())
 	}
 }
 
@@ -157,6 +160,10 @@ func TestOpinionatedSplitDividerSitsInTheMiddleColumn(t *testing.T) {
 	}
 	if len(center.Children()) != 0 {
 		t.Fatalf("middle column holds %d controls, want only the divider", len(center.Children()))
+	}
+	placed, ok := children[2].(interface{ Bounds() geometry.Rect })
+	if !ok || placed.Bounds().Min.X != float32(opinionatedRightGridX()) {
+		t.Fatalf("right grid did not stay on the inventory columns")
 	}
 	if opinionatedBodyH() != inventoryBagViewH+inventoryOpinionatedChromeH() {
 		t.Fatalf("window height %d stretched past the rows", opinionatedBodyH())

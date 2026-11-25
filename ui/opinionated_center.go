@@ -45,7 +45,13 @@ func (c *opinionatedCenterColumn) Draw(_ widget.Context, canvas widget.Canvas) {
 	if line > bounds.Width() {
 		line = bounds.Width()
 	}
-	x := (bounds.Width() - line) / 2
+	x := float32(opinionatedDividerInset()) * c.scale
+	if x+line > bounds.Width() {
+		x = bounds.Width() - line
+	}
+	if x < 0 {
+		x = 0
+	}
 	canvas.DrawRect(geometry.NewRect(bounds.Min.X+x, bounds.Min.Y, line, bounds.Height()), rotheme.Default.Colors.WindowBorder)
 }
 
