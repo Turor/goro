@@ -63,3 +63,19 @@ func TestOpinionatedSearchTypesWithoutTheField(t *testing.T) {
 		t.Fatalf("search = %q, want a", window.search)
 	}
 }
+
+func TestOpinionatedSortButtonFitsTheSearchBar(t *testing.T) {
+	window := &InventoryBagWindow{}
+	row := window.searchRow(Context{}).(*opinionatedSearchRow)
+	width := float32(opinionatedFrameW())
+	row.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(width, float32(inventorySearchRowH()))))
+	if row.sort.Bounds().Height() > row.search.fieldRect().Height() {
+		t.Fatalf("sort height %v is taller than the search bar %v", row.sort.Bounds().Height(), row.search.fieldRect().Height())
+	}
+	if row.search.Bounds().Max.X > row.sort.Bounds().Min.X {
+		t.Fatalf("search %v overlaps the sort button %v", row.search.Bounds(), row.sort.Bounds())
+	}
+	if row.search.Bounds().Width() >= width-float32(inventoryBagSortW)+1 {
+		t.Fatalf("search width %v did not shrink for the sort button", row.search.Bounds().Width())
+	}
+}

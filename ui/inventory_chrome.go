@@ -81,7 +81,7 @@ func (b *opinionatedSortBox) Layout(_ widget.Context, constraints geometry.Const
 	if scale <= 0 {
 		scale = 1
 	}
-	size := constraints.Constrain(geometry.Sz(float32(inventoryBagSortW)*scale, float32(inventorySearchRowH())*scale))
+	size := constraints.Constrain(geometry.Sz(float32(inventoryBagSortW)*scale, float32(inventoryBagSearchH)*scale))
 	b.SetBounds(geometry.FromPointSize(b.Position(), size))
 	return size
 }
@@ -197,4 +197,92 @@ func (w *InventoryBagWindow) syncSearchTyping(ctx Context) {
 	if w.searchBox != nil {
 		w.searchBox.SetNeedsRedraw(true)
 	}
+}
+
+type opinionatedSearchRow struct {
+	widget.WidgetBase
+	search *inventorySearchBox
+	sort   *opinionatedSortBox
+}
+
+func newOpinionatedSearchRow(search *inventorySearchBox, sort *opinionatedSortBox) *opinionatedSearchRow {
+	row := &opinionatedSearchRow{search: search, sort: sort}
+	row.SetVisible(true)
+	row.SetEnabled(true)
+	return row
+}
+
+func (r *opinionatedSearchRow) Layout(ctx widget.Context, constraints geometry.Constraints) geometry.Size {
+	scale := rotheme.ContentScale()
+	if scale <= 0 {
+		scale = 1
+	}
+	width := constraints.MaxWidth
+	if !opinionatedWidthBounded(width) {
+		width = float32(opinionatedFrameW()) * scale
+	}
+	height := float32(inventorySearchRowH()) * scale
+	sortW := float32(inventoryBagSortW) * scale
+	barH := float32(inventoryBagSearchH) * scale
+	inset := float32(inventoryBagSearchInset) * scale
+	if sortW > width {
+		sortW = width
+	}
+	searchW := width - sortW
+	if r.search != nil {
+		r.search.Layout(ctx, geometry.Tight(geometry.Sz(searchW, height)))
+		var origin geometry.Point
+		r.search.SetBounds(geometry.FromPointSize(origin, geometry.Sz(searchW, height)))
+	}
+	if r.sort != nil {
+		r.sort.Layout(ctx, geometry.Tight(geometry.Sz(sortW, barH)))
+		origin := geometry.Pt(searchW, inset)
+		r.sort.SetBounds(geometry.FromPointSize(origin, geometry.Sz(sortW, barH)))
+	}
+	size := constraints.Constrain(geometry.Sz(width, height))
+	r.SetBounds(geometry.FromPointSize(r.Position(), size))
+	return size
+}
+
+func (r *opinionatedSearchRow) Draw(ctx widget.Context, canvas widget.Canvas) {
+	if !r.IsVisible() {
+		return
+	}
+	bounds := r.Bounds()
+	canvas.PushTransform(bounds.Min)
+	if r.search != nil {
+		widget.DrawChild(r.search, ctx, canvas)
+	}
+	if r.sort != nil {
+		widget.DrawChild(r.sort, ctx, canvas)
+	}
+	canvas.PopTransform()
+}
+
+func (r *opinionatedSearchRow) Event(ctx widget.Context, e event.Event) bool {
+	mouse, ok := e.(*event.MouseEvent)
+	if !ok {
+		if r.search != nil {
+			return r.search.Event(ctx, e)
+		}
+		return false
+	}
+	if r.sort != nil && r.sort.Bounds().Contains(mouse.Position) {
+		return r.sort.Event(ctx, e)
+	}
+	if r.search != nil {
+		return r.search.Event(ctx, e)
+	}
+	return false
+}
+
+func (r *opinionatedSearchRow) Children() []widget.Widget {
+	children := make([]widget.Widget, 0, 2)
+	if r.search != nil {
+		children = append(children, r.search)
+	}
+	if r.sort != nil {
+		children = append(children, r.sort)
+	}
+	return children
 }

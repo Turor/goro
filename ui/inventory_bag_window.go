@@ -478,10 +478,7 @@ func (w *InventoryBagWindow) searchRow(ctx Context) widget.Widget {
 	w.searchCtx = ctx
 	box := newInventorySearchBox(w)
 	w.searchBox = box
-	return primitives.HBox(
-		primitives.Expanded(box),
-		newOpinionatedSortBox(w, ctx),
-	).Gap(0)
+	return newOpinionatedSearchRow(box, newOpinionatedSortBox(w, ctx))
 }
 
 func opinionatedMoveAmount(item session.InventoryItem) uint32 {
