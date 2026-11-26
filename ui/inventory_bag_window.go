@@ -121,6 +121,10 @@ type InventoryBagWindow struct {
 	centerSources         int
 	bagGrid               *inventoryGridWidget
 	sideGrid              *inventoryGridWidget
+	hoverInfo             *ItemInfoWindow
+	tabPressX             int
+	tabPressY             int
+	tabPressed            bool
 }
 
 type inventoryBagIconKey struct {
@@ -134,6 +138,7 @@ func (w *InventoryBagWindow) Toggle(ctx Context) {
 	w.EnsureWindow(width, height)
 	if w.IsOpen() {
 		w.hideTooltip()
+		w.hideItemHover(ctx)
 		w.amountPrompt.Close(ctx)
 		w.disarmSearch()
 		w.Window.Close()
@@ -164,8 +169,12 @@ func (w *InventoryBagWindow) Update(ctx Context, shortcuts *ShortcutBar, storage
 	if w.opinionated {
 		w.syncOpinionatedDrag()
 		w.syncSearchPointer(ctx)
+		w.noteTabPress(ctx)
 	}
 	consumed := w.Window.Update(ctx)
+	if w.updateItemHover(ctx) {
+		consumed = true
+	}
 	if w.opinionated {
 		w.syncSearchTyping(ctx)
 	}
@@ -185,7 +194,10 @@ func (w *InventoryBagWindow) UpdatePresentation(ctx Context, itemInfo *ItemWindo
 	if ctx.Resources != nil {
 		w.resources = ctx.Resources
 	}
-	width, height := inventoryBagFrameSize(inventoryOpinionatedSession(ctx.Session))
+	width, height := w.frameSize()
+	if !w.opinionated {
+		width, height = inventoryBagFrameSize(inventoryOpinionatedSession(ctx.Session))
+	}
 	w.EnsureWindow(width, height)
 	// SetContent releases the window's drag capture. Leave the snapshot stale
 	// until the drag ends so the next presentation update applies all changes.
@@ -193,7 +205,7 @@ func (w *InventoryBagWindow) UpdatePresentation(ctx Context, itemInfo *ItemWindo
 		return
 	}
 	w.syncStyle(ctx.Session)
-	width, height = inventoryBagFrameSize(w.opinionated)
+	width, height = w.frameSize()
 	w.ClampScroll(ctx.Session)
 	snapshot := w.inventorySnapshot(ctx.Session)
 	if gen := rotheme.Generation(); gen != w.layoutGen {
@@ -286,10 +298,12 @@ func (w *InventoryBagWindow) requestDrop(ctx Context, item session.InventoryItem
 	maxAmount := inventoryDropMaxAmount(item)
 	if inventoryItemTypeStackable(item.Type) && maxAmount > 1 {
 		w.amountPrompt.Open(ctx, "Enter amount to drop", maxAmount, maxAmount, func(amount uint16) {
+			w.showSubmittedAmount(item, opinionatedPaneBag, -1, amount)
 			w.sendDrop(ctx, item, amount)
 		})
 		return
 	}
+	w.showSubmittedAmount(item, opinionatedPaneBag, -1, 1)
 	w.sendDrop(ctx, item, 1)
 }
 

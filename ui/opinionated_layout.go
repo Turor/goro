@@ -13,6 +13,8 @@ import (
 const (
 	opinionatedPaneBag = iota
 	opinionatedPaneOther
+
+	opinionatedSplitFooterText = "Shift+right-click transfers to the other tab"
 )
 
 type opinionatedSourceTab struct {
@@ -225,9 +227,7 @@ func (w *InventoryBagWindow) opinionatedRightClick(ctx Context, itemInfo *ItemWi
 		w.requestTransfer(ctx, item, pane, other, true)
 		return
 	}
-	if itemInfo != nil {
-		itemInfo.openItem(ctx, item, mx, my)
-	}
+	w.pinItemHover(ctx, itemInfo, item, mx, my)
 }
 
 func (w *InventoryBagWindow) tryOpinionatedTransfer(ctx Context, item session.InventoryItem, mx, my int) bool {
@@ -256,10 +256,12 @@ func (w *InventoryBagWindow) requestTransfer(ctx Context, item session.Inventory
 	}
 	amount, prompt := opinionatedPromptAmount(item)
 	if whole || !prompt {
+		w.showSubmittedAmount(item, from, to, amount)
 		w.sendTransfer(ctx, item, from, to, amount)
 		return
 	}
 	w.amountPrompt.Open(ctx, "Enter amount to move", amount, amount, func(chosen uint16) {
+		w.showSubmittedAmount(item, from, to, chosen)
 		w.sendTransfer(ctx, item, from, to, chosen)
 	})
 }

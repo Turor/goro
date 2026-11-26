@@ -11,21 +11,24 @@ import (
 const verticalTabDividerW = 1
 
 type tabWidgetConfig struct {
-	label         string
-	labelRotation rotheme.TextRotation
-	active        bool
-	disabled      bool
-	width         int
-	height        int
-	omitBottom    bool
-	activeFill    widget.Color
-	onClick       func()
+	label          string
+	labelRotation  rotheme.TextRotation
+	active         bool
+	disabled       bool
+	width          int
+	height         int
+	omitBottom     bool
+	activeFill     widget.Color
+	onClick        func()
+	clickOnRelease bool
+	allowClick     func() bool
 }
 
 type tabWidget struct {
 	widget.WidgetBase
 	cfg     tabWidgetConfig
 	hovered bool
+	pressed bool
 }
 
 func newTabWidget(cfg tabWidgetConfig) *tabWidget {
@@ -103,13 +106,31 @@ func (w *tabWidget) Event(ctx widget.Context, e event.Event) bool {
 		return true
 	case event.MouseLeave:
 		w.hovered = false
+		w.pressed = false
 		ctx.SetCursor(widget.CursorDefault)
 		return false
 	case event.MousePress:
-		if mouse.Button == event.ButtonLeft && w.cfg.onClick != nil {
-			w.cfg.onClick()
+		if mouse.Button != event.ButtonLeft || w.cfg.onClick == nil {
 			return true
 		}
+		if w.cfg.clickOnRelease {
+			w.pressed = true
+			return true
+		}
+		w.cfg.onClick()
+		return true
+	case event.MouseRelease:
+		if !w.pressed || mouse.Button != event.ButtonLeft {
+			return true
+		}
+		w.pressed = false
+		if w.cfg.allowClick != nil && !w.cfg.allowClick() {
+			return true
+		}
+		if w.cfg.onClick != nil {
+			w.cfg.onClick()
+		}
+		return true
 	}
 	return true
 }

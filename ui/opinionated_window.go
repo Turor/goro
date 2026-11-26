@@ -11,7 +11,7 @@ import (
 
 func (w *InventoryBagWindow) opinionatedWindow(ctx Context, itemInfo *ItemWindows) widget.Widget {
 	w.normalizeOpinionatedSource(ctx)
-	width, height := inventoryBagFrameSize(true)
+	width, height := w.frameSize()
 	content := primitives.Box(
 		w.opinionatedTabRow(ctx),
 		w.filterRows(ctx),
@@ -19,7 +19,7 @@ func (w *InventoryBagWindow) opinionatedWindow(ctx Context, itemInfo *ItemWindow
 		w.opinionatedPanes(ctx, itemInfo),
 	).Gap(0)
 	w.syncOpinionatedDrag()
-	return Win(
+	options := []WindowOption{
 		TitleBar(false),
 		CloseButton(false),
 		OnClose(func() {
@@ -27,11 +27,16 @@ func (w *InventoryBagWindow) opinionatedWindow(ctx Context, itemInfo *ItemWindow
 		}),
 		Size(float32(width), float32(height)),
 		Content(content),
-	)
+	}
+	if w.opinionatedSplit() {
+		options = append(options, Footer(footerLabel(opinionatedSplitFooterText)))
+	}
+	return Win(options...)
 }
 
 func (w *InventoryBagWindow) closeFromChrome(ctx Context) {
 	w.amountPrompt.Close(ctx)
+	w.hideItemHover(ctx)
 	w.disarmSearch()
 	w.Window.Close()
 	w.Publish(ctx)
@@ -54,14 +59,17 @@ func (w *InventoryBagWindow) sourceTabs(ctx Context) widget.Widget {
 			active = i
 		}
 		tabs = append(tabs, newTabWidget(tabWidgetConfig{
-			label:      source.label,
-			active:     source.source == w.source,
-			width:      opinionatedEqualTabWidth(i, len(sources)),
-			height:     inventoryBagFilterH,
-			omitBottom: source.source == w.source,
-			activeFill: inventoryBagTabActive,
+			label:          source.label,
+			active:         source.source == w.source,
+			width:          opinionatedEqualTabWidth(i, len(sources)),
+			height:         inventoryBagFilterH,
+			omitBottom:     source.source == w.source,
+			activeFill:     inventoryBagTabActive,
+			clickOnRelease: true,
+			allowClick:     func() bool { return w.tabClickAllowed(ctx) },
 			onClick: func() {
 				w.hideTooltip()
+				w.hideItemHover(ctx)
 				w.source = source.source
 				w.ensureScrollSignal().Set(0)
 				w.ensureSideScrollSignal().Set(0)
@@ -96,8 +104,8 @@ func (w *InventoryBagWindow) opinionatedScroll(ctx Context, itemInfo *ItemWindow
 		onPress: func(item session.InventoryItem) {
 			w.startPaneDrag(ctx, item, pane)
 		},
-		onHover: func(item session.InventoryItem) { w.showTooltip(ctx, item) },
-		onLeave: func() { w.hideTooltip() },
+		onHover: func(item session.InventoryItem) { w.showItemHover(ctx, item) },
+		onLeave: func() { w.hideItemHover(ctx) },
 		onRightClickMods: func(item session.InventoryItem, mx, my int, mods event.Modifiers) {
 			w.opinionatedRightClick(ctx, itemInfo, item, mx, my, mods, pane)
 		},
