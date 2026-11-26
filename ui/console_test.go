@@ -456,6 +456,10 @@ func TestConsoleDragKeepsMessagesAndMovedInputBounds(t *testing.T) {
 	content := console.window.content
 	ctx.Input.SetMousePosition(x+100, y+60)
 	ctx.Input.SetMouseButton(input.MouseButtonLeft, true)
+	if !console.Update(ctx) {
+		t.Fatal("console message press was not consumed")
+	}
+	dragPastGrace(ctx.Input)
 	if !console.Update(ctx) || !app.WindowDragActive() {
 		t.Fatal("console message area did not start a captured drag")
 	}

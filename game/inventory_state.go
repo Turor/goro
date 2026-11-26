@@ -24,8 +24,20 @@ func applyStorageItemList(ctx client.Context, items []network.InventoryItem) {
 		return
 	}
 	ctx.Session.Storage.Open = !ctx.Session.Storage.PasswordPending
+	ctx.Session.GuildStorage.Open = false
 	for _, item := range items {
 		addOrReplaceSessionStorageItem(ctx.Session, sessionItemFromNetwork(item))
+	}
+}
+
+func applyGuildStorageItemList(ctx client.Context, items []network.InventoryItem) {
+	if ctx.Session == nil {
+		return
+	}
+	ctx.Session.GuildStorage.Open = true
+	ctx.Session.Storage.Open = false
+	for _, item := range items {
+		addOrReplaceSessionGuildStorageItem(ctx.Session, sessionItemFromNetwork(item))
 	}
 }
 
@@ -43,7 +55,11 @@ func applyStorageAmount(ctx client.Context, amount network.StorageAmount) {
 	if ctx.Session == nil {
 		return
 	}
-	ctx.Session.Storage.Open = !ctx.Session.Storage.PasswordPending
+	if ctx.Session.GuildStorage.Open {
+		ctx.Session.GuildStorage.Amount = int(amount.Amount)
+		ctx.Session.GuildStorage.MaxAmount = int(amount.MaxAmount)
+		return
+	}
 	ctx.Session.Storage.Amount = int(amount.Amount)
 	ctx.Session.Storage.MaxAmount = int(amount.MaxAmount)
 }
@@ -64,7 +80,13 @@ func applyStorageItemAdded(ctx client.Context, item network.InventoryItem) {
 	if ctx.Session == nil {
 		return
 	}
-	ctx.Session.Storage.Open = !ctx.Session.Storage.PasswordPending
+	if ctx.Session.GuildStorage.Open {
+		addOrReplaceSessionGuildStorageItem(ctx.Session, sessionItemFromNetwork(item))
+		return
+	}
+	if !ctx.Session.Storage.Open || ctx.Session.Storage.PasswordPending {
+		return
+	}
 	addOrReplaceSessionStorageItem(ctx.Session, sessionItemFromNetwork(item))
 }
 
@@ -77,6 +99,16 @@ func applyCartItemAdded(ctx client.Context, item network.InventoryItem) {
 }
 
 func applyStorageItemRemoved(ctx client.Context, item network.StorageItemRemoved) {
+	if ctx.Session == nil {
+		return
+	}
+	if ctx.Session.GuildStorage.Open {
+		removeSessionGuildStorageItem(ctx.Session, item.Index, int(item.Amount))
+		return
+	}
+	if !ctx.Session.Storage.Open {
+		return
+	}
 	removeSessionStorageItem(ctx.Session, item.Index, int(item.Amount))
 }
 
@@ -204,21 +236,35 @@ func addOrReplaceSessionInventoryItem(s *session.Session, item session.Inventory
 }
 
 func addOrReplaceSessionStorageItem(s *session.Session, item session.InventoryItem) {
-	if s == nil || item.Index == 0 {
+	if s == nil {
+		return
+	}
+	addOrReplaceStorageList(&s.Storage.Items, item)
+}
+
+func addOrReplaceSessionGuildStorageItem(s *session.Session, item session.InventoryItem) {
+	if s == nil {
+		return
+	}
+	addOrReplaceStorageList(&s.GuildStorage.Items, item)
+}
+
+func addOrReplaceStorageList(items *[]session.InventoryItem, item session.InventoryItem) {
+	if items == nil || item.Index == 0 {
 		return
 	}
 	normalizeSessionInventoryItem(&item)
 	if item.Amount <= 0 {
 		item.Amount = 1
 	}
-	for i := range s.Storage.Items {
-		if s.Storage.Items[i].Index != item.Index {
+	for i := range *items {
+		if (*items)[i].Index != item.Index {
 			continue
 		}
-		s.Storage.Items[i] = item
+		(*items)[i] = item
 		return
 	}
-	s.Storage.Items = append(s.Storage.Items, item)
+	*items = append(*items, item)
 }
 
 func addOrReplaceSessionCartItem(s *session.Session, item session.InventoryItem) {
@@ -421,21 +467,35 @@ func addPickedSessionInventoryItem(s *session.Session, item session.InventoryIte
 }
 
 func removeSessionStorageItem(s *session.Session, index uint16, amount int) {
-	if s == nil || index == 0 {
+	if s == nil {
+		return
+	}
+	removeStorageListItem(&s.Storage.Items, index, amount)
+}
+
+func removeSessionGuildStorageItem(s *session.Session, index uint16, amount int) {
+	if s == nil {
+		return
+	}
+	removeStorageListItem(&s.GuildStorage.Items, index, amount)
+}
+
+func removeStorageListItem(items *[]session.InventoryItem, index uint16, amount int) {
+	if items == nil || index == 0 {
 		return
 	}
 	if amount <= 0 {
 		amount = 1
 	}
-	for i := range s.Storage.Items {
-		if s.Storage.Items[i].Index != index {
+	for i := range *items {
+		if (*items)[i].Index != index {
 			continue
 		}
-		s.Storage.Items[i].Amount -= amount
-		if s.Storage.Items[i].Amount > 0 {
+		(*items)[i].Amount -= amount
+		if (*items)[i].Amount > 0 {
 			return
 		}
-		s.Storage.Items = append(s.Storage.Items[:i], s.Storage.Items[i+1:]...)
+		*items = append((*items)[:i], (*items)[i+1:]...)
 		return
 	}
 }
@@ -489,6 +549,18 @@ func applySwapEquipInfo(ctx client.Context, slots []network.SwapEquipSlot) {
 		item := &ctx.Session.Inventory.Items[i]
 		if pos, ok := byIndex[item.Index]; ok {
 			item.SwitchLocation = pos
+		}
+	}
+}
+
+func applyItemFavorite(ctx client.Context, favorite network.ItemFavorite) {
+	if ctx.Session == nil || favorite.Index == 0 {
+		return
+	}
+	for i := range ctx.Session.Inventory.Items {
+		if ctx.Session.Inventory.Items[i].Index == favorite.Index {
+			ctx.Session.Inventory.Items[i].Favorite = favorite.Favorite
+			return
 		}
 	}
 }

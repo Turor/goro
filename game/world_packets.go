@@ -62,6 +62,9 @@ func (m *WorldMode) handleNetworkPackets(ctx client.Context, now time.Time) (Mod
 // result stops the current frame when the packet changes modes or starts a map
 // transition.
 func (m *WorldMode) handleNetworkPacket(ctx client.Context, pkt network.Packet, now time.Time) (Mode, bool) {
+	if m.handleQuietStorage(ctx, pkt) {
+		return nil, false
+	}
 	if gm.HandlePacket(pkt, &m.ui.console) {
 		return nil, false
 	}
@@ -659,6 +662,11 @@ func (m *WorldMode) handleNetworkPacket(ctx client.Context, pkt network.Packet, 
 		glog.Errorf("parse inventory boundary 0x%04X: %v", pkt.ID, err)
 	} else if ok {
 		glog.Debugf("inventory list start=%t type=%d", boundary.Start, boundary.Type)
+		if boundary.Start && boundary.Type == network.InventoryTypeGuildStorage && ctx.Session != nil {
+			ctx.Session.GuildStorage.Items = nil
+			ctx.Session.GuildStorage.Open = true
+			ctx.Session.Storage.Open = false
+		}
 		return nil, false
 	}
 	if items, ok, err := network.ParseInventoryItemList(pkt); err != nil {
@@ -690,6 +698,12 @@ func (m *WorldMode) handleNetworkPacket(ctx client.Context, pkt network.Packet, 
 		m.ui.inventoryBag.ClampScroll(ctx.Session)
 		return nil, false
 	}
+	if favorite, ok, err := network.ParseItemFavorite(pkt); err != nil {
+		glog.Errorf("parse item favorite 0x%04X: %v", pkt.ID, err)
+	} else if ok {
+		applyItemFavorite(ctx, favorite)
+		return nil, false
+	}
 	if prompt, ok, err := network.ParseStoragePasswordPrompt(pkt); err != nil {
 		glog.Errorf("parse storage password prompt 0x%04X: %v", pkt.ID, err)
 	} else if ok {
@@ -705,11 +719,8 @@ func (m *WorldMode) handleNetworkPacket(ctx client.Context, pkt network.Packet, 
 	if guildItems, ok, err := network.ParseGuildStorageItemList(pkt); err != nil {
 		glog.Errorf("parse guild storage 0x%04X: %v", pkt.ID, err)
 	} else if ok {
-		applyStorageItemList(ctx, guildItems)
-		if ctx.Session != nil {
-			ctx.Session.Storage.Open = true
-		}
-		m.ui.storageWindow.OpenWindow(ctx)
+		applyGuildStorageItemList(ctx, guildItems)
+		m.presentClassicStorage(ctx)
 		return nil, false
 	}
 	if storageItems, ok, err := network.ParseStorageItemList(pkt); err != nil {
@@ -717,7 +728,7 @@ func (m *WorldMode) handleNetworkPacket(ctx client.Context, pkt network.Packet, 
 	} else if ok {
 		applyStorageItemList(ctx, storageItems)
 		if ctx.Session != nil && ctx.Session.Storage.Open {
-			m.ui.storageWindow.OpenWindow(ctx)
+			m.presentClassicStorage(ctx)
 		}
 		return nil, false
 	}
@@ -735,7 +746,7 @@ func (m *WorldMode) handleNetworkPacket(ctx client.Context, pkt network.Packet, 
 	} else if ok {
 		applyStorageAmount(ctx, storageAmount)
 		if ctx.Session != nil && ctx.Session.Storage.Open {
-			m.ui.storageWindow.OpenWindow(ctx)
+			m.presentClassicStorage(ctx)
 		}
 		return nil, false
 	}
@@ -1130,7 +1141,7 @@ func (m *WorldMode) handleNetworkPacket(ctx client.Context, pkt network.Packet, 
 	} else if ok {
 		applyStorageItemAdded(ctx, storageItem)
 		if ctx.Session != nil && ctx.Session.Storage.Open {
-			m.ui.storageWindow.OpenWindow(ctx)
+			m.presentClassicStorage(ctx)
 		}
 		m.ui.storageWindow.ClampScroll(ctx.Session)
 		m.ui.inventoryBag.ClampScroll(ctx.Session)
@@ -1220,7 +1231,11 @@ func (m *WorldMode) handleNetworkPacket(ctx client.Context, pkt network.Packet, 
 		return nil, false
 	}
 	if network.ParseStorageClosed(pkt) {
-		session.CloseStorage(ctx.Session)
+		if m.ui.inventoryBag.HidesClassicStorage() {
+			session.ReleaseOpenStorage(ctx.Session)
+		} else {
+			session.CloseStorage(ctx.Session)
+		}
 		m.ui.storageWindow.SetOpen(false)
 		m.ui.npc.StoragePassword.CloseFromServer(ctx)
 		return nil, false

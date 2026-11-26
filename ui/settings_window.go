@@ -348,6 +348,18 @@ func (w *SettingsWindow) gameplayTree(ctx client.Context) widget.Widget {
 		w.themeRow(ctx),
 
 		rotheme.Checkbox(
+			checkbox.Checked(settingsOpinionatedUI(ctx)),
+			checkbox.LabelOpt("Opinionated UI"),
+			checkbox.OnToggle(func(enabled bool) {
+				if ctx.Session != nil {
+					ctx.Session.OpinionatedUI = enabled
+				}
+				w.saveSettings(ctx)
+				w.refresh(ctx)
+			}),
+		),
+
+		rotheme.Checkbox(
 			checkbox.Checked(settingsNoShift(ctx)),
 			checkbox.LabelOpt("No Shift"),
 			checkbox.OnToggle(func(enabled bool) {
@@ -442,6 +454,7 @@ func (w *SettingsWindow) saveSettings(ctx client.Context) {
 		BGMVolume:        settingsVolumeBGM(ctx),
 		SFXVolume:        settingsVolumeSFX(ctx),
 		NoShift:          settingsNoShift(ctx),
+		OpinionatedUI:    settingsOpinionatedUI(ctx),
 		NoCtrl:           settingsNoCtrl(ctx),
 		LessEffects:      settingsLessEffects(ctx),
 		SnapTargets:      settingsSnapTargets(ctx),
@@ -523,6 +536,13 @@ func anisotropyLabel(level int) string {
 		return "Off"
 	}
 	return fmt.Sprintf("%dx", level)
+}
+
+func settingsOpinionatedUI(ctx client.Context) bool {
+	if ctx.Session != nil {
+		return ctx.Session.OpinionatedUI
+	}
+	return ctx.Config.Gameplay.OpinionatedUI
 }
 
 func settingsNoShift(ctx client.Context) bool {

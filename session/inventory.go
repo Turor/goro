@@ -42,3 +42,15 @@ func CloseStorage(s *Session) {
 	s.Storage.Amount = 0
 	s.Storage.MaxAmount = 0
 }
+
+// ReleaseOpenStorage clears the server-open flags without dropping the cached
+// lists. The opinionated bag uses that so a storage tab does not leave the
+// character stuck, while the pane still shows the last list.
+func ReleaseOpenStorage(s *Session) {
+	if s == nil {
+		return
+	}
+	s.Storage.Open = false
+	s.Storage.PasswordPending = false
+	s.GuildStorage.Open = false
+}

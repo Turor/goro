@@ -412,6 +412,10 @@ func TestShortcutBarDragPreservesPositionAndSlotInteractions(t *testing.T) {
 	}
 	ctx.Input.SetMousePosition(x+5, y+20)
 	ctx.Input.SetMouseButton(input.MouseButtonLeft, true)
+	if !bar.Update(ctx, actions) {
+		t.Fatal("shortcut grip press was not consumed")
+	}
+	dragPastGrace(ctx.Input)
 	if !bar.Update(ctx, actions) || !app.WindowDragActive() {
 		t.Fatal("shortcut grip did not start a captured drag")
 	}

@@ -96,6 +96,10 @@ func TestNPCWindowCutinCanBeDraggedByItsTitleBar(t *testing.T) {
 
 	inputState.SetMousePosition(startX+10, startY+10)
 	inputState.SetMouseButton(input.MouseButtonLeft, true)
+	if !cutin.Update(ctx) {
+		t.Fatal("windowed cut-in title press was not consumed")
+	}
+	dragPastGrace(inputState)
 	if !cutin.Update(ctx) || !cutin.window.dragging {
 		t.Fatal("windowed cut-in did not begin dragging from its title bar")
 	}

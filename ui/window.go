@@ -402,6 +402,9 @@ type Window struct {
 	looseDesignH  float32
 	looseTokens   map[widget.Widget]*scaleToken
 	dragging      bool
+	dragPending   bool
+	dragPressX    int
+	dragPressY    int
 	resizing      bool
 	resizeStartW  int
 	resizeStartH  int
@@ -449,6 +452,7 @@ func (w *Window) Close() {
 	w.setOpacity(1)
 	w.open = false
 	w.dragging = false
+	w.dragPending = false
 	w.content = nil
 	w.placed = nil
 	w.Publish(w.ctx)
@@ -657,6 +661,19 @@ func (w *Window) Update(ctx client.Context) bool {
 	}
 	w.ensurePosition(ctx)
 	screenW, screenH := ctx.ScreenSize()
+	if w.dragPending && !w.dragging {
+		if !ctx.Input.MousePressed(input.MouseButtonLeft) {
+			w.dragPending = false
+			return true
+		}
+		if pointerWithinDragGrace(w.dragPressX, w.dragPressY, ctx.Input.MouseX, ctx.Input.MouseY) {
+			return true
+		}
+		w.dragPending = false
+		w.dragging = true
+		w.userMoved = true
+		w.beginDragLayer(ctx)
+	}
 	if w.dragging {
 		if ctx.Input.MousePressed(input.MouseButtonLeft) {
 			x := clampWindowInt(ctx.Input.MouseX-w.dragDX, windowScreenMargin, maxInt(windowScreenMargin, screenW-w.width-windowScreenMargin))
@@ -701,11 +718,11 @@ func (w *Window) Update(ctx client.Context) bool {
 		if w.titleButtonHit(ctx.Input.MouseX, ctx.Input.MouseY) {
 			return true
 		}
-		w.dragging = true
-		w.userMoved = true
+		w.dragPending = true
+		w.dragPressX = ctx.Input.MouseX
+		w.dragPressY = ctx.Input.MouseY
 		w.dragDX = ctx.Input.MouseX - w.x
 		w.dragDY = ctx.Input.MouseY - w.y
-		w.beginDragLayer(ctx)
 		return true
 	}
 	return true
@@ -865,6 +882,20 @@ func (w *Window) keepOnScreen(ctx client.Context) {
 }
 
 func (w *Window) Dragging() bool { return w.dragging }
+
+// pointerWithinDragGrace reports whether the pointer is still inside the
+// distance that keeps a press a click. Past that distance the window drags.
+func pointerWithinDragGrace(x0, y0, x1, y1 int) bool {
+	dx := x1 - x0
+	if dx < 0 {
+		dx = -dx
+	}
+	dy := y1 - y0
+	if dy < 0 {
+		dy = -dy
+	}
+	return dx < windowDragSlop && dy < windowDragSlop
+}
 
 func (w *Window) SavedPosition() config.WindowPosition {
 	if !w.userMoved && !w.userSized {
@@ -1188,6 +1219,75 @@ func (w *positionedOverlay) Layout(ctx widget.Context, _ geometry.Constraints) g
 	return size
 }
 
+// deliverTopmostPointer gives a pointer event to the front-most widget that
+// covers the point and to no widget underneath it. A layout box that does not
+// handle the event itself still forwards to its own top child; a sibling
+// behind that child does not see the event even when the front child returns
+// false.
+func deliverTopmostPointer(ctx widget.Context, w widget.Widget, e event.Event) bool {
+	if w == nil {
+		return false
+	}
+	position, ok := pointerPosition(e)
+	if !ok {
+		return w.Event(ctx, e)
+	}
+	kids := w.Children()
+	if len(kids) == 0 {
+		return w.Event(ctx, e)
+	}
+	origin := geometry.Point{}
+	if bounds, ok := w.(interface{ Bounds() geometry.Rect }); ok {
+		origin = bounds.Bounds().Min
+	}
+	localPos := position.Sub(origin)
+	local := e
+	if localPos != position {
+		local = retargetPointer(e, localPos)
+	}
+	for i := len(kids) - 1; i >= 0; i-- {
+		child := kids[i]
+		if bw, ok := child.(interface{ Bounds() geometry.Rect }); ok && !bw.Bounds().Contains(localPos) {
+			continue
+		}
+		// A control handles its own click. Only a plain layout box is walked,
+		// so a button with a label child still receives the event.
+		if _, layout := child.(*primitives.BoxWidget); layout {
+			deliverTopmostPointer(ctx, child, local)
+			return true
+		}
+		child.Event(ctx, local)
+		return true
+	}
+	return w.Event(ctx, local)
+}
+
+func pointerPosition(e event.Event) (geometry.Point, bool) {
+	switch ev := e.(type) {
+	case *event.MouseEvent:
+		return ev.Position, true
+	case *event.WheelEvent:
+		return ev.Position, true
+	default:
+		return geometry.Point{}, false
+	}
+}
+
+func retargetPointer(e event.Event, position geometry.Point) event.Event {
+	switch ev := e.(type) {
+	case *event.MouseEvent:
+		local := *ev
+		local.Position = position
+		return &local
+	case *event.WheelEvent:
+		local := *ev
+		local.Position = position
+		return &local
+	default:
+		return e
+	}
+}
+
 func (w *positionedOverlay) Draw(ctx widget.Context, canvas widget.Canvas) {
 	defer w.clearDamage()
 	if !w.IsVisible() || w.hidden || w.child == nil {
@@ -1216,7 +1316,7 @@ func (w *positionedOverlay) Event(ctx widget.Context, e event.Event) bool {
 		}
 		local := *ev
 		local.Position = ev.Position.Sub(w.Bounds().Min)
-		w.child.Event(ctx, &local)
+		deliverTopmostPointer(ctx, w.child, &local)
 		return true
 	case *event.WheelEvent:
 		if !w.Bounds().Contains(ev.Position) {
@@ -1224,7 +1324,7 @@ func (w *positionedOverlay) Event(ctx widget.Context, e event.Event) bool {
 		}
 		local := *ev
 		local.Position = ev.Position.Sub(w.Bounds().Min)
-		w.child.Event(ctx, &local)
+		deliverTopmostPointer(ctx, w.child, &local)
 		return true
 	default:
 		return w.child.Event(ctx, e)

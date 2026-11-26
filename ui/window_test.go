@@ -285,6 +285,14 @@ func TestWindowDragReusesPublishedOverlay(t *testing.T) {
 	if !window.Update(ctx) {
 		t.Fatal("title press was not consumed")
 	}
+	if window.dragging || window.dragLayer || app.beginToken != nil {
+		t.Fatal("a press inside the drag grace started a window drag")
+	}
+	inputState.EndFrame()
+	inputState.SetMousePosition(20+windowDragSlop, 25)
+	if !window.Update(ctx) {
+		t.Fatal("travel past the drag grace was not consumed")
+	}
 	window.Publish(ctx)
 	if manager.overlays[0] != root {
 		t.Fatal("drag start replaced the published overlay")
@@ -292,6 +300,7 @@ func TestWindowDragReusesPublishedOverlay(t *testing.T) {
 	if app.beginToken != root {
 		t.Fatal("drag start did not capture the published overlay")
 	}
+	app.moves = nil
 	if app.beginRect != geometry.NewRect(10, 20, 100, 80) {
 		t.Fatalf("drag capture rect = %v, want x=10 y=20 w=100 h=80", app.beginRect)
 	}
@@ -395,6 +404,9 @@ func TestWindowCloseCancelsDragLayer(t *testing.T) {
 	inputState.SetMousePosition(20, 25)
 	inputState.SetMouseButton(input.MouseButtonLeft, true)
 	window.Update(ctx)
+	inputState.EndFrame()
+	inputState.SetMousePosition(20+windowDragSlop, 25)
+	window.Update(ctx)
 	window.Close()
 
 	if app.cancelToken != root {
@@ -426,6 +438,11 @@ func TestWindowDragContinuesAcrossEarlierUpdatedWindow(t *testing.T) {
 	inputState.SetMouseButton(input.MouseButtonLeft, true)
 	if !dragged.Update(ctx) {
 		t.Fatal("drag start was not consumed")
+	}
+	inputState.EndFrame()
+	inputState.SetMousePosition(20+windowDragSlop, 25)
+	if !dragged.Update(ctx) {
+		t.Fatal("travel past the drag grace did not start the drag")
 	}
 
 	inputState.EndFrame()
@@ -537,6 +554,12 @@ func (a *windowDragTestApp) CancelWindowDragLayer(token any) {
 	a.active = false
 }
 func (a *windowDragTestApp) WindowDragActive() bool { return a.active }
+
+func dragPastGrace(state *input.State) {
+	state.EndFrame()
+	state.SetMousePosition(state.MouseX+windowDragSlop, state.MouseY)
+	state.SetMouseButton(input.MouseButtonLeft, true)
+}
 
 type windowDragEventRecorder struct {
 	widget.WidgetBase

@@ -14,9 +14,9 @@ func TestSetSizeKeepsRememberedResize(t *testing.T) {
 	window := NewWindow(300, 200)
 	window.Open(ctx, Win(Title("Box"), Size(300, 200), Content(primitives.Box())))
 	window.Publish(ctx)
-	window.resizeTo(ctx, 340, 230)
+	window.resizeTo(ctx, 450, 300)
 	window.SetSize(100, 80)
-	if window.width != 340 || window.height != 230 {
+	if window.width != 450 || window.height != 300 {
 		t.Fatalf("SetSize clobbered size to %dx%d", window.width, window.height)
 	}
 	window.SetContent(Win(Title("Box"), Size(100, 80), Content(primitives.Box())))
@@ -26,8 +26,8 @@ func TestSetSizeKeepsRememberedResize(t *testing.T) {
 	}
 	frame.Layout(widget.NewContext(), geometry.Loose(geometry.Sz(800, 600)))
 	bounds := frame.Bounds()
-	if bounds.Width() != 340 || bounds.Height() != 230 {
-		t.Fatalf("frame = %.0fx%.0f, want 340x230", bounds.Width(), bounds.Height())
+	if bounds.Width() != 450 || bounds.Height() != 300 {
+		t.Fatalf("frame = %.0fx%.0f, want 450x300", bounds.Width(), bounds.Height())
 	}
 }
 
@@ -56,12 +56,12 @@ func TestUserSizeDoesNotLookLikeALayoutMismatch(t *testing.T) {
 	ctx := Context{Input: input.NewState(), UIManager: NewManager(), ScreenW: 1280, ScreenH: 720}
 	window := NewWindow(300, 200)
 	window.Open(ctx, Win(Title("Box"), Size(300, 200), Content(primitives.Box())))
-	window.resizeTo(ctx, 340, 230)
+	window.resizeTo(ctx, 450, 300)
 	if !window.holdsUserSize() {
 		t.Fatal("resized window does not hold its size")
 	}
 	window.SetSize(300, 200)
-	if window.width != 340 || window.height != 230 {
+	if window.width != 450 || window.height != 300 {
 		t.Fatalf("layout SetSize changed user size to %dx%d", window.width, window.height)
 	}
 }

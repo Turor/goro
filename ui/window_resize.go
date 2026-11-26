@@ -55,10 +55,16 @@ func (w *Window) resizeHit(x, y int) bool {
 		return false
 	}
 	localX, localY := x-w.x, y-w.y
-	return localX >= w.width-grip && localX < w.width && localY >= w.height-grip && localY < w.height
+	fromRight := w.width - localX
+	fromBottom := w.height - localY
+	return fromRight > 0 && fromBottom > 0 && fromRight+fromBottom <= grip
 }
 
 func (w *Window) resizeTo(ctx client.Context, width, height int) {
+	designW, designH := w.resizeDesign()
+	width, height = lockResizeAspect(designW, designH, width, height)
+	width, height = w.clampResize(ctx, width, height)
+	width, height = lockResizeAspect(designW, designH, width, height)
 	width, height = w.clampResize(ctx, width, height)
 	if width == w.width && height == w.height {
 		return
@@ -149,10 +155,62 @@ func drawWindowResizeGrip(canvas widget.Canvas, width, height int) {
 	if grip <= 0 || width < 1 || height < 1 {
 		return
 	}
-	canvas.DrawRect(
-		geometry.NewRect(float32(width)-grip, float32(height)-grip, grip, grip),
-		rotheme.Default.Colors.ButtonBorder,
-	)
+	row := windowBorderWidth
+	if row <= 0 {
+		row = grip
+	}
+	color := rotheme.Default.Colors.ButtonBorder
+	top := float32(height) - grip
+	bottom := float32(height)
+	right := float32(width)
+	y := top
+	for y < bottom {
+		remain := bottom - y
+		thick := row
+		if thick > remain {
+			thick = remain
+		}
+		span := y - top + thick
+		if span > grip {
+			span = grip
+		}
+		if span > 0 {
+			canvas.DrawRect(geometry.NewRect(right-span, y, span, thick), color)
+		}
+		y += row
+	}
+}
+
+func (w *Window) resizeDesign() (int, int) {
+	if frame, ok := w.content.(*windowFrame); ok && frame.designW > 0 && frame.designH > 0 {
+		return int(frame.designW), int(frame.designH)
+	}
+	if w.looseDesignW > 0 && w.looseDesignH > 0 {
+		return int(w.looseDesignW), int(w.looseDesignH)
+	}
+	return w.width, w.height
+}
+
+func lockResizeAspect(designW, designH, width, height int) (int, int) {
+	if designW <= 0 || designH <= 0 || width <= 0 || height <= 0 {
+		return width, height
+	}
+	deltaW := width - designW
+	if deltaW < 0 {
+		deltaW = -deltaW
+	}
+	deltaH := height - designH
+	if deltaH < 0 {
+		deltaH = -deltaH
+	}
+	scale := float32(width) / float32(designW)
+	if deltaH > deltaW {
+		scale = float32(height) / float32(designH)
+	}
+	if scale <= 0 {
+		return width, height
+	}
+	return int(float32(designW) * scale), int(float32(designH) * scale)
 }
 
 func frameScale(designW, designH, userW, userH float32) float32 {

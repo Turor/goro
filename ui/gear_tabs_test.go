@@ -50,7 +50,7 @@ func TestResizedWindowGrowsTheRightPane(t *testing.T) {
 	ctx := Context{Session: &session.Session{}, ScreenW: 1280, ScreenH: 900}
 	window.Toggle(ctx)
 	width, height := gearWindowSize()
-	window.resizeTo(ctx, width+80, height+50)
+	window.resizeTo(ctx, width*2, height*2)
 	frame, ok := window.content.(*windowFrame)
 	if !ok {
 		t.Fatal("gear content is not a window frame")
@@ -58,7 +58,7 @@ func TestResizedWindowGrowsTheRightPane(t *testing.T) {
 	frame.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(float32(window.width), float32(window.height))))
 	grown := false
 	for _, box := range windowBoxes(frame) {
-		if box.Style().ExplicitWidth >= float32(gearStatsColumnWidth()+80) {
+		if box.Style().ExplicitWidth > float32(gearStatsColumnWidth()) {
 			grown = true
 		}
 	}

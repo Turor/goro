@@ -71,6 +71,7 @@ var paletteRefs = map[string]string{
 	"item_labels.marker_fill":          "@highlight spin(-10.1) desaturate(11.8%) lighten(16.9%)",
 	"item_labels.outline":              "@shadow alpha(0.77)",
 	"item_labels.text":                 "@highlight spin(-9) lighten(29%)",
+	"inventory.tab_active":             "@accent",
 	"item_pickup.border":               "@accent spin(-1.4) saturate(7.4%) darken(9.4%) alpha(0.961)",
 	"item_pickup.fill":                 "@background alpha(0.96)",
 	"item_pickup.outline":              "@background alpha(0.96)",

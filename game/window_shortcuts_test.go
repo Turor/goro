@@ -144,3 +144,43 @@ func TestBasicInfoShortcut(t *testing.T) {
 		t.Fatal("Alt+V did not change the basic-info layout")
 	}
 }
+
+func TestAltIOpensInventory(t *testing.T) {
+	ctx := chatShortcutTestContext(t)
+	ctx.Session.OpinionatedUI = true
+	m := &WorldMode{}
+	ctx.Input.SetKeyCode(gpucontext.KeyLeftAlt, true)
+	ctx.Input.SetKeyCode(gpucontext.KeyI, true)
+	if !m.PrepareTextInput(ctx, gpucontext.KeyI) || !m.toggleWindowFromInput(ctx) || !m.ui.inventoryBag.IsOpen() {
+		t.Fatal("alt+i did not open inventory")
+	}
+}
+
+func TestSettingsOpenDoesNotBlockInventoryOrSkills(t *testing.T) {
+	ctx := chatShortcutTestContext(t)
+	m := &WorldMode{}
+	m.ui.settingsWindow.OpenWindow(ctx)
+	ctx.Input.SetKeyCode(gpucontext.KeyLeftAlt, true)
+	ctx.Input.SetKeyCode(gpucontext.KeyI, true)
+	if !m.PrepareTextInput(ctx, gpucontext.KeyI) || !m.toggleWindowFromInput(ctx) || !m.ui.inventoryBag.IsOpen() {
+		t.Fatal("alt+i did not open inventory while settings was open")
+	}
+	ctx.Input.SetKeyCode(gpucontext.KeyI, false)
+	ctx.Input.SetKeyCode(gpucontext.KeyS, true)
+	if !m.PrepareTextInput(ctx, gpucontext.KeyS) || !m.toggleWindowFromInput(ctx) || !m.ui.skillWindow.IsOpen() {
+		t.Fatal("alt+s did not open skills while settings was open")
+	}
+}
+
+func TestBasicMenuOpensWhileSettingsBlocksKeyboard(t *testing.T) {
+	ctx := chatShortcutTestContext(t)
+	m := &WorldMode{}
+	m.ui.settingsWindow.OpenWindow(ctx)
+	if !m.ui.keyboardInputBlocked(ctx) {
+		t.Fatal("open settings did not block keyboard")
+	}
+	m.ui.basicMenu.Update(ctx, m.basicMenuCallbacks(ctx))
+	if !m.ui.basicMenu.IsOpen() {
+		t.Fatal("basic menu stayed closed while settings blocked keyboard")
+	}
+}

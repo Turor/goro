@@ -11,19 +11,24 @@ import (
 const verticalTabDividerW = 1
 
 type tabWidgetConfig struct {
-	label         string
-	labelRotation rotheme.TextRotation
-	active        bool
-	disabled      bool
-	width         int
-	height        int
-	onClick       func()
+	label          string
+	labelRotation  rotheme.TextRotation
+	active         bool
+	disabled       bool
+	width          int
+	height         int
+	omitBottom     bool
+	activeFill     widget.Color
+	onClick        func()
+	clickOnRelease bool
+	allowClick     func() bool
 }
 
 type tabWidget struct {
 	widget.WidgetBase
 	cfg     tabWidgetConfig
 	hovered bool
+	pressed bool
 }
 
 func newTabWidget(cfg tabWidgetConfig) *tabWidget {
@@ -57,14 +62,31 @@ func (w *tabWidget) Draw(ctx widget.Context, canvas widget.Canvas) {
 	textColor := rotheme.Default.Colors.Text
 	if w.cfg.active {
 		fill = rotheme.Default.Colors.WindowBody
+		if w.cfg.activeFill.A > 0 {
+			fill = w.cfg.activeFill
+		}
 	} else if w.cfg.disabled {
 		textColor = rotheme.Default.Colors.MutedText
 	} else if w.hovered {
 		fill = rotheme.Default.Colors.ButtonHover
 	}
 	canvas.DrawRect(bounds, fill)
-	canvas.StrokeRect(bounds, rotheme.Default.Colors.WindowBorder, tabBorderW)
+	if w.cfg.omitBottom {
+		strokeTabOpenBottom(canvas, bounds, rotheme.Default.Colors.WindowBorder)
+	} else {
+		canvas.StrokeRect(bounds, rotheme.Default.Colors.WindowBorder, tabBorderW)
+	}
 	rotheme.DrawRotatedText(canvas, w.cfg.label, bounds, rotheme.Default.Typography.TextSize, textColor, false, w.cfg.labelRotation)
+}
+
+func strokeTabOpenBottom(canvas widget.Canvas, bounds geometry.Rect, color widget.Color) {
+	thick := tabBorderW
+	if thick <= 0 {
+		return
+	}
+	canvas.DrawRect(geometry.NewRect(bounds.Min.X, bounds.Min.Y, bounds.Width(), thick), color)
+	canvas.DrawRect(geometry.NewRect(bounds.Min.X, bounds.Min.Y, thick, bounds.Height()), color)
+	canvas.DrawRect(geometry.NewRect(bounds.Max.X-thick, bounds.Min.Y, thick, bounds.Height()), color)
 }
 
 func (w *tabWidget) Event(ctx widget.Context, e event.Event) bool {
@@ -84,13 +106,31 @@ func (w *tabWidget) Event(ctx widget.Context, e event.Event) bool {
 		return true
 	case event.MouseLeave:
 		w.hovered = false
+		w.pressed = false
 		ctx.SetCursor(widget.CursorDefault)
 		return false
 	case event.MousePress:
-		if mouse.Button == event.ButtonLeft && w.cfg.onClick != nil {
-			w.cfg.onClick()
+		if mouse.Button != event.ButtonLeft || w.cfg.onClick == nil {
 			return true
 		}
+		if w.cfg.clickOnRelease {
+			w.pressed = true
+			return true
+		}
+		w.cfg.onClick()
+		return true
+	case event.MouseRelease:
+		if !w.pressed || mouse.Button != event.ButtonLeft {
+			return true
+		}
+		w.pressed = false
+		if w.cfg.allowClick != nil && !w.cfg.allowClick() {
+			return true
+		}
+		if w.cfg.onClick != nil {
+			w.cfg.onClick()
+		}
+		return true
 	}
 	return true
 }

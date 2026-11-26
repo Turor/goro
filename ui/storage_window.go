@@ -339,23 +339,16 @@ func (w *StorageWindow) close(ctx Context) {
 	w.dragActive = false
 	if ctx.Session != nil {
 		ctx.Session.Storage.Open = false
+		ctx.Session.GuildStorage.Open = false
 	}
 }
 
 func (w *StorageWindow) withdraw(ctx Context, item session.InventoryItem) {
-	amount := uint32(item.Amount)
-	if amount == 0 {
-		amount = 1
+	source := opinionatedSourceStorage
+	if ctx.Session != nil && ctx.Session.GuildStorage.Open {
+		source = opinionatedSourceGuild
 	}
-	if ctx.Network == nil {
-		glog.Warnf("storage withdraw failed: not connected")
-		return
-	}
-	if err := ctx.Network.SendMoveFromStorage(item.Index, amount); err != nil {
-		glog.Warnf("storage withdraw failed: %v", err)
-		return
-	}
-	glog.Debugf("storage withdraw requested index=%d item=%d amount=%d", item.Index, item.ItemID, amount)
+	opinionatedWithdraw(ctx, source, item)
 }
 
 func (w *StorageWindow) ClampScroll(s *session.Session) {
@@ -419,7 +412,7 @@ func (w *StorageWindow) tabItemCount(s *session.Session) int {
 func (w *StorageWindow) updateCategoryCounts(s *session.Session) {
 	w.categoryCounts = [storageCategoryCount]int{}
 	if s != nil {
-		for _, item := range s.Storage.Items {
+		for _, item := range openStorage(s).Items {
 			w.categoryCounts[storageItemCategory(item)]++
 		}
 	}
@@ -490,10 +483,11 @@ func (w *StorageWindow) storageSnapshot(s *session.Session) uint64 {
 	if s == nil {
 		return 0
 	}
-	hash := storageSnapshotMix(storageSnapshotSeed, uint64(s.Storage.Amount))
-	hash = storageSnapshotMix(hash, uint64(s.Storage.MaxAmount))
-	hash = storageSnapshotMix(hash, uint64(len(s.Storage.Items)))
-	for _, item := range s.Storage.Items {
+	store := openStorage(s)
+	hash := storageSnapshotMix(storageSnapshotSeed, uint64(store.Amount))
+	hash = storageSnapshotMix(hash, uint64(store.MaxAmount))
+	hash = storageSnapshotMix(hash, uint64(len(store.Items)))
+	for _, item := range store.Items {
 		hash = storageSnapshotItem(hash, item)
 	}
 	return hash
@@ -602,11 +596,22 @@ func storageTableViewRowAt(mx, my, tableX, tableY, tableW, tableH, rowCount int,
 	return row, true
 }
 
+func openStorage(s *session.Session) session.Storage {
+	if s == nil {
+		return session.Storage{}
+	}
+	if s.GuildStorage.Open {
+		return s.GuildStorage
+	}
+	return s.Storage
+}
+
 func sortedStorageItems(s *session.Session) []session.InventoryItem {
-	if s == nil || len(s.Storage.Items) == 0 {
+	items := openStorage(s).Items
+	if len(items) == 0 {
 		return nil
 	}
-	items := append([]session.InventoryItem(nil), s.Storage.Items...)
+	items = append([]session.InventoryItem(nil), items...)
 	sort.SliceStable(items, func(i, j int) bool {
 		return items[i].Index < items[j].Index
 	})

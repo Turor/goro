@@ -32,6 +32,7 @@ const (
 	PacketCZMoveFromCart           uint16 = 0x0127
 	PacketCZMoveStorageToCart      uint16 = 0x0128
 	PacketCZMoveCartToStorage      uint16 = 0x0129
+	PacketCZItemFavorite           uint16 = 0x0907
 )
 
 const (
@@ -1809,4 +1810,41 @@ func (c *Client) SendShopBuyItems(items []BuyRequestItem) error {
 		glog.Warnf("send CZ_PC_PURCHASE_ITEMLIST failed opcode=0x%04X count=%d client_date=%d: %v", ID(packet), len(items), c.clientDate, err)
 	}
 	return err
+}
+
+func BuildItemFavoritePacket(index uint16, favorite bool) []byte {
+	packet := make([]byte, 5)
+	binary.LittleEndian.PutUint16(packet[0:2], PacketCZItemFavorite)
+	binary.LittleEndian.PutUint16(packet[2:4], index)
+	if !favorite {
+		packet[4] = 1
+	}
+	return packet
+}
+
+func (c *Client) SendItemFavorite(index uint16, favorite bool) error {
+	packet := BuildItemFavoritePacket(index, favorite)
+	err := c.Send(packet)
+	if err != nil {
+		glog.Warnf("send CZ_ITEM_FAVORITE failed opcode=0x%04X index=%d favorite=%t: %v", PacketCZItemFavorite, index, favorite, err)
+	}
+	return err
+}
+
+type ItemFavorite struct {
+	Index    uint16
+	Favorite bool
+}
+
+func ParseItemFavorite(packet Packet) (ItemFavorite, bool, error) {
+	if packet.ID != 0x0908 {
+		return ItemFavorite{}, false, nil
+	}
+	if len(packet.Data) < 5 {
+		return ItemFavorite{}, false, fmt.Errorf("ZC_ITEM_FAVORITE too short: %d", len(packet.Data))
+	}
+	return ItemFavorite{
+		Index:    binary.LittleEndian.Uint16(packet.Data[2:4]),
+		Favorite: packet.Data[4] == 0,
+	}, true, nil
 }

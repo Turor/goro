@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gogpu/ui/core/scrollview"
+	"github.com/gogpu/ui/core/textfield"
 	"github.com/gogpu/ui/event"
 	"github.com/gogpu/ui/geometry"
 	"github.com/gogpu/ui/primitives"
@@ -31,6 +32,29 @@ const (
 	inventoryBagTabEtc
 )
 
+const (
+	opinionatedSourceBag = iota
+	opinionatedSourceCart
+	opinionatedSourceStorage
+	opinionatedSourceGuild
+)
+
+const (
+	opinionatedSortRecent = iota
+	opinionatedSortName
+	opinionatedSortNameDesc
+	opinionatedSortCount
+)
+
+const (
+	opinionatedBagTabAll = iota
+	opinionatedBagTabUsable
+	opinionatedBagTabEquip
+	opinionatedBagTabAmmo
+	opinionatedBagTabEtc
+	opinionatedBagTabCard
+)
+
 // theme:ok packet option bits
 const inventoryBagCartOptionMask uint32 = 0x00000008 | 0x00000080 | 0x00000100 | 0x00000200 | 0x00000400
 
@@ -43,23 +67,64 @@ var inventoryBagTabs = []struct {
 	{label: "Etc", tab: inventoryBagTabEtc},
 }
 
+var opinionatedInventoryTabs = []struct {
+	label string
+	tab   int
+}{
+	{label: "All", tab: opinionatedBagTabAll},
+	{label: "Usable", tab: opinionatedBagTabUsable},
+	{label: "Equip", tab: opinionatedBagTabEquip},
+	{label: "Ammo", tab: opinionatedBagTabAmmo},
+	{label: "Etc", tab: opinionatedBagTabEtc},
+	{label: "Cards", tab: opinionatedBagTabCard},
+	{label: "Favorites", tab: opinionatedBagTabFavorite},
+}
+
+const opinionatedBagTabFavorite = opinionatedBagTabCard + 1
+
 type InventoryBagWindow struct {
 	Window
-	layoutGen     uint64
-	tab           int
-	scrollY       state.Signal[float32]
-	snapshot      string
-	itemInfo      *ItemWindows
-	lastClickItem uint16
-	lastClickAt   time.Time
-	dragItem      session.InventoryItem
-	dragActive    bool
-	dragFrom      time.Time
-	amountPrompt  amountPrompt
-	pendingCard   uint16
-	tooltip       tooltipState
-	icons         map[inventoryBagIconKey]image.Image
-	iconMiss      map[inventoryBagIconKey]struct{}
+	layoutGen             uint64
+	tab                   int
+	opinionated           bool
+	search                string
+	sort                  int
+	source                int
+	resources             *res.Manager
+	scrollY               state.Signal[float32]
+	scrollYSide           state.Signal[float32]
+	dragPane              int
+	pendingStore          session.InventoryItem
+	pendingStoreAmount    uint32
+	pendingStoreSource    int
+	pendingWithdraw       session.InventoryItem
+	pendingWithdrawAmount uint32
+	pendingWithdrawSource int
+	storageReleaseSent    bool
+	chromeKey             string
+	snapshot              string
+	itemInfo              *ItemWindows
+	lastClickItem         uint16
+	lastClickAt           time.Time
+	dragItem              session.InventoryItem
+	dragActive            bool
+	dragFrom              time.Time
+	amountPrompt          amountPrompt
+	pendingCard           uint16
+	tooltip               tooltipState
+	icons                 map[inventoryBagIconKey]image.Image
+	iconMiss              map[inventoryBagIconKey]struct{}
+	searchCtx             Context
+	searchField           *textfield.Widget
+	searchBox             *inventorySearchBox
+	searchArmed           bool
+	centerSources         int
+	bagGrid               *inventoryGridWidget
+	sideGrid              *inventoryGridWidget
+	hoverInfo             *ItemInfoWindow
+	tabPressX             int
+	tabPressY             int
+	tabPressed            bool
 }
 
 type inventoryBagIconKey struct {
@@ -68,10 +133,14 @@ type inventoryBagIconKey struct {
 }
 
 func (w *InventoryBagWindow) Toggle(ctx Context) {
-	w.EnsureWindow(inventoryBagWidth, inventoryBagHeight)
+	w.syncStyle(ctx.Session)
+	width, height := inventoryBagFrameSize(inventoryOpinionatedSession(ctx.Session))
+	w.EnsureWindow(width, height)
 	if w.IsOpen() {
 		w.hideTooltip()
+		w.hideItemHover(ctx)
 		w.amountPrompt.Close(ctx)
+		w.disarmSearch()
 		w.Window.Close()
 		w.Publish(ctx)
 		return
@@ -82,7 +151,7 @@ func (w *InventoryBagWindow) Toggle(ctx Context) {
 	x, y := inventoryBagDefaultPosition(ctx)
 	w.SetAutoPosition(x, y)
 	w.layoutGen = rotheme.Generation()
-	w.SetSize(inventoryBagWidth, inventoryBagHeight)
+	w.SetSize(width, height)
 	w.Open(ctx, w.widgetTree(ctx, nil))
 	w.bindLayoutReload()
 	w.Publish(ctx)
@@ -97,7 +166,18 @@ func (w *InventoryBagWindow) Update(ctx Context, shortcuts *ShortcutBar, storage
 	if w.UpdateDrag(ctx, shortcuts, storage, cart, trade, equipment, dropTargets...) {
 		return true
 	}
+	if w.opinionated {
+		w.syncOpinionatedDrag()
+		w.syncSearchPointer(ctx)
+		w.noteTabPress(ctx)
+	}
 	consumed := w.Window.Update(ctx)
+	if w.updateItemHover(ctx) {
+		consumed = true
+	}
+	if w.opinionated {
+		w.syncSearchTyping(ctx)
+	}
 	if !w.IsOpen() {
 		w.hideTooltip()
 		w.Publish(ctx)
@@ -109,24 +189,50 @@ func (w *InventoryBagWindow) Update(ctx Context, shortcuts *ShortcutBar, storage
 
 // UpdatePresentation follows server changes even when another window consumes input.
 func (w *InventoryBagWindow) UpdatePresentation(ctx Context, itemInfo *ItemWindows) {
-	w.EnsureWindow(inventoryBagWidth, inventoryBagHeight)
+	w.flushPendingStore(ctx)
+	w.releaseServerStorage(ctx)
+	if ctx.Resources != nil {
+		w.resources = ctx.Resources
+	}
+	width, height := w.frameSize()
+	if !w.opinionated {
+		width, height = inventoryBagFrameSize(inventoryOpinionatedSession(ctx.Session))
+	}
+	w.EnsureWindow(width, height)
 	// SetContent releases the window's drag capture. Leave the snapshot stale
 	// until the drag ends so the next presentation update applies all changes.
 	if !w.IsOpen() || w.dragging {
 		return
 	}
+	w.syncStyle(ctx.Session)
+	width, height = w.frameSize()
 	w.ClampScroll(ctx.Session)
 	snapshot := w.inventorySnapshot(ctx.Session)
 	if gen := rotheme.Generation(); gen != w.layoutGen {
 		// A reloaded ui-layout.ini may change the cell size or rows.
 		w.layoutGen = gen
-		w.SetSize(inventoryBagWidth, inventoryBagHeight)
+		w.SetSize(width, height)
 		w.snapshot = ""
 	}
 	if snapshot != w.snapshot || itemInfo != w.itemInfo {
+		chrome := w.inventoryChromeKey()
+		if w.bagGrid != nil && chrome == w.chromeKey {
+			w.snapshot = snapshot
+			w.itemInfo = itemInfo
+			w.syncSearchGrids(ctx)
+			return
+		}
+		w.chromeKey = chrome
+		if w.searchField != nil && w.searchField.IsFocused() && w.bagGrid != nil {
+			w.snapshot = snapshot
+			w.itemInfo = itemInfo
+			w.syncSearchGrids(ctx)
+			return
+		}
 		w.hideTooltip()
 		w.snapshot = snapshot
 		w.itemInfo = itemInfo
+		w.SetSize(width, height)
 		w.SetContent(w.widgetTree(ctx, itemInfo))
 		w.Publish(ctx)
 	}
@@ -167,11 +273,16 @@ func (w *InventoryBagWindow) UpdateDrag(ctx Context, shortcuts *ShortcutBar, sto
 		if shortcuts != nil && shortcuts.AcceptItemDrop(ctx, item, ctx.Input.MouseX, ctx.Input.MouseY) {
 			return true
 		}
+		if w.tryOpinionatedTransfer(ctx, item, ctx.Input.MouseX, ctx.Input.MouseY) {
+			return true
+		}
 		if manager, ok := ctx.UIManager.(interface{ PointerBlocked(int, int) bool }); ok && manager.PointerBlocked(ctx.Input.MouseX, ctx.Input.MouseY) {
 			return true
 		}
 		if !w.pointInside(ctx.Input.MouseX, ctx.Input.MouseY) {
-			w.requestDrop(ctx, item)
+			if !inventoryOpinionated(ctx) || w.dragPane == opinionatedPaneBag {
+				w.requestDrop(ctx, item)
+			}
 			return true
 		}
 		return true
@@ -187,10 +298,12 @@ func (w *InventoryBagWindow) requestDrop(ctx Context, item session.InventoryItem
 	maxAmount := inventoryDropMaxAmount(item)
 	if inventoryItemTypeStackable(item.Type) && maxAmount > 1 {
 		w.amountPrompt.Open(ctx, "Enter amount to drop", maxAmount, maxAmount, func(amount uint16) {
+			w.showSubmittedAmount(item, opinionatedPaneBag, -1, amount)
 			w.sendDrop(ctx, item, amount)
 		})
 		return
 	}
+	w.showSubmittedAmount(item, opinionatedPaneBag, -1, 1)
 	w.sendDrop(ctx, item, 1)
 }
 
@@ -210,7 +323,26 @@ func (w *InventoryBagWindow) sendDrop(ctx Context, item session.InventoryItem, r
 }
 
 func (w *InventoryBagWindow) KeyboardShortcutsBlocked() bool {
-	return w != nil && w.amountPrompt.IsOpen()
+	if w == nil || !w.IsOpen() {
+		return false
+	}
+	if w.amountPrompt.IsOpen() {
+		return true
+	}
+	if w.searchArmed {
+		return true
+	}
+	return w.searchField != nil && w.searchField.IsFocused()
+}
+
+func (w *InventoryBagWindow) disarmSearch() {
+	if w == nil {
+		return
+	}
+	w.searchArmed = false
+	if w.searchField != nil {
+		w.searchField.SetFocused(false)
+	}
 }
 
 func (w *InventoryBagWindow) DrawTooltip(ctx Context, screen *render.Frame) {
@@ -236,7 +368,7 @@ func (w *InventoryBagWindow) Rebind(ctx Context, itemInfo *ItemWindows) {
 		return
 	}
 	w.layoutGen = rotheme.Generation()
-	w.SetSize(inventoryBagWidth, inventoryBagHeight)
+	w.SetSize(inventoryBagFrameSize(w.opinionated))
 	w.refresh(ctx, itemInfo)
 	w.bindLayoutReload()
 }
@@ -247,7 +379,7 @@ func (w *InventoryBagWindow) bindLayoutReload() {
 			return
 		}
 		w.layoutGen = rotheme.Generation()
-		w.SetSize(inventoryBagWidth, inventoryBagHeight)
+		w.SetSize(inventoryBagFrameSize(w.opinionated))
 		w.refresh(w.ctx, w.itemInfo)
 	})
 }
@@ -258,14 +390,17 @@ func (w *InventoryBagWindow) PendingCardIndex() uint16 {
 
 func (w *InventoryBagWindow) widgetTree(ctx Context, itemInfo *ItemWindows) widget.Widget {
 	items := w.tabItems(ctx.Session)
+	viewW := inventoryBagViewW
+	if inventoryOpinionated(ctx) {
+		viewW = inventoryOpinionatedViewW()
+	}
 	grid := newInventoryGridWidget(inventoryGridConfig{
 		items:     items,
 		icons:     w.itemIcons(ctx, items),
 		amounts:   inventoryGridAmountLabels(items),
-		viewWidth: inventoryBagViewW,
-		onPress:   func(item session.InventoryItem) { w.startItemDragOrActivate(ctx, item) },
-		onHover:   func(item session.InventoryItem) { w.showTooltip(ctx, item) },
-		onLeave:   func() { w.hideTooltip() },
+		viewWidth: viewW, onPress: func(item session.InventoryItem) { w.startItemDragOrActivate(ctx, item) },
+		onHover: func(item session.InventoryItem) { w.showTooltip(ctx, item) },
+		onLeave: func() { w.hideTooltip() },
 		onRightClick: func(item session.InventoryItem, mx, my int) {
 			w.hideTooltip()
 			w.dragActive = false
@@ -282,6 +417,16 @@ func (w *InventoryBagWindow) widgetTree(ctx Context, itemInfo *ItemWindows) widg
 		scrollview.ScrollYSignal(w.ensureScrollSignal()),
 		scrollview.ScrollStep(float32(inventoryBagCell)),
 	)
+	width, height := inventoryBagFrameSize(inventoryOpinionated(ctx))
+	body := verticalTabFrame(
+		w.tabColumn(ctx),
+		primitives.Box(scroll).
+			Width(float32(viewW)).
+			Height(float32(inventoryBagViewH)),
+	)
+	if inventoryOpinionated(ctx) {
+		return w.opinionatedWindow(ctx, itemInfo)
+	}
 	return Win(
 		Title("Inventory"),
 		CloseButton(true),
@@ -290,15 +435,8 @@ func (w *InventoryBagWindow) widgetTree(ctx Context, itemInfo *ItemWindows) widg
 			w.Window.Close()
 			w.Publish(ctx)
 		}),
-		Size(float32(inventoryBagWidth), float32(inventoryBagHeight)),
-		Content(
-			verticalTabFrame(
-				w.tabColumn(ctx),
-				primitives.Box(scroll).
-					Width(float32(inventoryBagViewW)).
-					Height(float32(inventoryBagViewH)),
-			),
-		),
+		Size(float32(width), float32(height)),
+		Content(body),
 	)
 }
 
@@ -327,9 +465,220 @@ func (w *InventoryBagWindow) tabColumn(ctx Context) widget.Widget {
 		Gap(-inventoryBagTabOver)
 }
 
+func (w *InventoryBagWindow) moveRow(ctx Context) widget.Widget {
+	storageLabel := "To storage"
+	storageDest := opinionatedSourceStorage
+	if ctx.Session != nil && ctx.Session.GuildStorage.Open {
+		storageLabel = "To guild"
+		storageDest = opinionatedSourceGuild
+	}
+	return primitives.HBox(
+		rotheme.Button("To cart", func() {
+			w.depositSelected(ctx, opinionatedSourceCart)
+		}),
+		rotheme.Button(storageLabel, func() {
+			w.depositSelected(ctx, storageDest)
+		}),
+		rotheme.Button("Favorite", func() {
+			w.toggleFavorite(ctx)
+		}),
+	).Gap(float32(inventoryBagMenuGap)).Height(float32(inventoryBagFilterH))
+}
+
+func (w *InventoryBagWindow) toggleFavorite(ctx Context) {
+	if !inventoryOpinionated(ctx) || w.source != opinionatedSourceBag || ctx.Session == nil {
+		return
+	}
+	for i := range ctx.Session.Inventory.Items {
+		item := &ctx.Session.Inventory.Items[i]
+		if item.Index != w.lastClickItem {
+			continue
+		}
+		next := !item.Favorite
+		if ctx.Network != nil {
+			if err := ctx.Network.SendItemFavorite(item.Index, next); err != nil {
+				glog.Warnf("favorite toggle failed: %v", err)
+				return
+			}
+		}
+		item.Favorite = next
+		w.refresh(ctx, w.itemInfo)
+		return
+	}
+}
+
+func (w *InventoryBagWindow) depositSelected(ctx Context, dest int) {
+	if !inventoryOpinionated(ctx) || w.source != opinionatedSourceBag {
+		return
+	}
+	item, ok := session.FindInventoryItem(ctx.Session, w.lastClickItem)
+	if !ok {
+		return
+	}
+	opinionatedDeposit(ctx, dest, item)
+}
+
+func (w *InventoryBagWindow) searchRow(ctx Context) widget.Widget {
+	w.searchCtx = ctx
+	box := newInventorySearchBox(w)
+	w.searchBox = box
+	return newOpinionatedSearchRow(box, newOpinionatedSortBox(w, ctx))
+}
+
+func opinionatedMoveAmount(item session.InventoryItem) uint32 {
+	amount := uint32(item.Amount)
+	if amount == 0 {
+		return 1
+	}
+	return amount
+}
+
+func opinionatedWithdraw(ctx Context, source int, item session.InventoryItem) {
+	opinionatedWithdrawAmount(ctx, source, item, opinionatedMoveAmount(item))
+}
+
+func opinionatedWithdrawAmount(ctx Context, source int, item session.InventoryItem, amount uint32) {
+	if ctx.Network == nil {
+		glog.Warnf("opinionated withdraw failed: not connected")
+		return
+	}
+	if amount == 0 {
+		amount = opinionatedMoveAmount(item)
+	}
+	var err error
+	switch source {
+	case opinionatedSourceCart:
+		err = ctx.Network.SendMoveFromCart(item.Index, amount)
+	case opinionatedSourceStorage:
+		if ctx.Session == nil || !ctx.Session.Storage.Open || ctx.Session.GuildStorage.Open {
+			return
+		}
+		err = ctx.Network.SendMoveFromStorage(item.Index, amount)
+	case opinionatedSourceGuild:
+		if ctx.Session == nil || !ctx.Session.GuildStorage.Open {
+			return
+		}
+		err = ctx.Network.SendMoveFromStorage(item.Index, amount)
+	default:
+		return
+	}
+	if err != nil {
+		glog.Warnf("opinionated withdraw failed: %v", err)
+		return
+	}
+	glog.Debugf("opinionated withdraw requested source=%d index=%d item=%d amount=%d", source, item.Index, item.ItemID, amount)
+}
+
+func opinionatedDeposit(ctx Context, dest int, item session.InventoryItem) {
+	opinionatedDepositAmount(ctx, dest, item, opinionatedMoveAmount(item))
+}
+
+func opinionatedDepositAmount(ctx Context, dest int, item session.InventoryItem, amount uint32) {
+	if ctx.Network == nil {
+		glog.Warnf("opinionated deposit failed: not connected")
+		return
+	}
+	if amount == 0 {
+		amount = opinionatedMoveAmount(item)
+	}
+	var err error
+	switch dest {
+	case opinionatedSourceCart:
+		err = ctx.Network.SendMoveToCart(item.Index, amount)
+	case opinionatedSourceStorage:
+		if ctx.Session == nil || !ctx.Session.Storage.Open || ctx.Session.GuildStorage.Open {
+			return
+		}
+		err = ctx.Network.SendMoveToStorage(item.Index, amount)
+	case opinionatedSourceGuild:
+		if ctx.Session == nil || !ctx.Session.GuildStorage.Open {
+			return
+		}
+		err = ctx.Network.SendMoveToStorage(item.Index, amount)
+	default:
+		return
+	}
+	if err != nil {
+		glog.Warnf("opinionated deposit failed: %v", err)
+		return
+	}
+	glog.Debugf("opinionated deposit requested dest=%d index=%d item=%d amount=%d", dest, item.Index, item.ItemID, amount)
+}
+
+func opinionatedSortLabel(sort int) string {
+	switch sort {
+	case opinionatedSortName:
+		return "A-Z"
+	case opinionatedSortNameDesc:
+		return "Z-A"
+	default:
+		return "Recent"
+	}
+}
+
+func (w *InventoryBagWindow) sourceRow(ctx Context) widget.Widget {
+	tabs := []struct {
+		label  string
+		source int
+	}{
+		{label: "Bag", source: opinionatedSourceBag},
+		{label: "Cart", source: opinionatedSourceCart},
+		{label: "Storage", source: opinionatedSourceStorage},
+		{label: "Guild", source: opinionatedSourceGuild},
+	}
+	cells := make([]widget.Widget, 0, len(tabs))
+	for i, tab := range tabs {
+		tab := tab
+		cells = append(cells, newTabWidget(tabWidgetConfig{
+			label:  tab.label,
+			active: tab.source == w.source,
+			width:  inventoryBagFilterTabWidth(i, len(tabs)),
+			height: inventoryBagFilterH,
+			onClick: func() {
+				w.hideTooltip()
+				w.source = tab.source
+				w.ensureScrollSignal().Set(0)
+				w.refresh(ctx, w.itemInfo)
+			},
+		}))
+	}
+	return primitives.HBox(cells...).Gap(0).Height(float32(inventoryBagFilterH))
+}
+
+func (w *InventoryBagWindow) filterRows(ctx Context) widget.Widget {
+	return w.categoryStrip(ctx)
+}
+
+func (w *InventoryBagWindow) categoryStrip(ctx Context) widget.Widget {
+	tabs := make([]*tabWidget, 0, len(opinionatedInventoryTabs))
+	active := 0
+	for i, tab := range opinionatedInventoryTabs {
+		tab := tab
+		if tab.tab == w.tab {
+			active = i
+		}
+		tabs = append(tabs, newTabWidget(tabWidgetConfig{
+			label:      tab.label,
+			active:     tab.tab == w.tab,
+			height:     inventoryBagFilterH,
+			omitBottom: tab.tab == w.tab,
+			activeFill: inventoryBagTabActive,
+			onClick: func() {
+				w.hideTooltip()
+				w.tab = tab.tab
+				w.ensureScrollSignal().Set(0)
+				w.lastClickItem = 0
+				w.refresh(ctx, w.itemInfo)
+			},
+		}))
+	}
+	return newOpinionatedTabStrip(tabs, active)
+}
+
 func (w *InventoryBagWindow) refresh(ctx Context, itemInfo *ItemWindows) {
 	w.hideTooltip()
 	w.ClampScroll(ctx.Session)
+	w.chromeKey = w.inventoryChromeKey()
 	w.snapshot = w.inventorySnapshot(ctx.Session)
 	w.itemInfo = itemInfo
 	w.SetContent(w.widgetTree(ctx, itemInfo))
@@ -349,6 +698,19 @@ func inventoryBagHasCart(ctx Context) bool {
 func (w *InventoryBagWindow) startItemDragOrActivate(ctx Context, item session.InventoryItem) {
 	w.hideTooltip()
 	now := time.Now()
+	if inventoryOpinionated(ctx) && w.source != opinionatedSourceBag {
+		if w.lastClickItem == item.Index && now.Sub(w.lastClickAt) <= 360*time.Millisecond {
+			opinionatedWithdraw(ctx, w.source, item)
+			w.lastClickItem = 0
+			w.refresh(ctx, w.itemInfo)
+			return
+		}
+		w.dragActive = false
+		w.dragItem = session.InventoryItem{}
+		w.lastClickItem = item.Index
+		w.lastClickAt = now
+		return
+	}
 	if w.lastClickItem == item.Index && now.Sub(w.lastClickAt) <= 360*time.Millisecond {
 		w.dragActive = false
 		w.dragItem = session.InventoryItem{}
@@ -494,7 +856,7 @@ func (w *InventoryBagWindow) selectFirstNonEmptyTab(s *session.Session) {
 		return
 	}
 	original := w.tab
-	for _, tab := range inventoryBagTabs {
+	for _, tab := range w.categoryTabs(s) {
 		if tab.tab == w.tab {
 			continue
 		}
@@ -508,27 +870,123 @@ func (w *InventoryBagWindow) selectFirstNonEmptyTab(s *session.Session) {
 }
 
 func (w *InventoryBagWindow) tabItems(s *session.Session) []session.InventoryItem {
-	items := sortedInventoryItems(s)
+	items := w.sourceItems(s)
 	if len(items) == 0 {
 		return nil
 	}
-	filtered := items[:0]
+	if !inventoryOpinionatedSession(s) {
+		filtered := make([]session.InventoryItem, 0, len(items))
+		for _, item := range items {
+			if inventoryItemTab(item) == w.tab {
+				filtered = append(filtered, item)
+			}
+		}
+		sort.SliceStable(filtered, func(i, j int) bool {
+			return filtered[i].Index < filtered[j].Index
+		})
+		return filtered
+	}
+	if w.tab == opinionatedBagTabFavorite {
+		filtered := make([]session.InventoryItem, 0, len(items))
+		for _, item := range items {
+			if item.Favorite {
+				filtered = append(filtered, item)
+			}
+		}
+		items = filtered
+	} else if w.tab != opinionatedBagTabAll {
+		filtered := make([]session.InventoryItem, 0, len(items))
+		for _, item := range items {
+			if opinionatedInventoryTab(item) == w.tab {
+				filtered = append(filtered, item)
+			}
+		}
+		items = filtered
+	}
+	items = w.matchSearch(items)
+	w.sortOpinionated(items)
+	return items
+}
+
+func (w *InventoryBagWindow) sourceItems(s *session.Session) []session.InventoryItem {
+	if s == nil || !s.OpinionatedUI || w.source == opinionatedSourceBag {
+		return sortedInventoryItems(s)
+	}
+	var src []session.InventoryItem
+	switch w.source {
+	case opinionatedSourceCart:
+		src = s.Cart.Items
+	case opinionatedSourceStorage:
+		src = s.Storage.Items
+	case opinionatedSourceGuild:
+		src = s.GuildStorage.Items
+	default:
+		src = s.Inventory.Items
+	}
+	items := append([]session.InventoryItem(nil), src...)
+	sort.SliceStable(items, func(i, j int) bool {
+		return items[i].Index < items[j].Index
+	})
+	return items
+}
+
+func (w *InventoryBagWindow) matchSearch(items []session.InventoryItem) []session.InventoryItem {
+	query := strings.TrimSpace(strings.ToLower(w.search))
+	if query == "" {
+		return items
+	}
+	matched := make([]session.InventoryItem, 0, len(items))
 	for _, item := range items {
-		if inventoryItemTab(item) == w.tab {
-			filtered = append(filtered, item)
+		if strings.Contains(strings.ToLower(w.itemName(item)), query) {
+			matched = append(matched, item)
 		}
 	}
-	sort.SliceStable(filtered, func(i, j int) bool {
-		return filtered[i].Index < filtered[j].Index
-	})
-	return filtered
+	return matched
+}
+
+func (w *InventoryBagWindow) itemName(item session.InventoryItem) string {
+	return ItemDisplayName(w.resources, item)
+}
+func (w *InventoryBagWindow) sortOpinionated(items []session.InventoryItem) {
+	switch w.sort {
+	case opinionatedSortName:
+		sort.SliceStable(items, func(i, j int) bool {
+			return strings.ToLower(w.itemName(items[i])) < strings.ToLower(w.itemName(items[j]))
+		})
+	case opinionatedSortNameDesc:
+		sort.SliceStable(items, func(i, j int) bool {
+			return strings.ToLower(w.itemName(items[i])) > strings.ToLower(w.itemName(items[j]))
+		})
+	default:
+		sort.SliceStable(items, func(i, j int) bool {
+			return items[i].Index < items[j].Index
+		})
+	}
+}
+
+func (w *InventoryBagWindow) inventoryChromeKey() string {
+	if w == nil {
+		return ""
+	}
+	return fmt.Sprintf("%d|%t|%s|%d|%d", w.tab, w.opinionated, w.search, w.sort, w.source)
 }
 
 func (w *InventoryBagWindow) inventorySnapshot(s *session.Session) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "tab=%d;", w.tab)
+	fmt.Fprintf(&b, "tab=%d;opinionated=%t;search=%s;sort=%d;source=%d;", w.tab, s != nil && s.OpinionatedUI, w.search, w.sort, w.source)
 	for _, item := range sortedInventoryItems(s) {
-		fmt.Fprintf(&b, "%d:%d:%d:%d:%d:%t:%t;", item.Index, item.ItemID, item.Type, item.Amount, item.Location, item.Equip, item.Equipped)
+		fmt.Fprintf(&b, "%d:%d:%d:%d:%d:%t:%t:%t;", item.Index, item.ItemID, item.Type, item.Amount, item.Location, item.Equip, item.Equipped, item.Favorite)
+	}
+	if s != nil && s.OpinionatedUI {
+		for _, item := range s.Cart.Items {
+			fmt.Fprintf(&b, "c%d:%d:%d;", item.Index, item.ItemID, item.Amount)
+		}
+		for _, item := range s.Storage.Items {
+			fmt.Fprintf(&b, "s%d:%d:%d;", item.Index, item.ItemID, item.Amount)
+		}
+		for _, item := range s.GuildStorage.Items {
+			fmt.Fprintf(&b, "g%d:%d:%d:%t;", item.Index, item.ItemID, item.Amount, s.GuildStorage.Open)
+		}
 	}
 	return b.String()
 }
@@ -566,17 +1024,20 @@ func inventoryGridAmountLabels(items []session.InventoryItem) []string {
 }
 
 type inventoryGridConfig struct {
-	items        []session.InventoryItem
-	icons        []image.Image
-	amounts      []string
-	cols         int
-	minRows      int
-	cellSize     int
-	viewWidth    int
-	onPress      func(session.InventoryItem)
-	onHover      func(session.InventoryItem)
-	onLeave      func()
-	onRightClick func(session.InventoryItem, int, int)
+	items            []session.InventoryItem
+	icons            []image.Image
+	amounts          []string
+	cols             int
+	minRows          int
+	cellSize         int
+	viewWidth        int
+	grid             bool
+	onPress          func(session.InventoryItem)
+	onHover          func(session.InventoryItem)
+	onLeave          func()
+	onRightClick     func(session.InventoryItem, int, int)
+	onRightClickMods func(session.InventoryItem, int, int, event.Modifiers)
+	fillWidth        bool
 }
 
 type inventoryGridWidget struct {
@@ -593,16 +1054,36 @@ func newInventoryGridWidget(cfg inventoryGridConfig) *inventoryGridWidget {
 	return w
 }
 
+func (w *inventoryGridWidget) setItems(items []session.InventoryItem, icons []image.Image, amounts []string) {
+	w.cfg.items = items
+	w.cfg.icons = icons
+	w.cfg.amounts = amounts
+	w.hovered = -1
+	w.SetNeedsRedraw(true)
+}
+
 func (w *inventoryGridWidget) Layout(ctx widget.Context, constraints geometry.Constraints) geometry.Size {
-	cell := float32(w.cellSize()) * rotheme.ContentScale()
-	pref := geometry.Sz(float32(w.viewWidth())*rotheme.ContentScale(), float32(w.totalRows())*cell)
-	size := constraints.Constrain(pref)
-	if cols := w.cols(); cols > 0 && size.Width > 0 {
-		fitted := size.Width / float32(cols)
-		if fitted > 0 && fitted < cell {
-			cell = fitted
+	scale := rotheme.ContentScale()
+	if scale <= 0 {
+		scale = 1
+	}
+	cell := float32(w.cellSize()) * scale
+	width := float32(w.viewWidth()) * scale
+	if w.cfg.grid {
+		width = float32(w.cols()) * cell
+	} else if w.cfg.fillWidth && opinionatedWidthBounded(constraints.MaxWidth) {
+		width = constraints.MaxWidth
+	}
+	if !w.cfg.grid {
+		if cols := w.cols(); cols > 0 && width > 0 {
+			fitted := width / float32(cols)
+			if w.cfg.fillWidth || (fitted > 0 && fitted < cell) {
+				cell = fitted
+			}
 		}
 	}
+	pref := geometry.Sz(width, float32(w.totalRows())*cell)
+	size := constraints.Constrain(pref)
 	if cell <= 0 {
 		cell = float32(w.cellSize())
 	}
@@ -621,7 +1102,11 @@ func (w *inventoryGridWidget) Draw(ctx widget.Context, canvas widget.Canvas) {
 		for col := 0; col < cols; col++ {
 			index := row*cols + col
 			cell := w.cellBounds(index)
-			drawInventoryGridCellShadow(canvas, cell, index == w.hovered)
+			if w.cfg.grid {
+				drawInventoryGridCell(canvas, cell, index == w.hovered)
+			} else {
+				drawInventoryGridCellShadow(canvas, cell, index == w.hovered)
+			}
 		}
 	}
 	startIndex := startRow * cols
@@ -653,6 +1138,15 @@ func (w *inventoryGridWidget) Draw(ctx widget.Context, canvas widget.Canvas) {
 			rotheme.DrawText(canvas, "E", geometry.NewRect(cell.Min.X+equipInset, cell.Min.Y+equipInset, equip, equip), rotheme.Default.Typography.TextSize, inventoryBagEquippedColor, false, widget.TextAlignLeft)
 		}
 	}
+}
+
+func drawInventoryGridCell(canvas widget.Canvas, cell geometry.Rect, hovered bool) {
+	fill := rotheme.Default.Colors.PanelBody
+	if hovered {
+		fill = rotheme.Default.Colors.ButtonHover
+	}
+	canvas.DrawRect(cell, fill)
+	canvas.StrokeRect(cell, rotheme.Default.Colors.WindowBorder, windowBorderWidth)
 }
 
 func drawInventoryGridCellShadow(canvas widget.Canvas, cell geometry.Rect, hovered bool) {
@@ -739,7 +1233,9 @@ func (w *inventoryGridWidget) Event(ctx widget.Context, e event.Event) bool {
 					w.cfg.onPress(item)
 				}
 			case event.ButtonRight:
-				if w.cfg.onRightClick != nil {
+				if w.cfg.onRightClickMods != nil {
+					w.cfg.onRightClickMods(item, int(ev.GlobalPosition.X), int(ev.GlobalPosition.Y), ev.Modifiers())
+				} else if w.cfg.onRightClick != nil {
 					w.cfg.onRightClick(item, int(ev.GlobalPosition.X), int(ev.GlobalPosition.Y))
 				}
 			}
@@ -828,6 +1324,49 @@ func inventoryItemTab(item session.InventoryItem) int {
 		return inventoryBagTabItem
 	}
 	return inventoryBagTabEtc
+}
+
+func opinionatedInventoryTab(item session.InventoryItem) int {
+	switch item.Type {
+	case db.ItemTypeAmmo:
+		return opinionatedBagTabAmmo
+	case db.ItemTypeCard:
+		return opinionatedBagTabCard
+	}
+	if inventoryItemUsesEquipmentTab(item) {
+		return opinionatedBagTabEquip
+	}
+	if db.ItemTypeIsUsable(item.Type) {
+		return opinionatedBagTabUsable
+	}
+	return opinionatedBagTabEtc
+}
+
+func inventoryOpinionated(ctx Context) bool {
+	return inventoryOpinionatedSession(ctx.Session)
+}
+
+func inventoryOpinionatedSession(s *session.Session) bool {
+	return s != nil && s.OpinionatedUI
+}
+
+func (w *InventoryBagWindow) syncStyle(s *session.Session) {
+	opinionated := inventoryOpinionatedSession(s)
+	if opinionated == w.opinionated {
+		return
+	}
+	w.opinionated = opinionated
+	w.tab = 0
+}
+
+func (w *InventoryBagWindow) categoryTabs(s *session.Session) []struct {
+	label string
+	tab   int
+} {
+	if inventoryOpinionatedSession(s) {
+		return opinionatedInventoryTabs
+	}
+	return inventoryBagTabs
 }
 
 func inventoryItemCanEquip(item session.InventoryItem) bool {

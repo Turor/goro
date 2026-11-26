@@ -155,11 +155,11 @@ func TestWindowPollingRespectsStackingAndEscape(t *testing.T) {
 	app.Window().DrawTo(&uitest.MockCanvas{})
 	ctx.Input.SetMousePosition(140, 115)
 	ctx.Input.SetMouseButton(input.MouseButtonLeft, true)
-	if lower.Update(ctx) || lower.dragging {
+	if lower.Update(ctx) || lower.dragging || lower.dragPending {
 		t.Fatal("lower window intercepted a drag on the visible window")
 	}
-	if !upper.Update(ctx) || !upper.dragging {
-		t.Fatal("visible window did not start dragging")
+	if !upper.Update(ctx) || !upper.dragPending || upper.dragging {
+		t.Fatal("visible window did not take the press")
 	}
 	ctx.Input.SetMouseButton(input.MouseButtonLeft, false)
 	ctx.Input.EndFrame()

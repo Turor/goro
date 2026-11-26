@@ -245,14 +245,15 @@ type FogConfig struct {
 }
 
 type GameplayConfig struct {
-	NoShift     bool
-	NoCtrl      bool
-	LessEffects bool
-	NoEffects   bool
-	SimpleAura  bool
-	SnapTargets bool
-	SnapItems   bool
-	ForceUserAI bool
+	NoShift       bool
+	OpinionatedUI bool
+	NoCtrl        bool
+	LessEffects   bool
+	NoEffects     bool
+	SimpleAura    bool
+	SnapTargets   bool
+	SnapItems     bool
+	ForceUserAI   bool
 }
 
 type ScriptConfig struct {
@@ -319,6 +320,7 @@ type UserSettings struct {
 	BGMVolume        float64
 	SFXVolume        float64
 	NoShift          bool
+	OpinionatedUI    bool
 	NoCtrl           bool
 	LessEffects      bool
 	SnapTargets      bool
@@ -402,11 +404,12 @@ func (cfg Config) SaveUserSettings(settings UserSettings) (string, error) {
 			"sfx_volume": formatINIValueFloat(settings.SFXVolume),
 		},
 		"gameplay": {
-			"no_shift":     formatINIValueBool(settings.NoShift),
-			"no_ctrl":      formatINIValueBool(settings.NoCtrl),
-			"less_effects": formatINIValueBool(settings.LessEffects),
-			"snap":         formatINIValueBool(settings.SnapTargets),
-			"itemsnap":     formatINIValueBool(settings.SnapItems),
+			"no_shift":       formatINIValueBool(settings.NoShift),
+			"opinionated_ui": formatINIValueBool(settings.OpinionatedUI),
+			"no_ctrl":        formatINIValueBool(settings.NoCtrl),
+			"less_effects":   formatINIValueBool(settings.LessEffects),
+			"snap":           formatINIValueBool(settings.SnapTargets),
+			"itemsnap":       formatINIValueBool(settings.SnapItems),
 		},
 	}
 	return cfg.saveConfigValues(values)
@@ -832,6 +835,8 @@ func applyConfigValue(cfg *Config, section, key, value string) error {
 		return setBool(value, &cfg.Fog.Enabled)
 	case "gameplay.noshift":
 		return setBool(value, &cfg.Gameplay.NoShift)
+	case "gameplay.opinionatedui":
+		return setBool(value, &cfg.Gameplay.OpinionatedUI)
 	case "gameplay.noctrl":
 		return setBool(value, &cfg.Gameplay.NoCtrl)
 	case "gameplay.lesseffects", "gameplay.lesseffect", "gameplay.mineffect", "gameplay.less_effects", "gameplay.less_effect":

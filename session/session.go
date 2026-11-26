@@ -20,6 +20,7 @@ type Session struct {
 	KeepLoginID          bool
 	SavedUsername        string
 	NoShift              bool
+	OpinionatedUI        bool
 	NoCtrl               bool
 	BattleMode           bool
 	ScriptPath           string // Runtime override; empty uses the configured script.
@@ -55,6 +56,7 @@ type Session struct {
 	Progress             Progress
 	Inventory            Inventory
 	Storage              Storage
+	GuildStorage         Storage
 	Cart                 Cart
 	Stats                Stats
 	Skills               Skills
@@ -101,6 +103,7 @@ func (s *Session) SelectCharacter(character Character) {
 	s.Progress = ProgressFromCharacter(character)
 	s.Inventory = Inventory{Zeny: character.Money}
 	s.Storage = Storage{}
+	s.GuildStorage = Storage{}
 	s.Cart = Cart{}
 	s.Stats = StatsFromCharacter(character)
 	s.Skills = Skills{}
@@ -386,6 +389,7 @@ type InventoryItem struct {
 	Amount         int
 	Equip          bool
 	Equipped       bool
+	Favorite       bool
 	Damaged        bool
 	Refine         uint8
 	Grade          uint8

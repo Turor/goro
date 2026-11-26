@@ -21,21 +21,29 @@ func TestWindowResizePersistsSize(t *testing.T) {
 	}
 	ctx.Input.EndFrame()
 	ctx.Input.SetMousePosition(pressX+40, pressY+30)
-	if !window.Update(ctx) || window.width != 340 || window.height != 230 {
-		t.Fatalf("resized = %dx%d, want 340x230", window.width, window.height)
+	wantW, wantH := lockResizeAspect(300, 200, 340, 230)
+	if !window.Update(ctx) || window.width != wantW || window.height != wantH {
+		t.Fatalf("resized = %dx%d, want %dx%d", window.width, window.height, wantW, wantH)
+	}
+	drift := window.width*200 - window.height*300
+	if drift < 0 {
+		drift = -drift
+	}
+	if drift > 300 {
+		t.Fatalf("resized = %dx%d, aspect drifted from 300x200", window.width, window.height)
 	}
 	ctx.Input.EndFrame()
 	ctx.Input.SetMouseButton(input.MouseButtonLeft, false)
 	window.Update(ctx)
 	saved := window.SavedPosition()
-	if !saved.Set || saved.Width != 340 || saved.Height != 230 {
+	if !saved.Set || saved.Width != wantW || saved.Height != wantH {
 		t.Fatalf("saved size = %+v", saved)
 	}
 	restored := Window{}
 	restored.RestorePosition(ctx, saved)
 	restored.EnsureWindow(300, 200)
-	if restored.width != 340 || restored.height != 230 {
-		t.Fatalf("restored size = %dx%d, want 340x230", restored.width, restored.height)
+	if restored.width != wantW || restored.height != wantH {
+		t.Fatalf("restored size = %dx%d, want %dx%d", restored.width, restored.height, wantW, wantH)
 	}
 }
 

@@ -224,6 +224,7 @@ func (u *worldUI) nonConsoleKeyboardInputBlockedExcept(ctx client.Context, excep
 		(except != &u.companions.HomunculusInfo.Window && u.companions.HomunculusInfo.KeyboardShortcutsBlocked()) ||
 		u.changeCartWindow.IsOpen() ||
 		u.itemWindows.KeyboardShortcutsBlocked() ||
+		u.inventoryBag.KeyboardShortcutsBlocked() ||
 		u.npc.Shop.KeyboardShortcutsBlocked() ||
 		u.social.VendingWindow.KeyboardShortcutsBlocked() ||
 		u.social.TradeWindow.IsOpen() ||
@@ -983,7 +984,11 @@ func (m *WorldMode) Update(ctx client.Context) (Mode, error) {
 	if m.ui.social.MailWindow.Update(ctx, &m.ui.itemWindows) {
 		return nil, nil
 	}
-	if m.ui.inventoryBag.Update(ctx, &m.ui.shortcutBar, &m.ui.storageWindow, &m.ui.cartWindow, &m.ui.social.TradeWindow, &m.ui.equipmentWindow, &m.ui.itemWindows, &m.ui.social.MailWindow) {
+	inventoryConsumed := m.ui.inventoryBag.Update(ctx, &m.ui.shortcutBar, &m.ui.storageWindow, &m.ui.cartWindow, &m.ui.social.TradeWindow, &m.ui.equipmentWindow, &m.ui.itemWindows, &m.ui.social.MailWindow)
+	if m.ui.inventoryBag.HidesClassicStorage() {
+		m.ui.storageWindow.SetOpen(false)
+	}
+	if inventoryConsumed {
 		return nil, nil
 	}
 	if m.ui.social.TradeWindow.Update(ctx, &m.ui.itemWindows) {
@@ -1043,10 +1048,9 @@ func (m *WorldMode) Update(ctx client.Context) (Mode, error) {
 	if m.ui.statsWindow.Update(ctx) {
 		return nil, nil
 	}
-	if !m.ui.keyboardInputBlocked(ctx) {
-		if m.ui.basicMenu.Update(ctx, m.basicMenuCallbacks(ctx)) {
-			return nil, nil
-		}
+	// The menu under the status window is HUD. A blocking window must not hide it.
+	if m.ui.basicMenu.Update(ctx, m.basicMenuCallbacks(ctx)) {
+		return nil, nil
 	}
 	m.ui.minimap.SetWorldMapOpener(func() { m.openWorldMap(ctx) })
 	minimapDragging := m.ui.minimap.Update(ctx)

@@ -105,6 +105,37 @@ func TestInventoryBagUsesOnlyVerticalCategoryTabs(t *testing.T) {
 	}
 }
 
+func TestOpinionatedInventoryUsesHorizontalFilterTabs(t *testing.T) {
+	window := InventoryBagWindow{}
+	rows := window.filterRows(Context{})
+	rows.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(float32(opinionatedFrameW()), float32(inventoryBagFilterH))))
+	children := rows.Children()
+	if len(children) == 1 {
+		if _, ok := children[0].(*tabWidget); !ok {
+			children = children[0].Children()
+		}
+	}
+	seen := 0
+	for _, child := range children {
+		{
+			tab, ok := child.(*tabWidget)
+			if !ok {
+				t.Fatalf("filter child = %T, want *tabWidget", child)
+			}
+			if tab.cfg.labelRotation != rotheme.TextRotationNone {
+				t.Fatalf("tab %q is still rotated", tab.cfg.label)
+			}
+			if seen >= len(opinionatedInventoryTabs) || tab.cfg.label != opinionatedInventoryTabs[seen].label {
+				t.Fatalf("tab %d label = %q", seen, tab.cfg.label)
+			}
+			seen++
+		}
+	}
+	if seen != len(opinionatedInventoryTabs) {
+		t.Fatalf("saw %d tabs, want %d", seen, len(opinionatedInventoryTabs))
+	}
+}
+
 func TestStorageVerticalTabsFitTableHeight(t *testing.T) {
 	column := (&StorageWindow{}).tabColumn(Context{})
 	column.Layout(widget.NewContext(), geometry.Tight(geometry.Sz(float32(storageTabRailW), float32(storageTableViewH))))
