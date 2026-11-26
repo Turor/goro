@@ -18,7 +18,6 @@ var (
 	inventoryBagCols                     = 8
 	opinionatedBagCols                   = 13
 	opinionatedSplitCols                 = 6
-	opinionatedTabDragSlop               = 4
 	inventoryBagSplitFrame               = 4
 	inventoryBagSearchClear              = 16
 	inventoryBagSearchInset              = 6
@@ -63,7 +62,7 @@ func init() {
 	s.Int("cols", &inventoryBagCols, 1, 16, "inventory columns")
 	s.Int("opinionated_cols", &opinionatedBagCols, 4, 16, "opinionated inventory columns")
 	s.Int("split_cols", &opinionatedSplitCols, 1, 8, "columns in each split inventory pane")
-	s.Int("tab_drag_slop", &opinionatedTabDragSlop, 1, 16, "pointer travel that turns a tab click into a window drag")
+	s.Int("tab_drag_slop", &windowDragSlop, 1, 16, "pointer travel that turns a tab click into a window drag")
 	s.Int("split_frame", &inventoryBagSplitFrame, 1, 16, "thin frame between split inventory panes")
 	s.Int("search_clear", &inventoryBagSearchClear, 8, 32, "opinionated search clear mark width")
 	s.Int("search_inset", &inventoryBagSearchInset, 0, 24, "opinionated search bar inset")

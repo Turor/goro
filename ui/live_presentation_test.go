@@ -48,6 +48,10 @@ func TestLivePresentationDefersRebuildUntilWindowDragEnds(t *testing.T) {
 
 			ctx.Input.SetMousePosition(20, 25)
 			ctx.Input.SetMouseButton(input.MouseButtonLeft, true)
+			if !update() {
+				t.Fatal("drag press was not consumed")
+			}
+			dragPastGrace(ctx.Input)
 			if !update() || !app.WindowDragActive() {
 				t.Fatal("failed to start captured window drag")
 			}

@@ -1504,7 +1504,7 @@ func (r *runner) beginUIDragLayer(token any, rect geometry.Rect) bool {
 	if r == nil || token == nil || rect.IsEmpty() || r.uiDrag.active {
 		return false
 	}
-	capture := r.captureUIImageRect(rect)
+	capture := r.captureDragLayer(token, rect)
 	if capture.image == nil {
 		return false
 	}
@@ -1553,6 +1553,163 @@ func (r *runner) completeUIDragLayerRelease() {
 	if r != nil && r.uiDrawnOnce && r.uiImage != nil && r.uiDrag.active && r.uiDrag.releasePending {
 		r.setUIDragLayer(uiDragLayer{})
 	}
+}
+
+// dragWindowDrawer is the published overlay. Its Draw paints only that
+// window, so the ghost cannot include a window that was painted on top.
+type dragWindowDrawer interface {
+	Draw(widget.Context, widget.Canvas)
+	Bounds() geometry.Rect
+}
+
+func (r *runner) captureDragLayer(token any, rect geometry.Rect) uiImageRectCapture {
+	drawer, isWindow := token.(dragWindowDrawer)
+	if !isWindow {
+		return r.captureUIImageRect(rect)
+	}
+	// The window was raised before this call and is still visible. Raster the
+	// current stack so the crop is that window on top, then paint the window
+	// itself over its bounds. A stale composite must not survive in that area.
+	rastered := r.rasterUIForDragCapture()
+	capture := r.captureUIImageRect(rect)
+	own := r.captureDraggedWindow(drawer)
+	if own == nil {
+		if rastered && capture.image != nil {
+			return capture
+		}
+		return uiImageRectCapture{}
+	}
+	if capture.image == nil {
+		return uiImageRectCapture{image: own, rect: drawer.Bounds()}
+	}
+	coverDragCapture(capture.image, capture.rect, drawer.Bounds(), own)
+	return capture
+}
+
+func (r *runner) rasterUIForDragCapture() bool {
+	if r == nil || r.ui == nil || r.uiCanvas == nil {
+		return false
+	}
+	win := r.ui.Window()
+	if win == nil {
+		return false
+	}
+	widget.MarkRedrawInTree(win.Root())
+	width, height := r.uiCanvas.Size()
+	if width <= 0 || height <= 0 {
+		return false
+	}
+	deviceScale := r.uiScale
+	if deviceScale <= 0 {
+		deviceScale = 1
+	}
+	drawn := false
+	if err := r.uiCanvas.Draw(func(cc *gg.Context) {
+		baseCanvas := uirender.NewCanvas(cc, width, height)
+		canvas := widget.Canvas(scaledImageCanvas{Canvas: baseCanvas, scale: float32(deviceScale)})
+		if textMode, ok := baseCanvas.(widget.TextModeController); ok {
+			textMode.SetTextMode(widget.TextModeVector)
+			defer textMode.SetTextMode(widget.TextModeAuto)
+		}
+		drawn = win.DrawTo(canvas)
+	}); err != nil || !drawn {
+		return false
+	}
+	if _, err := r.uiCanvas.Flush(); err != nil {
+		return false
+	}
+	r.updateUIImage()
+	return r.uiImage != nil
+}
+
+func (r *runner) captureDraggedWindow(drawer dragWindowDrawer) *Image {
+	if r == nil || r.app == nil || drawer == nil {
+		return nil
+	}
+	bounds := drawer.Bounds()
+	width := int(bounds.Width())
+	height := int(bounds.Height())
+	if width < 1 || height < 1 {
+		return nil
+	}
+	provider := r.app.GPUContextProvider()
+	if provider == nil {
+		return nil
+	}
+	deviceScale := r.uiScale
+	if deviceScale <= 0 {
+		deviceScale = 1
+	}
+	canvas, err := r.ensureOverlayCanvas(provider, width, height, deviceScale)
+	if err != nil {
+		return nil
+	}
+	if err := canvas.Draw(func(cc *gg.Context) {
+		base := uirender.NewCanvas(cc, width, height)
+		base.Clear(widget.RGBA8(0, 0, 0, 0))
+		if textMode, ok := base.(widget.TextModeController); ok {
+			textMode.SetTextMode(widget.TextModeVector)
+		}
+		shifted := localDragCanvas{
+			Canvas: scaledImageCanvas{Canvas: base, scale: float32(deviceScale)},
+			origin: bounds.Min,
+		}
+		drawer.Draw(widget.NewContext(), shifted)
+	}); err != nil {
+		return nil
+	}
+	if _, err := canvas.Flush(); err != nil {
+		return nil
+	}
+	return NewImageFromStraightAlpha(canvas.Context().ResizeTarget().ImageView())
+}
+
+// localDragCanvas draws a window whose screen origin is bounds.Min into a
+// canvas whose origin is the window's top-left.
+type localDragCanvas struct {
+	widget.Canvas
+	origin geometry.Point
+}
+
+func (c localDragCanvas) PushTransform(offset geometry.Point) {
+	c.Canvas.PushTransform(offset.Sub(c.origin))
+}
+
+func (c localDragCanvas) ScreenOriginBase() geometry.Point {
+	return c.origin
+}
+
+// coverDragCapture replaces the window's pixels in a region crop. The crop can
+// still hold a window that was painted on top last frame; the window's own
+// draw covers that area. Pixels outside the window, such as an attached menu,
+// stay in the crop.
+func coverDragCapture(dst *Image, dstRect, windowRect geometry.Rect, src *Image) {
+	if dst == nil || src == nil || dst.pix == nil || src.pix == nil || dstRect.Width() <= 0 || dstRect.Height() <= 0 {
+		return
+	}
+	db := dst.pix.Bounds()
+	scaleX := float64(db.Dx()) / float64(dstRect.Width())
+	scaleY := float64(db.Dy()) / float64(dstRect.Height())
+	x0 := int(math.Round(float64(windowRect.Min.X-dstRect.Min.X) * scaleX))
+	y0 := int(math.Round(float64(windowRect.Min.Y-dstRect.Min.Y) * scaleY))
+	x1 := int(math.Round(float64(windowRect.Max.X-dstRect.Min.X) * scaleX))
+	y1 := int(math.Round(float64(windowRect.Max.Y-dstRect.Min.Y) * scaleY))
+	target := image.Rect(x0, y0, x1, y1).Intersect(db)
+	if target.Empty() {
+		return
+	}
+	sb := src.pix.Bounds()
+	if sb.Empty() {
+		return
+	}
+	for y := target.Min.Y; y < target.Max.Y; y++ {
+		sy := sb.Min.Y + (y-target.Min.Y)*sb.Dy()/target.Dy()
+		for x := target.Min.X; x < target.Max.X; x++ {
+			sx := sb.Min.X + (x-target.Min.X)*sb.Dx()/target.Dx()
+			dst.pix.SetRGBA(x, y, src.pix.RGBAAt(sx, sy))
+		}
+	}
+	dst.version++
 }
 
 func (r *runner) captureUIImageRect(rect geometry.Rect) uiImageRectCapture {

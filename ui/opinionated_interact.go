@@ -39,15 +39,7 @@ func (w *InventoryBagWindow) tabClickAllowed(ctx Context) bool {
 	if w == nil || !w.tabPressed || ctx.Input == nil {
 		return true
 	}
-	dx := ctx.Input.MouseX - w.tabPressX
-	dy := ctx.Input.MouseY - w.tabPressY
-	if dx < 0 {
-		dx = -dx
-	}
-	if dy < 0 {
-		dy = -dy
-	}
-	return dx < opinionatedTabDragSlop && dy < opinionatedTabDragSlop
+	return pointerWithinDragGrace(w.tabPressX, w.tabPressY, ctx.Input.MouseX, ctx.Input.MouseY)
 }
 
 func (w *InventoryBagWindow) gridForPane(pane int) *inventoryGridWidget {

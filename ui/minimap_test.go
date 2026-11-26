@@ -113,6 +113,8 @@ func TestMinimapDragsFromTitleBar(t *testing.T) {
 
 	inputState.SetMousePosition(startX+12, startY+10)
 	inputState.SetMouseButton(input.MouseButtonLeft, true)
+	m.Update(ctx)
+	dragPastGrace(inputState)
 	if !m.Update(ctx) {
 		t.Fatal("minimap title press did not start a drag")
 	}

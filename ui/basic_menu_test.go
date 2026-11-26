@@ -183,10 +183,16 @@ func testCharacterDragKeepsAttachedBasicMenuOnScreen(t *testing.T, collapsed, co
 		menu.toggleCollapsed()
 	}
 	menu.FollowCharacterWindow(ctx, &character)
-	inputState.SetMousePosition(character.x+10, character.y+5)
+	pressX, pressY := character.x+10, character.y+5
+	inputState.SetMousePosition(pressX, pressY)
 	inputState.SetMouseButton(input.MouseButtonLeft, true)
 	if !character.Update(ctx) {
 		t.Fatal("character window drag start was not consumed")
+	}
+	inputState.EndFrame()
+	inputState.SetMousePosition(pressX+windowDragSlop, pressY)
+	if !character.Update(ctx) {
+		t.Fatal("character window did not drag past the grace distance")
 	}
 	menu.FollowCharacterWindow(ctx, &character)
 	if !character.dragLayer || app.beginToken != character.positionedOverlay() {
@@ -194,8 +200,8 @@ func testCharacterDragKeepsAttachedBasicMenuOnScreen(t *testing.T, collapsed, co
 	}
 	_, menuHeight := basicMenuSize(collapsed)
 	wantStartRect := geometry.NewRect(
-		float32(character.x),
-		float32(character.y),
+		float32(pressX-10),
+		float32(pressY-5),
 		float32(character.width),
 		float32(character.height+basicMenuFollowGap+menuHeight),
 	)
@@ -205,6 +211,7 @@ func testCharacterDragKeepsAttachedBasicMenuOnScreen(t *testing.T, collapsed, co
 	if !character.positionedOverlay().hidden || !menu.positionedOverlay().hidden {
 		t.Fatal("group drag left a source overlay visible behind the immediate layer")
 	}
+	app.moves = nil
 	inputState.EndFrame()
 	inputState.SetMousePosition(700, 1000)
 	if !character.Update(ctx) {

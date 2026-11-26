@@ -22,6 +22,9 @@ var (
 	windowResizeGrip      = 12
 	windowMinWidth        = 160
 	windowMinHeight       = 64
+	// windowDragSlop is how far the pointer may travel before a press in the
+	// drag bounds becomes a drag. A release inside this distance is a click.
+	windowDragSlop = 4
 )
 
 func init() {
@@ -30,6 +33,7 @@ func init() {
 	s.Float("dirty_padding", &windowDirtyPadding, 0, 16, "extra pixels invalidated around a moved window")
 	s.Int("title_button_size", &windowTitleButtonSize, 8, 64, "title bar button width")
 	s.Int("resize_grip", &windowResizeGrip, 8, 32, "bottom-right resize grip")
+	s.Int("drag_slop", &windowDragSlop, 1, 16, "pointer travel before a press becomes a window drag")
 	s.Int("min_width", &windowMinWidth, 80, 640, "smallest resized window width")
 	s.Int("min_height", &windowMinHeight, 40, 480, "smallest resized window height")
 	rotheme.OnLayoutApplied(recomputeWindowScreenMargins)
