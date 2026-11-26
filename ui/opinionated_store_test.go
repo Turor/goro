@@ -36,39 +36,32 @@ func TestOpinionatedDropOnStorageStoresWhileTheWindowBlocksThePointer(t *testing
 		t.Fatal("drop on the storage pane was ignored")
 	}
 	got := readStorePacket(t, packets)
-	want := network.BuildMoveToStoragePacketForClientDate(7, 3, 20250716)
+	want := network.BuildStorageMovePacket(network.StorageWherePersonal, network.StorageActionDeposit, 7, 3)
 	if string(got) != string(want) {
 		t.Fatalf("stored packet %x, want %x", got, want)
 	}
 }
 
-func TestOpinionatedDropOpensStorageThenStores(t *testing.T) {
+func TestOpinionatedDropStoresWithoutOpeningStorage(t *testing.T) {
 	client, packets := connectedStoreClient(t)
 	window := storageDropWindow()
 	window.dragActive = true
 	window.dragPane = opinionatedPaneBag
 	window.dragItem = session.InventoryItem{Index: 7, ItemID: 501, Amount: 1, Type: db.ItemTypeWeapon}
-	sessionState := &session.Session{OpinionatedUI: true}
 	ctx := Context{
-		Session: sessionState,
+		Session: &session.Session{OpinionatedUI: true},
 		Input:   &input.State{MouseX: opinionatedSideViewW() + opinionatedMiddleW() + 4, MouseY: inventoryOpinionatedChromeH() + 4},
 		Network: client,
 	}
 	if !window.UpdateDrag(ctx, nil, nil, nil, nil, nil) {
-		t.Fatal("drop did not ask storage to open")
+		t.Fatal("drop on the storage pane was ignored")
 	}
-	if window.pendingStore.Index != 7 || window.pendingStoreAmount != 1 {
-		t.Fatalf("pending store = %+v amount %d", window.pendingStore, window.pendingStoreAmount)
+	if window.pendingStoreAmount != 0 {
+		t.Fatal("drop waited for storage to open")
 	}
-	opened := readStorePacket(t, packets)
-	if indexOf(opened, []byte("@storage")) < 0 {
-		t.Fatalf("open packet %q, want @storage", opened)
-	}
-	sessionState.Storage.Open = true
-	window.UpdatePresentation(ctx, nil)
 	got := readStorePacket(t, packets)
-	want := network.BuildMoveToStoragePacketForClientDate(7, 1, 20250716)
-	if len(got) < len(want) || string(got[:len(want)]) != string(want) {
+	want := network.BuildStorageMovePacket(network.StorageWherePersonal, network.StorageActionDeposit, 7, 1)
+	if string(got) != string(want) {
 		t.Fatalf("stored packet %x, want %x", got, want)
 	}
 }

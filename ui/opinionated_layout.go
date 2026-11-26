@@ -272,10 +272,8 @@ func opinionatedMoveAllowed(ctx Context, source int) bool {
 	switch source {
 	case opinionatedSourceCart:
 		return true
-	case opinionatedSourceStorage:
-		return ctx.Session != nil && ctx.Session.Storage.Open && !ctx.Session.GuildStorage.Open
-	case opinionatedSourceGuild:
-		return ctx.Session != nil && ctx.Session.GuildStorage.Open
+	case opinionatedSourceStorage, opinionatedSourceGuild:
+		return ctx.Session != nil && ctx.Network != nil
 	default:
 		return false
 	}
@@ -292,6 +290,9 @@ func opinionatedPromptAmount(item session.InventoryItem) (uint16, bool) {
 
 func (w *InventoryBagWindow) sendTransfer(ctx Context, item session.InventoryItem, from, to int, amount uint16) {
 	if amount == 0 {
+		return
+	}
+	if w.sendQuietStorageMove(ctx, item, from, to, amount) {
 		return
 	}
 	if from == opinionatedPaneOther && to == opinionatedPaneBag {

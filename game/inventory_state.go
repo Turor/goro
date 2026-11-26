@@ -60,7 +60,6 @@ func applyStorageAmount(ctx client.Context, amount network.StorageAmount) {
 		ctx.Session.GuildStorage.MaxAmount = int(amount.MaxAmount)
 		return
 	}
-	ctx.Session.Storage.Open = !ctx.Session.Storage.PasswordPending
 	ctx.Session.Storage.Amount = int(amount.Amount)
 	ctx.Session.Storage.MaxAmount = int(amount.MaxAmount)
 }
@@ -85,7 +84,9 @@ func applyStorageItemAdded(ctx client.Context, item network.InventoryItem) {
 		addOrReplaceSessionGuildStorageItem(ctx.Session, sessionItemFromNetwork(item))
 		return
 	}
-	ctx.Session.Storage.Open = !ctx.Session.Storage.PasswordPending
+	if !ctx.Session.Storage.Open || ctx.Session.Storage.PasswordPending {
+		return
+	}
 	addOrReplaceSessionStorageItem(ctx.Session, sessionItemFromNetwork(item))
 }
 
@@ -98,8 +99,14 @@ func applyCartItemAdded(ctx client.Context, item network.InventoryItem) {
 }
 
 func applyStorageItemRemoved(ctx client.Context, item network.StorageItemRemoved) {
-	if ctx.Session != nil && ctx.Session.GuildStorage.Open {
+	if ctx.Session == nil {
+		return
+	}
+	if ctx.Session.GuildStorage.Open {
 		removeSessionGuildStorageItem(ctx.Session, item.Index, int(item.Amount))
+		return
+	}
+	if !ctx.Session.Storage.Open {
 		return
 	}
 	removeSessionStorageItem(ctx.Session, item.Index, int(item.Amount))

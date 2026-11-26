@@ -62,6 +62,9 @@ func (m *WorldMode) handleNetworkPackets(ctx client.Context, now time.Time) (Mod
 // result stops the current frame when the packet changes modes or starts a map
 // transition.
 func (m *WorldMode) handleNetworkPacket(ctx client.Context, pkt network.Packet, now time.Time) (Mode, bool) {
+	if m.handleQuietStorage(ctx, pkt) {
+		return nil, false
+	}
 	if gm.HandlePacket(pkt, &m.ui.console) {
 		return nil, false
 	}

@@ -1,8 +1,8 @@
 package ui
 
 import (
-	"github.com/kivutar/goro/client"
 	"github.com/kivutar/goro/glog"
+	"github.com/kivutar/goro/network"
 	"github.com/kivutar/goro/session"
 )
 
@@ -67,33 +67,47 @@ func (w *InventoryBagWindow) requestSourceOpen(ctx Context, source int) {
 	if w == nil || ctx.Network == nil {
 		return
 	}
-	w.storageReleaseSent = false
+	where, ok := quietStorageWhere(source)
+	if !ok {
+		return
+	}
+	if err := ctx.Network.SendStorageMove(where, network.StorageActionList, 0, 1); err != nil {
+		glog.Warnf("storage list failed: %v", err)
+	}
+}
+
+func quietStorageWhere(source int) (byte, bool) {
 	switch source {
 	case opinionatedSourceStorage:
-		if ctx.Session != nil && ctx.Session.Storage.Open && !ctx.Session.GuildStorage.Open {
-			return
-		}
-		if ctx.Session != nil && ctx.Session.GuildStorage.Open {
-			if err := ctx.Network.SendCloseStorage(); err != nil {
-				glog.Warnf("close guild storage before kafra failed: %v", err)
-			}
-		}
-		if err := client.SendChat(ctx, "@storage"); err != nil {
-			glog.Warnf("open storage failed: %v", err)
-		}
+		return network.StorageWherePersonal, true
 	case opinionatedSourceGuild:
-		if ctx.Session != nil && ctx.Session.GuildStorage.Open {
-			return
-		}
-		if ctx.Session != nil && ctx.Session.Storage.Open {
-			if err := ctx.Network.SendCloseStorage(); err != nil {
-				glog.Warnf("close kafra before guild storage failed: %v", err)
-			}
-		}
-		if err := client.SendChat(ctx, "@gstorage"); err != nil {
-			glog.Warnf("open guild storage failed: %v", err)
-		}
+		return network.StorageWhereGuild, true
+	default:
+		return 0, false
 	}
+}
+
+func (w *InventoryBagWindow) sendQuietStorageMove(ctx Context, item session.InventoryItem, from, to int, amount uint16) bool {
+	if w == nil || !w.storageSource() || ctx.Network == nil {
+		return false
+	}
+	deposit := from == opinionatedPaneBag && to == opinionatedPaneOther
+	withdraw := from == opinionatedPaneOther && to == opinionatedPaneBag
+	if !deposit && !withdraw {
+		return false
+	}
+	where, ok := quietStorageWhere(w.source)
+	if !ok {
+		return false
+	}
+	action := network.StorageActionDeposit
+	if withdraw {
+		action = network.StorageActionWithdraw
+	}
+	if err := ctx.Network.SendStorageMove(where, action, item.Index, uint32(amount)); err != nil {
+		glog.Warnf("storage move failed: %v", err)
+	}
+	return true
 }
 
 func (w *InventoryBagWindow) releaseServerStorage(ctx Context) {

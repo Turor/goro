@@ -25,17 +25,11 @@ func TestOpinionatedWithdrawQueuesUntilStorageOpens(t *testing.T) {
 	if !window.UpdateDrag(ctx, nil, nil, nil, nil, nil) {
 		t.Fatal("drop on the inventory pane was ignored")
 	}
-	if window.pendingWithdraw.Index != 4 {
-		t.Fatalf("pending withdraw = %+v", window.pendingWithdraw)
+	if window.pendingWithdrawAmount != 0 {
+		t.Fatal("withdraw waited for storage to open")
 	}
-	opened := readStorePacket(t, packets)
-	if indexOf(opened, []byte("@storage")) < 0 {
-		t.Fatalf("open packet %q, want @storage", opened)
-	}
-	ctx.Session.Storage.Open = true
-	window.flushPendingStore(ctx)
 	got := readStorePacket(t, packets)
-	want := network.BuildMoveFromStoragePacketForClientDate(4, 1, 20250716)
+	want := network.BuildStorageMovePacket(network.StorageWherePersonal, network.StorageActionWithdraw, 4, 1)
 	if string(got) != string(want) {
 		t.Fatalf("withdraw packet %x, want %x", got, want)
 	}

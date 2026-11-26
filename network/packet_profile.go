@@ -40,6 +40,8 @@ func PacketLengths20250716() LengthTable {
 // in the same PR as the plugin. 0x0EF1 is also a client-to-server opcode (the
 // stable homunculus request); both directions use length 6.
 var turoranCustomLengths = LengthTable{
+	0x0EE3: 18, // ZC_TURORAN_STORAGE_RESULT (turoran_storage_move)
+	0x0EE4: -1, // ZC_TURORAN_STORAGE_LIST (turoran_storage_move)
 	0x0EE8: -1, // ZC_ITEM_MARKS_LIST (turoran_item_marks), opt-in
 	0x0EE9: 7,  // ZC_ITEM_MARK_RESULT (turoran_item_marks)
 	0x0EF1: 6,  // ZC_TURORAN_FEATURES (turoran_item_marks), every client after every map load
