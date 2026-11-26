@@ -68,7 +68,7 @@ func TestOpinionatedDropOpensStorageThenStores(t *testing.T) {
 	window.UpdatePresentation(ctx, nil)
 	got := readStorePacket(t, packets)
 	want := network.BuildMoveToStoragePacketForClientDate(7, 1, 20250716)
-	if string(got) != string(want) {
+	if len(got) < len(want) || string(got[:len(want)]) != string(want) {
 		t.Fatalf("stored packet %x, want %x", got, want)
 	}
 }

@@ -22,7 +22,20 @@ func (w *InventoryBagWindow) queueStore(item session.InventoryItem, amount uint1
 	w.pendingStoreSource = w.source
 }
 
+func (w *InventoryBagWindow) queueWithdraw(item session.InventoryItem, amount uint16) {
+	if w == nil {
+		return
+	}
+	w.pendingWithdraw = item
+	w.pendingWithdrawAmount = uint32(amount)
+	if w.pendingWithdrawAmount == 0 {
+		w.pendingWithdrawAmount = opinionatedMoveAmount(item)
+	}
+	w.pendingWithdrawSource = w.source
+}
+
 func (w *InventoryBagWindow) flushPendingStore(ctx Context) {
+	w.flushPendingWithdraw(ctx)
 	if w == nil || w.pendingStoreAmount == 0 || w.source != w.pendingStoreSource {
 		return
 	}
@@ -34,6 +47,20 @@ func (w *InventoryBagWindow) flushPendingStore(ctx Context) {
 	w.pendingStore = session.InventoryItem{}
 	w.pendingStoreAmount = 0
 	opinionatedDepositAmount(ctx, w.source, item, amount)
+}
+
+func (w *InventoryBagWindow) flushPendingWithdraw(ctx Context) {
+	if w == nil || w.pendingWithdrawAmount == 0 || w.source != w.pendingWithdrawSource {
+		return
+	}
+	if !opinionatedMoveAllowed(ctx, w.source) {
+		return
+	}
+	item := w.pendingWithdraw
+	amount := w.pendingWithdrawAmount
+	w.pendingWithdraw = session.InventoryItem{}
+	w.pendingWithdrawAmount = 0
+	opinionatedWithdrawAmount(ctx, w.source, item, amount)
 }
 
 func (w *InventoryBagWindow) requestSourceOpen(ctx Context, source int) {
@@ -70,7 +97,7 @@ func (w *InventoryBagWindow) requestSourceOpen(ctx Context, source int) {
 }
 
 func (w *InventoryBagWindow) releaseServerStorage(ctx Context) {
-	if w == nil || !w.HidesClassicStorage() || w.pendingStoreAmount != 0 || ctx.Network == nil || ctx.Session == nil {
+	if w == nil || !w.HidesClassicStorage() || w.pendingStoreAmount != 0 || w.pendingWithdrawAmount != 0 || ctx.Network == nil || ctx.Session == nil {
 		return
 	}
 	if !ctx.Session.Storage.Open && !ctx.Session.GuildStorage.Open {

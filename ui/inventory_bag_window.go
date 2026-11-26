@@ -84,39 +84,43 @@ const opinionatedBagTabFavorite = opinionatedBagTabCard + 1
 
 type InventoryBagWindow struct {
 	Window
-	layoutGen          uint64
-	tab                int
-	opinionated        bool
-	search             string
-	sort               int
-	source             int
-	resources          *res.Manager
-	scrollY            state.Signal[float32]
-	scrollYSide        state.Signal[float32]
-	dragPane           int
-	pendingStore       session.InventoryItem
-	pendingStoreAmount uint32
-	pendingStoreSource int
-	storageReleaseSent bool
-	snapshot           string
-	itemInfo           *ItemWindows
-	lastClickItem      uint16
-	lastClickAt        time.Time
-	dragItem           session.InventoryItem
-	dragActive         bool
-	dragFrom           time.Time
-	amountPrompt       amountPrompt
-	pendingCard        uint16
-	tooltip            tooltipState
-	icons              map[inventoryBagIconKey]image.Image
-	iconMiss           map[inventoryBagIconKey]struct{}
-	searchCtx          Context
-	searchField        *textfield.Widget
-	searchBox          *inventorySearchBox
-	searchArmed        bool
-	centerSources      int
-	bagGrid            *inventoryGridWidget
-	sideGrid           *inventoryGridWidget
+	layoutGen             uint64
+	tab                   int
+	opinionated           bool
+	search                string
+	sort                  int
+	source                int
+	resources             *res.Manager
+	scrollY               state.Signal[float32]
+	scrollYSide           state.Signal[float32]
+	dragPane              int
+	pendingStore          session.InventoryItem
+	pendingStoreAmount    uint32
+	pendingStoreSource    int
+	pendingWithdraw       session.InventoryItem
+	pendingWithdrawAmount uint32
+	pendingWithdrawSource int
+	storageReleaseSent    bool
+	chromeKey             string
+	snapshot              string
+	itemInfo              *ItemWindows
+	lastClickItem         uint16
+	lastClickAt           time.Time
+	dragItem              session.InventoryItem
+	dragActive            bool
+	dragFrom              time.Time
+	amountPrompt          amountPrompt
+	pendingCard           uint16
+	tooltip               tooltipState
+	icons                 map[inventoryBagIconKey]image.Image
+	iconMiss              map[inventoryBagIconKey]struct{}
+	searchCtx             Context
+	searchField           *textfield.Widget
+	searchBox             *inventorySearchBox
+	searchArmed           bool
+	centerSources         int
+	bagGrid               *inventoryGridWidget
+	sideGrid              *inventoryGridWidget
 }
 
 type inventoryBagIconKey struct {
@@ -199,6 +203,14 @@ func (w *InventoryBagWindow) UpdatePresentation(ctx Context, itemInfo *ItemWindo
 		w.snapshot = ""
 	}
 	if snapshot != w.snapshot || itemInfo != w.itemInfo {
+		chrome := w.inventoryChromeKey()
+		if w.bagGrid != nil && chrome == w.chromeKey {
+			w.snapshot = snapshot
+			w.itemInfo = itemInfo
+			w.syncSearchGrids(ctx)
+			return
+		}
+		w.chromeKey = chrome
 		if w.searchField != nil && w.searchField.IsFocused() && w.bagGrid != nil {
 			w.snapshot = snapshot
 			w.itemInfo = itemInfo
@@ -652,6 +664,7 @@ func (w *InventoryBagWindow) categoryStrip(ctx Context) widget.Widget {
 func (w *InventoryBagWindow) refresh(ctx Context, itemInfo *ItemWindows) {
 	w.hideTooltip()
 	w.ClampScroll(ctx.Session)
+	w.chromeKey = w.inventoryChromeKey()
 	w.snapshot = w.inventorySnapshot(ctx.Session)
 	w.itemInfo = itemInfo
 	w.SetContent(w.widgetTree(ctx, itemInfo))
@@ -935,6 +948,13 @@ func (w *InventoryBagWindow) sortOpinionated(items []session.InventoryItem) {
 			return items[i].Index < items[j].Index
 		})
 	}
+}
+
+func (w *InventoryBagWindow) inventoryChromeKey() string {
+	if w == nil {
+		return ""
+	}
+	return fmt.Sprintf("%d|%t|%s|%d|%d", w.tab, w.opinionated, w.search, w.sort, w.source)
 }
 
 func (w *InventoryBagWindow) inventorySnapshot(s *session.Session) string {

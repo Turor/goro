@@ -193,9 +193,8 @@ func (w *InventoryBagWindow) startPaneDrag(ctx Context, item session.InventoryIt
 	w.hideTooltip()
 	now := time.Now()
 	if pane == opinionatedPaneOther && w.lastClickItem == item.Index && now.Sub(w.lastClickAt) <= 360*time.Millisecond {
-		opinionatedWithdraw(ctx, w.source, item)
+		w.requestTransfer(ctx, item, pane, opinionatedPaneBag, true)
 		w.lastClickItem = 0
-		w.refresh(ctx, w.itemInfo)
 		return
 	}
 	if pane == opinionatedPaneBag && w.lastClickItem == item.Index && now.Sub(w.lastClickAt) <= 360*time.Millisecond {
@@ -248,7 +247,9 @@ func (w *InventoryBagWindow) requestTransfer(ctx Context, item session.Inventory
 		return
 	}
 	if !w.transferAllowed(ctx) {
-		if from != opinionatedPaneBag || to != opinionatedPaneOther || !w.storageSource() {
+		withdraw := from == opinionatedPaneOther && to == opinionatedPaneBag
+		deposit := from == opinionatedPaneBag && to == opinionatedPaneOther
+		if (!withdraw && !deposit) || !w.storageSource() {
 			return
 		}
 		w.requestSourceOpen(ctx, w.source)
@@ -294,6 +295,10 @@ func (w *InventoryBagWindow) sendTransfer(ctx Context, item session.InventoryIte
 		return
 	}
 	if from == opinionatedPaneOther && to == opinionatedPaneBag {
+		if !opinionatedMoveAllowed(ctx, w.source) {
+			w.queueWithdraw(item, amount)
+			return
+		}
 		opinionatedWithdrawAmount(ctx, w.source, item, uint32(amount))
 		return
 	}
