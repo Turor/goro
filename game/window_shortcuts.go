@@ -41,7 +41,16 @@ func (m *WorldMode) windowShortcutAllowed(ctx client.Context, code input.KeyCode
 			return false
 		}
 	}
-	return !m.ui.nonConsoleKeyboardInputBlockedExcept(ctx, target)
+	// Settings is a checkbox panel. Leaving it open must not swallow Alt+I or Alt+S.
+	if m.ui.nonConsoleKeyboardInputBlockedExcept(ctx, target) {
+		if target == &m.ui.settingsWindow.Window || !m.ui.settingsWindow.IsOpen() {
+			return false
+		}
+		if m.ui.nonConsoleKeyboardInputBlockedExcept(ctx, &m.ui.settingsWindow.Window) {
+			return false
+		}
+	}
+	return true
 }
 
 func (m *WorldMode) toggleWindowFromInput(ctx client.Context) bool {

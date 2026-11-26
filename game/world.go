@@ -1048,10 +1048,9 @@ func (m *WorldMode) Update(ctx client.Context) (Mode, error) {
 	if m.ui.statsWindow.Update(ctx) {
 		return nil, nil
 	}
-	if !m.ui.keyboardInputBlocked(ctx) {
-		if m.ui.basicMenu.Update(ctx, m.basicMenuCallbacks(ctx)) {
-			return nil, nil
-		}
+	// The menu under the status window is HUD. A blocking window must not hide it.
+	if m.ui.basicMenu.Update(ctx, m.basicMenuCallbacks(ctx)) {
+		return nil, nil
 	}
 	m.ui.minimap.SetWorldMapOpener(func() { m.openWorldMap(ctx) })
 	minimapDragging := m.ui.minimap.Update(ctx)
